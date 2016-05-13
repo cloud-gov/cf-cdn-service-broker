@@ -2,27 +2,16 @@ package utils
 
 import (
 	"fmt"
-	"log"
-	"net"
-	"os"
-	"path"
-	"strings"
-
-	"crypto"
-	"crypto/rand"
-	"crypto/rsa"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"github.com/aws/aws-sdk-go/service/iam"
-	"github.com/aws/aws-sdk-go/service/s3"
 
 	"github.com/xenolf/lego/acme"
-)
 
-var bucket string = os.Getenv("CDN_BUCKET")
-var region string = os.Getenv("CDN_REGION")
+	"github.com/18F/cf-cdn-service-broker/config"
+)
 
 func CreateDistribution(domain string) (id string, err error) {
 	svc := cloudfront.New(session.New())
@@ -40,7 +29,7 @@ func CreateDistribution(domain string) (id string, err error) {
 					QueryString: aws.Bool(false),
 				},
 				MinTTL:         aws.Int64(0),
-				TargetOriginId: aws.String(fmt.Sprintf("s3-%s-%s", bucket, domain)),
+				TargetOriginId: aws.String(fmt.Sprintf("s3-%s-%s", config.Bucket, domain)),
 				TrustedSigners: &cloudfront.TrustedSigners{
 					Enabled:  aws.Bool(false),
 					Quantity: aws.Int64(0),
@@ -70,8 +59,8 @@ func CreateDistribution(domain string) (id string, err error) {
 				Quantity: aws.Int64(1),
 				Items: []*cloudfront.Origin{
 					{
-						DomainName: aws.String(fmt.Sprintf("%s.s3.amazonaws.com", bucket)),
-						Id:         aws.String(fmt.Sprintf("s3-%s-%s", bucket, domain)),
+						DomainName: aws.String(fmt.Sprintf("%s.s3.amazonaws.com", config.Bucket)),
+						Id:         aws.String(fmt.Sprintf("s3-%s-%s", config.Bucket, domain)),
 						S3OriginConfig: &cloudfront.S3OriginConfig{
 							OriginAccessIdentity: aws.String(""),
 						},
@@ -87,99 +76,6 @@ func CreateDistribution(domain string) (id string, err error) {
 	}
 
 	return *resp.Distribution.Id, nil
-}
-
-type User struct {
-	Email        string
-	Registration *acme.RegistrationResource
-	key          crypto.PrivateKey
-}
-
-func (u User) GetEmail() string {
-	return u.Email
-}
-
-func (u User) GetRegistration() *acme.RegistrationResource {
-	return u.Registration
-}
-
-func (u User) GetPrivateKey() crypto.PrivateKey {
-	return u.key
-}
-
-type HTTPProvider struct{}
-
-func (*HTTPProvider) Present(domain, token, keyAuth string) error {
-	svc := s3.New(session.New(&aws.Config{Region: aws.String(region)}))
-
-	_, err := svc.PutObject(&s3.PutObjectInput{
-		Bucket: aws.String(bucket),
-		Body:   strings.NewReader(keyAuth),
-		Key:    aws.String(path.Join(".well-known", "acme-challenge", token)),
-	})
-
-	return err
-}
-
-func (*HTTPProvider) CleanUp(domain, token, keyAuth string) error {
-	svc := s3.New(session.New(&aws.Config{Region: aws.String(region)}))
-
-	_, err := svc.DeleteObject(&s3.DeleteObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(path.Join(".well-known", "acme-challenge", token)),
-	})
-
-	return err
-}
-
-func ObtainCertificate(domain string) (certificates acme.CertificateResource, failures map[string]error) {
-	keySize := 2048
-	key, err := rsa.GenerateKey(rand.Reader, keySize)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	user := User{
-		Email: os.Getenv("CDN_EMAIL"),
-		key:   key,
-	}
-	client, err := acme.NewClient(os.Getenv("CDN_ACME_URL"), &user, acme.RSA2048)
-
-	client.SetChallengeProvider(acme.HTTP01, &HTTPProvider{})
-	client.ExcludeChallenges([]acme.Challenge{acme.DNS01, acme.TLSSNI01})
-
-	reg, err := client.Register()
-	user.Registration = reg
-
-	err = client.AgreeToTOS()
-
-	domains := []string{domain}
-	certificate, failures := client.ObtainCertificate(domains, false, nil)
-
-	if len(failures) > 0 {
-		return acme.CertificateResource{}, failures
-	}
-
-	return certificate, failures
-}
-
-func CheckCNAME(domain string) bool {
-	cname, err := net.LookupCNAME(domain)
-	if err != nil {
-		return false
-	}
-	return strings.Contains(cname, ".cloudfront.net")
-}
-
-func CheckDistribution(distId string) bool {
-	svc := cloudfront.New(session.New())
-	resp, err := svc.GetDistribution(&cloudfront.GetDistributionInput{
-		Id: aws.String(distId),
-	})
-	if err != nil {
-		return false
-	}
-	return *resp.Distribution.Status == "Deployed" && *resp.Distribution.DistributionConfig.Enabled
 }
 
 func UploadCert(domain string, cert acme.CertificateResource) (id string, err error) {
