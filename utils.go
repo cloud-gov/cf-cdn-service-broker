@@ -122,7 +122,14 @@ func (*HTTPProvider) Present(domain, token, keyAuth string) error {
 }
 
 func (*HTTPProvider) CleanUp(domain, token, keyAuth string) error {
-	return nil
+	svc := s3.New(session.New(&aws.Config{Region: aws.String(region)}))
+
+	_, err := svc.DeleteObject(&s3.DeleteObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(path.Join(".well-known", "acme-challenge", token)),
+	})
+
+	return err
 }
 
 func ObtainCertificate(domain string) (certificates acme.CertificateResource, failures map[string]error) {
@@ -136,7 +143,7 @@ func ObtainCertificate(domain string) (certificates acme.CertificateResource, fa
 		Email: os.Getenv("CDN_EMAIL"),
 		key:   key,
 	}
-	client, err := acme.NewClient("https://acme-staging.api.letsencrypt.org/directory", &user, acme.RSA2048)
+	client, err := acme.NewClient(os.Getenv("CDN_ACME_URL"), &user, acme.RSA2048)
 
 	client.SetChallengeProvider(acme.HTTP01, &HTTPProvider{})
 	client.ExcludeChallenges([]acme.Challenge{acme.DNS01, acme.TLSSNI01})
@@ -221,7 +228,52 @@ func DeployCert(certId, distId string) error {
 	return nil
 }
 
-// func main() {
-// 	id, err := CreateDistribution("test.org")
-// 	cert, failures := ObtainCertificate("test.org")
-// }
+func AddHTTPOrigin(distId, domain string) error {
+	svc := cloudfront.New(session.New())
+
+	resp, err := svc.GetDistributionConfig(&cloudfront.GetDistributionConfigInput{
+		Id: aws.String(distId),
+	})
+	if err != nil {
+		return err
+	}
+
+	DistributionConfig, ETag := resp.DistributionConfig, resp.ETag
+	Origins := DistributionConfig.Origins
+
+	origin := &cloudfront.Origin{
+		DomainName: aws.String(domain),
+		Id:         aws.String(fmt.Sprintf("cdn-route:%s", domain)),
+		OriginPath: aws.String(""),
+		CustomHeaders: &cloudfront.CustomHeaders{
+			Quantity: aws.Int64(0),
+		},
+		CustomOriginConfig: &cloudfront.CustomOriginConfig{
+			HTTPPort:             aws.Int64(80),
+			HTTPSPort:            aws.Int64(443),
+			OriginProtocolPolicy: aws.String("https-only"),
+			OriginSslProtocols: &cloudfront.OriginSslProtocols{
+				Quantity: aws.Int64(3),
+				Items: []*string{
+					aws.String("TLSv1"),
+					aws.String("TLSv1.1"),
+					aws.String("TLSv1.2"),
+				},
+			},
+		},
+	}
+
+	Origins.Quantity = aws.Int64(*Origins.Quantity + 1)
+	Origins.Items = append(Origins.Items, origin)
+
+	_, err = svc.UpdateDistribution(&cloudfront.UpdateDistributionInput{
+		Id:                 aws.String(distId),
+		IfMatch:            ETag,
+		DistributionConfig: DistributionConfig,
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
