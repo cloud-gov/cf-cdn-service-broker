@@ -17,21 +17,23 @@ import (
 
 type Route struct {
 	gorm.Model
+	InstanceId  string `gorm:"unique_index"`
+	Pending     bool   `gorm:"index"`
 	Domain      string
 	DistId      string
-	Pending     bool `gorm:"index"`
 	Certificate Certificate
 }
 
-func NewRoute(db *gorm.DB, domain string) (Route, error) {
+func NewRoute(db *gorm.DB, instanceId, domain string) (Route, error) {
 	distId, err := utils.CreateDistribution(domain)
 	if err != nil {
 		return Route{}, err
 	}
 	route := Route{
-		Domain:  domain,
-		DistId:  distId,
-		Pending: true,
+		InstanceId: instanceId,
+		Domain:     domain,
+		DistId:     distId,
+		Pending:    true,
 	}
 	db.Create(&route)
 	return route, nil
@@ -68,10 +70,6 @@ func (r *Route) provisionCert() (acme.CertificateResource, error) {
 		return acme.CertificateResource{}, err
 	}
 	err = utils.DeployCert(certId, r.DistId)
-	if err != nil {
-		return acme.CertificateResource{}, err
-	}
-	err = utils.AddHTTPOrigin(r.DistId, r.Domain)
 	if err != nil {
 		return acme.CertificateResource{}, err
 	}

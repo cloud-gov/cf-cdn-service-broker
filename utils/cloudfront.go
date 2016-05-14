@@ -124,7 +124,7 @@ func DeployCert(certId, distId string) error {
 	return nil
 }
 
-func AddHTTPOrigin(distId, domain string) error {
+func BindHTTPOrigin(distId, domain string) error {
 	svc := cloudfront.New(session.New())
 
 	resp, err := svc.GetDistributionConfig(&cloudfront.GetDistributionConfigInput{
@@ -171,5 +171,9 @@ func AddHTTPOrigin(distId, domain string) error {
 		return err
 	}
 
+	return nil
+}
+
+func UnbindHTTPOrigin(distId, domain string) error {
 	return nil
 }
