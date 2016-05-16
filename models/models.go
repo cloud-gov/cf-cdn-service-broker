@@ -17,23 +17,25 @@ import (
 
 type Route struct {
 	gorm.Model
-	InstanceId  string `gorm:"unique_index"`
-	Pending     bool   `gorm:"index"`
-	Domain      string
-	DistId      string
-	Certificate Certificate
+	InstanceId     string `gorm:"unique_index"`
+	Pending        bool   `gorm:"index"`
+	DomainExternal string
+	DomainInternal string
+	DistId         string
+	Certificate    Certificate
 }
 
 func NewRoute(db *gorm.DB, instanceId, domain string) (Route, error) {
-	distId, err := utils.CreateDistribution(domain)
+	dist, err := utils.CreateDistribution(domain)
 	if err != nil {
 		return Route{}, err
 	}
 	route := Route{
-		InstanceId: instanceId,
-		Domain:     domain,
-		DistId:     distId,
-		Pending:    true,
+		InstanceId:     instanceId,
+		DomainExternal: domain,
+		DomainInternal: *dist.DomainName,
+		DistId:         *dist.Id,
+		Pending:        true,
 	}
 	db.Create(&route)
 	return route, nil
@@ -61,11 +63,11 @@ func (r *Route) Update(db *gorm.DB) error {
 }
 
 func (r *Route) provisionCert() (acme.CertificateResource, error) {
-	cert, err := utils.ObtainCertificate(r.Domain)
+	cert, err := utils.ObtainCertificate(r.DomainExternal)
 	if err != nil {
 		return acme.CertificateResource{}, err
 	}
-	certId, err := utils.UploadCert(r.Domain, cert)
+	certId, err := utils.UploadCert(r.DomainExternal, cert)
 	if err != nil {
 		return acme.CertificateResource{}, err
 	}
@@ -77,7 +79,7 @@ func (r *Route) provisionCert() (acme.CertificateResource, error) {
 }
 
 func (r *Route) checkCNAME() bool {
-	cname, err := net.LookupCNAME(r.Domain)
+	cname, err := net.LookupCNAME(r.DomainExternal)
 	if err != nil {
 		return false
 	}

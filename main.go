@@ -10,6 +10,7 @@ import (
 
 	"github.com/18F/cf-cdn-service-broker/broker"
 	"github.com/18F/cf-cdn-service-broker/config"
+	"github.com/18F/cf-cdn-service-broker/models"
 )
 
 func main() {
@@ -17,6 +18,8 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
+
+	db.AutoMigrate(&models.Route{}, &models.Certificate{})
 
 	broker := broker.CdnServiceBroker{DB: db}
 	logger := lager.NewLogger("cdn-service-broker")

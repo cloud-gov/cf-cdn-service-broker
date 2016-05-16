@@ -13,7 +13,7 @@ import (
 	"github.com/18F/cf-cdn-service-broker/config"
 )
 
-func CreateDistribution(domain string) (id string, err error) {
+func CreateDistribution(domain string) (*cloudfront.Distribution, error) {
 	svc := cloudfront.New(session.New())
 
 	params := &cloudfront.CreateDistributionInput{
@@ -78,10 +78,10 @@ func CreateDistribution(domain string) (id string, err error) {
 	resp, err := svc.CreateDistribution(params)
 
 	if err != nil {
-		return "", err
+		return &cloudfront.Distribution{}, err
 	}
 
-	return *resp.Distribution.Id, nil
+	return resp.Distribution, nil
 }
 
 func UploadCert(domain string, cert acme.CertificateResource) (id string, err error) {
