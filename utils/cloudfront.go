@@ -67,6 +67,12 @@ func CreateDistribution(domain string) (id string, err error) {
 					},
 				},
 			},
+			Aliases: &cloudfront.Aliases{
+				Quantity: aws.Int64(1),
+				Items: []*string{
+					aws.String(domain),
+				},
+			},
 		},
 	}
 	resp, err := svc.CreateDistribution(params)
@@ -117,11 +123,7 @@ func DeployCert(certId, distId string) error {
 		IfMatch:            ETag,
 		DistributionConfig: DistributionConfig,
 	})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func BindHTTPOrigin(distId, domain string) error {
@@ -167,13 +169,36 @@ func BindHTTPOrigin(distId, domain string) error {
 		IfMatch:            ETag,
 		DistributionConfig: DistributionConfig,
 	})
+	return err
+}
+
+func UnbindHTTPOrigin(distId, domain string) error {
+	svc := cloudfront.New(session.New())
+
+	resp, err := svc.GetDistributionConfig(&cloudfront.GetDistributionConfigInput{
+		Id: aws.String(distId),
+	})
 	if err != nil {
 		return err
 	}
 
-	return nil
-}
+	DistributionConfig, ETag := resp.DistributionConfig, resp.ETag
+	Origins := DistributionConfig.Origins
 
-func UnbindHTTPOrigin(distId, domain string) error {
-	return nil
+	var items []*cloudfront.Origin
+	for _, origin := range Origins.Items {
+		if *origin.Id != fmt.Sprintf("cdn-route:%s", domain) {
+			items = append(items, origin)
+		}
+	}
+
+	Origins.Quantity = aws.Int64(int64(len(items)))
+	Origins.Items = items
+
+	_, err = svc.UpdateDistribution(&cloudfront.UpdateDistributionInput{
+		Id:                 aws.String(distId),
+		IfMatch:            ETag,
+		DistributionConfig: DistributionConfig,
+	})
+	return err
 }
