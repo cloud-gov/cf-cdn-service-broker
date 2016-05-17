@@ -78,7 +78,7 @@ func (b *CdnServiceBroker) LastOperation(instanceId string) (brokerapi.LastOpera
 		return brokerapi.LastOperation{
 			State: brokerapi.InProgress,
 			Description: fmt.Sprintf(
-				"Provisioning in progress; CNAME domain %s to %s",
+				`Provisioning in progress; CNAME domain "%s" to "%s."`,
 				route.DomainExternal, route.DomainInternal,
 			),
 		}, nil

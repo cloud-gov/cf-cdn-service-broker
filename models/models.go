@@ -1,8 +1,8 @@
 package models
 
 import (
+	"fmt"
 	"net"
-	"strings"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -27,11 +27,7 @@ type Route struct {
 }
 
 func NewRoute(db *gorm.DB, instanceId, domain, origin string) (Route, error) {
-	dist, err := utils.CreateDistribution(domain)
-	if err != nil {
-		return Route{}, err
-	}
-	err = utils.BindHTTPOrigin(*dist.Id, origin)
+	dist, err := utils.CreateDistribution(domain, origin)
 	if err != nil {
 		return Route{}, err
 	}
@@ -84,7 +80,7 @@ func (r *Route) updateProvisioning(db *gorm.DB) error {
 		db.Create(&certRow)
 		r.State = "provisioned"
 		r.Certificate = certRow
-		db.Save(r)
+		db.Save(&r)
 	}
 	return nil
 }
@@ -122,7 +118,7 @@ func (r *Route) checkCNAME() bool {
 	if err != nil {
 		return false
 	}
-	return strings.Contains(cname, ".cloudfront.net")
+	return cname == fmt.Sprintf("%s.", r.DomainInternal)
 }
 
 func (r *Route) checkDistribution() bool {

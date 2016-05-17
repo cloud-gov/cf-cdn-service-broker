@@ -83,7 +83,7 @@ func ObtainCertificate(domain string) (acme.CertificateResource, error) {
 	err = client.AgreeToTOS()
 
 	domains := []string{domain}
-	certificate, failures := client.ObtainCertificate(domains, false, nil)
+	certificate, failures := client.ObtainCertificate(domains, true, nil)
 
 	if len(failures) > 0 {
 		return acme.CertificateResource{}, failures[domain]
