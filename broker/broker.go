@@ -10,11 +10,11 @@ import (
 	"github.com/pivotal-cf/brokerapi"
 
 	"github.com/18F/cf-cdn-service-broker/models"
-	"github.com/18F/cf-cdn-service-broker/utils"
 )
 
 type ProvisionOptions struct {
 	Domain string `json:"domain"`
+	Origin string `json:"origin"`
 }
 
 type CdnServiceBroker struct {
@@ -54,11 +54,11 @@ func (b *CdnServiceBroker) Provision(
 	if err != nil {
 		return spec, err
 	}
-	if options.Domain == "" {
-		return spec, errors.New("must be invoked with `options` key")
+	if options.Domain == "" || options.Origin == "" {
+		return spec, errors.New("must be invoked with `domain` and `origin` keys")
 	}
 
-	_, err = models.NewRoute(b.DB, instanceId, options.Domain)
+	_, err = models.NewRoute(b.DB, instanceId, options.Domain, options.Origin)
 	if err != nil {
 		return spec, err
 	}
@@ -75,7 +75,7 @@ func (b *CdnServiceBroker) LastOperation(instanceId string) (brokerapi.LastOpera
 		}, nil
 	}
 	err = route.Update(b.DB)
-	if route.Pending || err != nil {
+	if route.IsPending() || err != nil {
 		return brokerapi.LastOperation{
 			State: brokerapi.InProgress,
 			Description: fmt.Sprintf(
@@ -91,27 +91,29 @@ func (b *CdnServiceBroker) LastOperation(instanceId string) (brokerapi.LastOpera
 }
 
 func (b *CdnServiceBroker) Deprovision(instanceId string, details brokerapi.DeprovisionDetails, asyncAllowed bool) (brokerapi.IsAsync, error) {
+	if !asyncAllowed {
+		return false, errors.New("must be invoked with `asyncAllowed`")
+	}
+
+	route, err := b.getRoute(instanceId)
+	if err != nil {
+		return false, err
+	}
+
+	err = route.Disable(b.DB)
+	if err != nil {
+		return false, err
+	}
+
 	return true, nil
 }
 
 func (b *CdnServiceBroker) Bind(instanceId, bindingId string, details brokerapi.BindDetails) (brokerapi.Binding, error) {
-	route, err := b.getRoute(instanceId)
-	if err != nil {
-		return brokerapi.Binding{}, err
-	}
-	err = utils.BindHTTPOrigin(route.DistId, route.DomainExternal)
-	if err != nil {
-		return brokerapi.Binding{}, err
-	}
-	return brokerapi.Binding{}, nil
+	return brokerapi.Binding{}, errors.New("service does not support bind")
 }
 
 func (b *CdnServiceBroker) Unbind(instanceId, bindingId string, details brokerapi.UnbindDetails) error {
-	route, err := b.getRoute(instanceId)
-	if err != nil {
-		return err
-	}
-	return utils.UnbindHTTPOrigin(route.DistId, route.DomainExternal)
+	return errors.New("service does not support bind")
 }
 
 func (b *CdnServiceBroker) Update(instanceId string, details brokerapi.UpdateDetails, asyncAllowed bool) (brokerapi.IsAsync, error) {

@@ -84,6 +84,48 @@ func CreateDistribution(domain string) (*cloudfront.Distribution, error) {
 	return resp.Distribution, nil
 }
 
+func DisableDistribution(distId string) error {
+	svc := cloudfront.New(session.New())
+
+	resp, err := svc.GetDistributionConfig(&cloudfront.GetDistributionConfigInput{
+		Id: aws.String(distId),
+	})
+	if err != nil {
+		return err
+	}
+
+	DistributionConfig, ETag := resp.DistributionConfig, resp.ETag
+	DistributionConfig.Enabled = aws.Bool(false)
+
+	_, err = svc.UpdateDistribution(&cloudfront.UpdateDistributionInput{
+		Id:                 aws.String(distId),
+		IfMatch:            ETag,
+		DistributionConfig: DistributionConfig,
+	})
+	return err
+}
+
+func DeleteDistribution(distId string) (bool, error) {
+	svc := cloudfront.New(session.New())
+
+	resp, err := svc.GetDistribution(&cloudfront.GetDistributionInput{
+		Id: aws.String(distId),
+	})
+	if err != nil {
+		return false, err
+	}
+
+	if *resp.Distribution.Status != "Deployed" {
+		return false, nil
+	}
+
+	_, err = svc.DeleteDistribution(&cloudfront.DeleteDistributionInput{
+		Id:      aws.String(distId),
+		IfMatch: resp.ETag,
+	})
+	return err == nil, err
+}
+
 func UploadCert(domain string, cert acme.CertificateResource) (id string, err error) {
 	svc := iam.New(session.New())
 
@@ -96,7 +138,6 @@ func UploadCert(domain string, cert acme.CertificateResource) (id string, err er
 	if err != nil {
 		return "", err
 	}
-
 	return *resp.ServerCertificateMetadata.ServerCertificateId, nil
 }
 

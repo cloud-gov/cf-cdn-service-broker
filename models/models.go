@@ -18,33 +18,60 @@ import (
 type Route struct {
 	gorm.Model
 	InstanceId     string `gorm:"unique_index"`
-	Pending        bool   `gorm:"index"`
+	State          string `gorm:"index"`
 	DomainExternal string
 	DomainInternal string
 	DistId         string
+	Origin         string
 	Certificate    Certificate
 }
 
-func NewRoute(db *gorm.DB, instanceId, domain string) (Route, error) {
+func NewRoute(db *gorm.DB, instanceId, domain, origin string) (Route, error) {
 	dist, err := utils.CreateDistribution(domain)
+	if err != nil {
+		return Route{}, err
+	}
+	err = utils.BindHTTPOrigin(*dist.Id, origin)
 	if err != nil {
 		return Route{}, err
 	}
 	route := Route{
 		InstanceId:     instanceId,
+		State:          "provisioning",
 		DomainExternal: domain,
 		DomainInternal: *dist.DomainName,
 		DistId:         *dist.Id,
-		Pending:        true,
+		Origin:         origin,
 	}
 	db.Create(&route)
 	return route, nil
 }
 
+func (r *Route) IsPending() bool {
+	return r.State == "provisioning" || r.State == "deprovisioning"
+}
+
 func (r *Route) Update(db *gorm.DB) error {
-	if !r.Pending {
-		return nil
+	switch r.State {
+	case "provisioning":
+		return r.updateProvisioning(db)
+	case "deprovisioning":
+		return r.updateDeprovisioning(db)
 	}
+	return nil
+}
+
+func (r *Route) Disable(db *gorm.DB) error {
+	err := utils.DisableDistribution(r.DistId)
+	if err != nil {
+		return err
+	}
+	r.State = "deprovisioning"
+	db.Save(&r)
+	return nil
+}
+
+func (r *Route) updateProvisioning(db *gorm.DB) error {
 	if r.checkCNAME() && r.checkDistribution() {
 		certResource, err := r.provisionCert()
 		if err != nil {
@@ -55,9 +82,21 @@ func (r *Route) Update(db *gorm.DB) error {
 			CertStableURL: certResource.CertStableURL,
 		}
 		db.Create(&certRow)
-		r.Pending = false
+		r.State = "provisioned"
 		r.Certificate = certRow
 		db.Save(r)
+	}
+	return nil
+}
+
+func (r *Route) updateDeprovisioning(db *gorm.DB) error {
+	deleted, err := utils.DeleteDistribution(r.DistId)
+	if err != nil {
+		return err
+	}
+	if deleted {
+		r.State = "deprovisioned"
+		db.Save(&r)
 	}
 	return nil
 }
@@ -99,6 +138,7 @@ func (r *Route) checkDistribution() bool {
 
 type Certificate struct {
 	gorm.Model
+	RouteId       uint
 	CertURL       string
 	CertStableURL string
 	Expires       time.Time `gorm:"index"`
