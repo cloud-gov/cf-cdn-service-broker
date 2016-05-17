@@ -9,6 +9,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/pivotal-cf/brokerapi"
 
+	"github.com/18F/cf-cdn-service-broker/config"
 	"github.com/18F/cf-cdn-service-broker/models"
 )
 
@@ -18,7 +19,8 @@ type ProvisionOptions struct {
 }
 
 type CdnServiceBroker struct {
-	DB *gorm.DB
+	Settings config.Settings
+	DB       *gorm.DB
 }
 
 func (*CdnServiceBroker) Services() []brokerapi.Service {
@@ -58,7 +60,7 @@ func (b *CdnServiceBroker) Provision(
 		return spec, errors.New("must be invoked with `domain` and `origin` keys")
 	}
 
-	_, err = models.NewRoute(b.DB, instanceId, options.Domain, options.Origin)
+	_, err = models.NewRoute(b.Settings, b.DB, instanceId, options.Domain, options.Origin)
 	if err != nil {
 		return spec, err
 	}
@@ -73,7 +75,7 @@ func (b *CdnServiceBroker) LastOperation(instanceId string) (brokerapi.LastOpera
 			Description: "Service instance not found",
 		}, nil
 	}
-	err = route.Update(b.DB)
+	err = route.Update(b.Settings, b.DB)
 	if route.IsPending() || err != nil {
 		return brokerapi.LastOperation{
 			State: brokerapi.InProgress,

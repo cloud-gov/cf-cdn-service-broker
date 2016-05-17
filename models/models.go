@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 
+	"github.com/18F/cf-cdn-service-broker/config"
 	"github.com/18F/cf-cdn-service-broker/utils"
 )
 
@@ -26,8 +27,8 @@ type Route struct {
 	Certificate    Certificate
 }
 
-func NewRoute(db *gorm.DB, instanceId, domain, origin string) (Route, error) {
-	dist, err := utils.CreateDistribution(domain, origin)
+func NewRoute(settings config.Settings, db *gorm.DB, instanceId, domain, origin string) (Route, error) {
+	dist, err := utils.CreateDistribution(settings, domain, origin)
 	if err != nil {
 		return Route{}, err
 	}
@@ -47,10 +48,10 @@ func (r *Route) IsPending() bool {
 	return r.State == "provisioning" || r.State == "deprovisioning"
 }
 
-func (r *Route) Update(db *gorm.DB) error {
+func (r *Route) Update(settings config.Settings, db *gorm.DB) error {
 	switch r.State {
 	case "provisioning":
-		return r.updateProvisioning(db)
+		return r.updateProvisioning(settings, db)
 	case "deprovisioning":
 		return r.updateDeprovisioning(db)
 	}
@@ -67,9 +68,9 @@ func (r *Route) Disable(db *gorm.DB) error {
 	return nil
 }
 
-func (r *Route) updateProvisioning(db *gorm.DB) error {
+func (r *Route) updateProvisioning(settings config.Settings, db *gorm.DB) error {
 	if r.checkCNAME() && r.checkDistribution() {
-		certResource, err := r.provisionCert()
+		certResource, err := r.provisionCert(settings)
 		if err != nil {
 			return err
 		}
@@ -97,8 +98,8 @@ func (r *Route) updateDeprovisioning(db *gorm.DB) error {
 	return nil
 }
 
-func (r *Route) provisionCert() (acme.CertificateResource, error) {
-	cert, err := utils.ObtainCertificate(r.DomainExternal)
+func (r *Route) provisionCert(settings config.Settings) (acme.CertificateResource, error) {
+	cert, err := utils.ObtainCertificate(settings, r.DomainExternal)
 	if err != nil {
 		return acme.CertificateResource{}, err
 	}

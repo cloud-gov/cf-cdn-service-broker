@@ -13,7 +13,7 @@ import (
 	"github.com/18F/cf-cdn-service-broker/config"
 )
 
-func CreateDistribution(domain, origin string) (*cloudfront.Distribution, error) {
+func CreateDistribution(settings config.Settings, domain, origin string) (*cloudfront.Distribution, error) {
 	svc := cloudfront.New(session.New())
 
 	resp, err := svc.CreateDistribution(&cloudfront.CreateDistributionInput{
@@ -22,14 +22,14 @@ func CreateDistribution(domain, origin string) (*cloudfront.Distribution, error)
 			Comment:         aws.String("cdn route service"),
 			Enabled:         aws.Bool(true),
 			DefaultCacheBehavior: &cloudfront.DefaultCacheBehavior{
+				TargetOriginId: aws.String(fmt.Sprintf("cdn-route:%s", domain)),
 				ForwardedValues: &cloudfront.ForwardedValues{
 					Cookies: &cloudfront.CookiePreference{
 						Forward: aws.String("all"),
 					},
 					QueryString: aws.Bool(true),
 				},
-				MinTTL:         aws.Int64(0),
-				TargetOriginId: aws.String(fmt.Sprintf("cdn-route:%s", domain)),
+				MinTTL: aws.Int64(0),
 				TrustedSigners: &cloudfront.TrustedSigners{
 					Enabled:  aws.Bool(false),
 					Quantity: aws.Int64(0),
@@ -45,13 +45,6 @@ func CreateDistribution(domain, origin string) (*cloudfront.Distribution, error)
 						aws.String("POST"),
 						aws.String("PATCH"),
 						aws.String("DELETE"),
-					},
-					CachedMethods: &cloudfront.CachedMethods{
-						Quantity: aws.Int64(2),
-						Items: []*string{
-							aws.String("HEAD"),
-							aws.String("GET"),
-						},
 					},
 				},
 			},
@@ -80,8 +73,8 @@ func CreateDistribution(domain, origin string) (*cloudfront.Distribution, error)
 						},
 					},
 					{
-						DomainName: aws.String(fmt.Sprintf("%s.s3.amazonaws.com", config.Bucket)),
-						Id:         aws.String(fmt.Sprintf("s3-%s-%s", config.Bucket, domain)),
+						DomainName: aws.String(fmt.Sprintf("%s.s3.amazonaws.com", settings.Bucket)),
+						Id:         aws.String(fmt.Sprintf("s3-%s-%s", settings.Bucket, domain)),
 						S3OriginConfig: &cloudfront.S3OriginConfig{
 							OriginAccessIdentity: aws.String(""),
 						},
@@ -92,35 +85,27 @@ func CreateDistribution(domain, origin string) (*cloudfront.Distribution, error)
 				Quantity: aws.Int64(1),
 				Items: []*cloudfront.CacheBehavior{
 					{
-						PathPattern: aws.String("/.well-known/acme-challenge/*"),
+						PathPattern:    aws.String("/.well-known/acme-challenge/*"),
+						TargetOriginId: aws.String(fmt.Sprintf("s3-%s-%s", settings.Bucket, domain)),
 						ForwardedValues: &cloudfront.ForwardedValues{
 							QueryString: aws.Bool(false),
 							Cookies: &cloudfront.CookiePreference{
 								Forward: aws.String("none"),
 							},
 						},
-						MinTTL:         aws.Int64(0),
-						TargetOriginId: aws.String(fmt.Sprintf("s3-%s-%s", config.Bucket, domain)),
+						MinTTL: aws.Int64(0),
 						TrustedSigners: &cloudfront.TrustedSigners{
 							Enabled:  aws.Bool(false),
 							Quantity: aws.Int64(0),
 						},
 						ViewerProtocolPolicy: aws.String("allow-all"),
-						AllowedMethods: &cloudfront.AllowedMethods{
-							Quantity: aws.Int64(2),
-							Items: []*string{
-								aws.String("HEAD"),
-								aws.String("GET"),
-							},
-							CachedMethods: &cloudfront.CachedMethods{
-								Quantity: aws.Int64(2),
-								Items: []*string{
-									aws.String("HEAD"),
-									aws.String("GET"),
-								},
-							},
-						},
 					},
+				},
+			},
+			Aliases: &cloudfront.Aliases{
+				Quantity: aws.Int64(1),
+				Items: []*string{
+					aws.String(domain),
 				},
 			},
 		},

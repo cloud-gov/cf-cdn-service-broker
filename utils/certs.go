@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"os"
 	"path"
 	"strings"
 
@@ -36,13 +35,15 @@ func (u *User) GetPrivateKey() crypto.PrivateKey {
 	return u.key
 }
 
-type HTTPProvider struct{}
+type HTTPProvider struct {
+	settings config.Settings
+}
 
-func (*HTTPProvider) Present(domain, token, keyAuth string) error {
-	svc := s3.New(session.New(&aws.Config{Region: aws.String(config.Region)}))
+func (p *HTTPProvider) Present(domain, token, keyAuth string) error {
+	svc := s3.New(session.New(&aws.Config{Region: aws.String(p.settings.AwsRegion)}))
 
 	_, err := svc.PutObject(&s3.PutObjectInput{
-		Bucket: aws.String(config.Bucket),
+		Bucket: aws.String(p.settings.Bucket),
 		Body:   strings.NewReader(keyAuth),
 		Key:    aws.String(path.Join(".well-known", "acme-challenge", token)),
 	})
@@ -50,18 +51,18 @@ func (*HTTPProvider) Present(domain, token, keyAuth string) error {
 	return err
 }
 
-func (*HTTPProvider) CleanUp(domain, token, keyAuth string) error {
-	svc := s3.New(session.New(&aws.Config{Region: aws.String(config.Region)}))
+func (p *HTTPProvider) CleanUp(domain, token, keyAuth string) error {
+	svc := s3.New(session.New(&aws.Config{Region: aws.String(p.settings.AwsRegion)}))
 
 	_, err := svc.DeleteObject(&s3.DeleteObjectInput{
-		Bucket: aws.String(config.Bucket),
+		Bucket: aws.String(p.settings.Bucket),
 		Key:    aws.String(path.Join(".well-known", "acme-challenge", token)),
 	})
 
 	return err
 }
 
-func ObtainCertificate(domain string) (acme.CertificateResource, error) {
+func ObtainCertificate(settings config.Settings, domain string) (acme.CertificateResource, error) {
 	keySize := 2048
 	key, err := rsa.GenerateKey(rand.Reader, keySize)
 	if err != nil {
@@ -69,12 +70,12 @@ func ObtainCertificate(domain string) (acme.CertificateResource, error) {
 	}
 
 	user := User{
-		Email: os.Getenv("CDN_EMAIL"),
+		Email: settings.Email,
 		key:   key,
 	}
-	client, err := acme.NewClient(os.Getenv("CDN_ACME_URL"), &user, acme.RSA2048)
+	client, err := acme.NewClient(settings.AcmeUrl, &user, acme.RSA2048)
 
-	client.SetChallengeProvider(acme.HTTP01, &HTTPProvider{})
+	client.SetChallengeProvider(acme.HTTP01, &HTTPProvider{settings: settings})
 	client.ExcludeChallenges([]acme.Challenge{acme.DNS01, acme.TLSSNI01})
 
 	reg, err := client.Register()
