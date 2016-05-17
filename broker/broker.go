@@ -42,7 +42,7 @@ func (b *CdnServiceBroker) Provision(
 	spec := brokerapi.ProvisionedServiceSpec{}
 
 	if !asyncAllowed {
-		return spec, errors.New("must be invoked with `asyncAllowed`")
+		return spec, brokerapi.ErrAsyncRequired
 	}
 
 	if len(details.RawParameters) == 0 {
@@ -62,7 +62,6 @@ func (b *CdnServiceBroker) Provision(
 	if err != nil {
 		return spec, err
 	}
-
 	return brokerapi.ProvisionedServiceSpec{IsAsync: true}, nil
 }
 
@@ -92,7 +91,7 @@ func (b *CdnServiceBroker) LastOperation(instanceId string) (brokerapi.LastOpera
 
 func (b *CdnServiceBroker) Deprovision(instanceId string, details brokerapi.DeprovisionDetails, asyncAllowed bool) (brokerapi.IsAsync, error) {
 	if !asyncAllowed {
-		return false, errors.New("must be invoked with `asyncAllowed`")
+		return false, brokerapi.ErrAsyncRequired
 	}
 
 	route, err := b.getRoute(instanceId)
@@ -104,7 +103,6 @@ func (b *CdnServiceBroker) Deprovision(instanceId string, details brokerapi.Depr
 	if err != nil {
 		return false, err
 	}
-
 	return true, nil
 }
 
@@ -126,5 +124,5 @@ func (b *CdnServiceBroker) getRoute(instanceId string) (models.Route, error) {
 	if route.InstanceId == instanceId {
 		return route, nil
 	}
-	return models.Route{}, fmt.Errorf("no route with InstanceId %s", instanceId)
+	return models.Route{}, brokerapi.ErrInstanceDoesNotExist
 }
