@@ -74,9 +74,11 @@ func (r *Route) updateProvisioning(settings config.Settings, db *gorm.DB) error 
 		if err != nil {
 			return err
 		}
+		expires, err := acme.GetPEMCertExpiration(certResource.Certificate)
 		certRow := Certificate{
 			CertURL:       certResource.CertURL,
 			CertStableURL: certResource.CertStableURL,
+			Expires:       expires,
 		}
 		db.Create(&certRow)
 		r.State = "provisioned"
@@ -139,9 +141,4 @@ type Certificate struct {
 	CertURL       string
 	CertStableURL string
 	Expires       time.Time `gorm:"index"`
-}
-
-func (c *Certificate) BeforeCreate(scope *gorm.Scope) error {
-	scope.SetColumn("Expires", time.Now().AddDate(0, 0, 90))
-	return nil
 }
