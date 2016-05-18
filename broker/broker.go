@@ -76,7 +76,8 @@ func (b *CdnServiceBroker) LastOperation(instanceId string) (brokerapi.LastOpera
 		}, nil
 	}
 	err = route.Update(b.Settings, b.DB)
-	if route.IsPending() || err != nil {
+	switch route.State {
+	case "provisioning":
 		return brokerapi.LastOperation{
 			State: brokerapi.InProgress,
 			Description: fmt.Sprintf(
@@ -84,11 +85,17 @@ func (b *CdnServiceBroker) LastOperation(instanceId string) (brokerapi.LastOpera
 				route.DomainExternal, route.DomainInternal,
 			),
 		}, nil
+	case "deprovisioning":
+		return brokerapi.LastOperation{
+			State:       brokerapi.InProgress,
+			Description: "Deprovisioning in progress",
+		}, nil
+	default:
+		return brokerapi.LastOperation{
+			State:       brokerapi.Succeeded,
+			Description: "Service instance provisioned",
+		}, nil
 	}
-	return brokerapi.LastOperation{
-		State:       brokerapi.Succeeded,
-		Description: "Service instance provisioned",
-	}, nil
 }
 
 func (b *CdnServiceBroker) Deprovision(instanceId string, details brokerapi.DeprovisionDetails, asyncAllowed bool) (brokerapi.IsAsync, error) {

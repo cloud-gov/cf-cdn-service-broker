@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"github.com/aws/aws-sdk-go/service/iam"
@@ -18,11 +19,11 @@ func CreateDistribution(settings config.Settings, domain, origin string) (*cloud
 
 	resp, err := svc.CreateDistribution(&cloudfront.CreateDistributionInput{
 		DistributionConfig: &cloudfront.DistributionConfig{
-			CallerReference: aws.String(fmt.Sprintf("cdn-route:%s", domain)),
+			CallerReference: aws.String(fmt.Sprintf("cdn-route-%s", domain)),
 			Comment:         aws.String("cdn route service"),
 			Enabled:         aws.Bool(true),
 			DefaultCacheBehavior: &cloudfront.DefaultCacheBehavior{
-				TargetOriginId: aws.String(fmt.Sprintf("cdn-route:%s", domain)),
+				TargetOriginId: aws.String(fmt.Sprintf("cdn-route-%s", domain)),
 				ForwardedValues: &cloudfront.ForwardedValues{
 					Cookies: &cloudfront.CookiePreference{
 						Forward: aws.String("all"),
@@ -53,7 +54,7 @@ func CreateDistribution(settings config.Settings, domain, origin string) (*cloud
 				Items: []*cloudfront.Origin{
 					{
 						DomainName: aws.String(origin),
-						Id:         aws.String(fmt.Sprintf("cdn-route:%s", domain)),
+						Id:         aws.String(fmt.Sprintf("cdn-route-%s", domain)),
 						OriginPath: aws.String(""),
 						CustomHeaders: &cloudfront.CustomHeaders{
 							Quantity: aws.Int64(0),
@@ -154,28 +155,51 @@ func DeleteDistribution(domain, distId string) (bool, error) {
 		return false, nil
 	}
 
-	if *resp.Distribution.DistributionConfig.ViewerCertificate.IAMCertificateId != "" {
-		err = DeleteCert(domain)
-		if err != nil {
-			return false, err
-		}
-	}
-
 	_, err = svc.DeleteDistribution(&cloudfront.DeleteDistributionInput{
 		Id:      aws.String(distId),
 		IfMatch: resp.ETag,
 	})
 
+	err = deleteCert(fmt.Sprintf("cdn-route-%s", domain))
+	if err != nil {
+		return false, err
+	}
+
 	return err == nil, err
 }
 
-func UploadCert(domain string, cert acme.CertificateResource) (id string, err error) {
+// Deploy certificate to distribution without downtime: upload to IAM with a
+// "new" prefix, add to CloudFront by ID, delete existing certificate if exists,
+// and rename new certificate.
+func DeployCert(domain, distId string, cert acme.CertificateResource) error {
+	prev := fmt.Sprintf("cdn-route-%s-new", domain)
+	next := fmt.Sprintf("cdn-route-%s", domain)
+
+	certId, err := uploadCert(prev, cert)
+	if err != nil {
+		return err
+	}
+
+	err = setDistributionCert(certId, distId)
+	if err != nil {
+		return err
+	}
+
+	return renameCert(prev, next)
+}
+
+func uploadCert(name string, cert acme.CertificateResource) (string, error) {
 	svc := iam.New(session.New())
+
+	err := deleteCert(name)
+	if err != nil {
+		return "", err
+	}
 
 	resp, err := svc.UploadServerCertificate(&iam.UploadServerCertificateInput{
 		CertificateBody:       aws.String(string(cert.Certificate)),
 		PrivateKey:            aws.String(string(cert.PrivateKey)),
-		ServerCertificateName: aws.String(fmt.Sprintf("cdn-route:%s", domain)),
+		ServerCertificateName: aws.String(name),
 		Path: aws.String("/cloudfront/letsencrypt/"),
 	})
 	if err != nil {
@@ -185,17 +209,7 @@ func UploadCert(domain string, cert acme.CertificateResource) (id string, err er
 	return *resp.ServerCertificateMetadata.ServerCertificateId, nil
 }
 
-func DeleteCert(domain string) error {
-	svc := iam.New(session.New())
-
-	_, err := svc.DeleteServerCertificate(&iam.DeleteServerCertificateInput{
-		ServerCertificateName: aws.String(fmt.Sprintf("cdn-route:%s", domain)),
-	})
-
-	return err
-}
-
-func DeployCert(certId, distId string) error {
+func setDistributionCert(certId, distId string) error {
 	svc := cloudfront.New(session.New())
 
 	resp, err := svc.GetDistributionConfig(&cloudfront.GetDistributionConfigInput{
@@ -221,4 +235,37 @@ func DeployCert(certId, distId string) error {
 	})
 
 	return err
+}
+
+func renameCert(prev, next string) error {
+	svc := iam.New(session.New())
+
+	err := deleteCert(next)
+	if err != nil {
+		return err
+	}
+
+	_, err = svc.UpdateServerCertificate(&iam.UpdateServerCertificateInput{
+		ServerCertificateName:    aws.String(prev),
+		NewServerCertificateName: aws.String(next),
+	})
+
+	return err
+}
+
+func deleteCert(name string) error {
+	svc := iam.New(session.New())
+
+	_, err := svc.DeleteServerCertificate(&iam.DeleteServerCertificateInput{
+		ServerCertificateName: aws.String(name),
+	})
+
+	if err != nil {
+		failure := err.(awserr.RequestFailure)
+		if failure.StatusCode() != 404 {
+			return err
+		}
+	}
+
+	return nil
 }

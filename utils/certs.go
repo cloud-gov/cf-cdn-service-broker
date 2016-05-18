@@ -62,26 +62,48 @@ func (p *HTTPProvider) CleanUp(domain, token, keyAuth string) error {
 	return err
 }
 
-func ObtainCertificate(settings config.Settings, domain string) (acme.CertificateResource, error) {
+func NewClient(settings config.Settings) (*acme.Client, error) {
 	keySize := 2048
 	key, err := rsa.GenerateKey(rand.Reader, keySize)
 	if err != nil {
-		return acme.CertificateResource{}, err
+		return &acme.Client{}, err
 	}
 
 	user := User{
 		Email: settings.Email,
 		key:   key,
 	}
+
 	client, err := acme.NewClient(settings.AcmeUrl, &user, acme.RSA2048)
+	if err != nil {
+		return &acme.Client{}, err
+	}
+
+	reg, err := client.Register()
+
+	if err != nil {
+		return &acme.Client{}, err
+	}
+
+	user.Registration = reg
+
+	err = client.AgreeToTOS()
+
+	if err != nil {
+		return &acme.Client{}, err
+	}
 
 	client.SetChallengeProvider(acme.HTTP01, &HTTPProvider{settings: settings})
 	client.ExcludeChallenges([]acme.Challenge{acme.DNS01, acme.TLSSNI01})
 
-	reg, err := client.Register()
-	user.Registration = reg
+	return client, nil
+}
 
-	err = client.AgreeToTOS()
+func ObtainCertificate(settings config.Settings, domain string) (acme.CertificateResource, error) {
+	client, err := NewClient(settings)
+	if err != nil {
+		return acme.CertificateResource{}, err
+	}
 
 	domains := []string{domain}
 	certificate, failures := client.ObtainCertificate(domains, true, nil)
@@ -91,4 +113,13 @@ func ObtainCertificate(settings config.Settings, domain string) (acme.Certificat
 	}
 
 	return certificate, nil
+}
+
+func RenewCertificate(settings config.Settings, cert acme.CertificateResource) (acme.CertificateResource, error) {
+	client, err := NewClient(settings)
+	if err != nil {
+		return acme.CertificateResource{}, err
+	}
+
+	return client.RenewCertificate(cert, true)
 }

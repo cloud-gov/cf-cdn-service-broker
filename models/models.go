@@ -44,17 +44,41 @@ func NewRoute(settings config.Settings, db *gorm.DB, instanceId, domain, origin 
 	return route, nil
 }
 
-func (r *Route) IsPending() bool {
-	return r.State == "provisioning" || r.State == "deprovisioning"
-}
-
 func (r *Route) Update(settings config.Settings, db *gorm.DB) error {
 	switch r.State {
 	case "provisioning":
 		return r.updateProvisioning(settings, db)
 	case "deprovisioning":
 		return r.updateDeprovisioning(db)
+	default:
+		return nil
 	}
+}
+
+func (r *Route) Renew(settings config.Settings, db *gorm.DB) error {
+	var certRow Certificate
+
+	db.Model(&r).Related(&certRow, "Certificate")
+
+	certResource, err := utils.RenewCertificate(settings, certRow.CertificateResource)
+	if err != nil {
+		return err
+	}
+
+	err = utils.DeployCert(r.DomainExternal, r.DistId, certResource)
+	if err != nil {
+		return err
+	}
+
+	expires, err := acme.GetPEMCertExpiration(certResource.Certificate)
+	if err != nil {
+		return err
+	}
+
+	certRow.CertificateResource = certResource
+	certRow.Expires = expires
+	db.Save(&certRow)
+
 	return nil
 }
 
@@ -63,8 +87,10 @@ func (r *Route) Disable(db *gorm.DB) error {
 	if err != nil {
 		return err
 	}
+
 	r.State = "deprovisioning"
 	db.Save(&r)
+
 	return nil
 }
 
@@ -74,17 +100,23 @@ func (r *Route) updateProvisioning(settings config.Settings, db *gorm.DB) error 
 		if err != nil {
 			return err
 		}
+
 		expires, err := acme.GetPEMCertExpiration(certResource.Certificate)
+		if err != nil {
+			return err
+		}
+
 		certRow := Certificate{
-			CertURL:       certResource.CertURL,
-			CertStableURL: certResource.CertStableURL,
-			Expires:       expires,
+			CertificateResource: certResource,
+			Expires:             expires,
 		}
 		db.Create(&certRow)
+
 		r.State = "provisioned"
 		r.Certificate = certRow
 		db.Save(&r)
 	}
+
 	return nil
 }
 
@@ -93,10 +125,12 @@ func (r *Route) updateDeprovisioning(db *gorm.DB) error {
 	if err != nil {
 		return err
 	}
+
 	if deleted {
 		r.State = "deprovisioned"
 		db.Save(&r)
 	}
+
 	return nil
 }
 
@@ -105,14 +139,12 @@ func (r *Route) provisionCert(settings config.Settings) (acme.CertificateResourc
 	if err != nil {
 		return acme.CertificateResource{}, err
 	}
-	certId, err := utils.UploadCert(r.DomainExternal, cert)
+
+	err = utils.DeployCert(r.DomainExternal, r.DistId, cert)
 	if err != nil {
 		return acme.CertificateResource{}, err
 	}
-	err = utils.DeployCert(certId, r.DistId)
-	if err != nil {
-		return acme.CertificateResource{}, err
-	}
+
 	return cert, nil
 }
 
@@ -121,24 +153,26 @@ func (r *Route) checkCNAME() bool {
 	if err != nil {
 		return false
 	}
+
 	return cname == fmt.Sprintf("%s.", r.DomainInternal)
 }
 
 func (r *Route) checkDistribution() bool {
 	svc := cloudfront.New(session.New())
+
 	resp, err := svc.GetDistribution(&cloudfront.GetDistributionInput{
 		Id: aws.String(r.DistId),
 	})
 	if err != nil {
 		return false
 	}
+
 	return *resp.Distribution.Status == "Deployed" && *resp.Distribution.DistributionConfig.Enabled
 }
 
 type Certificate struct {
 	gorm.Model
-	RouteId       uint
-	CertURL       string
-	CertStableURL string
-	Expires       time.Time `gorm:"index"`
+	acme.CertificateResource
+	RouteId uint
+	Expires time.Time `gorm:"index"`
 }
