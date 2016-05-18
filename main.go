@@ -6,7 +6,6 @@ import (
 
 	"github.com/pivotal-cf/brokerapi"
 	"github.com/pivotal-golang/lager"
-	"github.com/xenolf/lego/acme"
 
 	"github.com/18F/cf-cdn-service-broker/broker"
 	"github.com/18F/cf-cdn-service-broker/config"

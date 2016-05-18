@@ -89,7 +89,7 @@ func (r *Route) updateProvisioning(settings config.Settings, db *gorm.DB) error 
 }
 
 func (r *Route) updateDeprovisioning(db *gorm.DB) error {
-	deleted, err := utils.DeleteDistribution(r.DistId)
+	deleted, err := utils.DeleteDistribution(r.DomainExternal, r.DistId)
 	if err != nil {
 		return err
 	}

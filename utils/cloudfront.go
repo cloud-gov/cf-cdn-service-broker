@@ -114,6 +114,7 @@ func CreateDistribution(settings config.Settings, domain, origin string) (*cloud
 	if err != nil {
 		return &cloudfront.Distribution{}, err
 	}
+
 	return resp.Distribution, nil
 }
 
@@ -135,10 +136,11 @@ func DisableDistribution(distId string) error {
 		IfMatch:            ETag,
 		DistributionConfig: DistributionConfig,
 	})
+
 	return err
 }
 
-func DeleteDistribution(distId string) (bool, error) {
+func DeleteDistribution(domain, distId string) (bool, error) {
 	svc := cloudfront.New(session.New())
 
 	resp, err := svc.GetDistribution(&cloudfront.GetDistributionInput{
@@ -152,25 +154,45 @@ func DeleteDistribution(distId string) (bool, error) {
 		return false, nil
 	}
 
+	if *resp.Distribution.DistributionConfig.ViewerCertificate.IAMCertificateId != "" {
+		err = DeleteCert(domain)
+		if err != nil {
+			return false, err
+		}
+	}
+
 	_, err = svc.DeleteDistribution(&cloudfront.DeleteDistributionInput{
 		Id:      aws.String(distId),
 		IfMatch: resp.ETag,
 	})
+
 	return err == nil, err
 }
 
 func UploadCert(domain string, cert acme.CertificateResource) (id string, err error) {
 	svc := iam.New(session.New())
+
 	resp, err := svc.UploadServerCertificate(&iam.UploadServerCertificateInput{
 		CertificateBody:       aws.String(string(cert.Certificate)),
 		PrivateKey:            aws.String(string(cert.PrivateKey)),
-		ServerCertificateName: aws.String(fmt.Sprintf("cdn-route-%s", domain)),
+		ServerCertificateName: aws.String(fmt.Sprintf("cdn-route:%s", domain)),
 		Path: aws.String("/cloudfront/letsencrypt/"),
 	})
 	if err != nil {
 		return "", err
 	}
+
 	return *resp.ServerCertificateMetadata.ServerCertificateId, nil
+}
+
+func DeleteCert(domain string) error {
+	svc := iam.New(session.New())
+
+	_, err := svc.DeleteServerCertificate(&iam.DeleteServerCertificateInput{
+		ServerCertificateName: aws.String(fmt.Sprintf("cdn-route:%s", domain)),
+	})
+
+	return err
 }
 
 func DeployCert(certId, distId string) error {
@@ -197,5 +219,6 @@ func DeployCert(certId, distId string) error {
 		IfMatch:            ETag,
 		DistributionConfig: DistributionConfig,
 	})
+
 	return err
 }
