@@ -176,3 +176,18 @@ type Certificate struct {
 	RouteId uint
 	Expires time.Time `gorm:"index"`
 }
+
+func Renew(settings config.Settings, db *gorm.DB) {
+	routes := []Route{}
+	db.Where(
+		"state = ? and expires < now() + interval '30 days'", "provisioned",
+	).Joins(
+		"join certificates on routes.id = certificates.route_id",
+	).Preload(
+		"Certificate",
+	).Find(&routes)
+
+	for _, route := range routes {
+		route.Renew(settings, db)
+	}
+}

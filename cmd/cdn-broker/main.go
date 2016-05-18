@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/pivotal-cf/brokerapi"
 	"github.com/pivotal-golang/lager"
@@ -15,9 +16,12 @@ import (
 func main() {
 	settings := config.NewSettings()
 
+	logger := lager.NewLogger("cdn-service-broker")
+	logger.RegisterSink(lager.NewWriterSink(os.Stderr, lager.INFO))
+
 	db, err := config.Connect()
 	if err != nil {
-		fmt.Println(err)
+		logger.Fatal("Error", err)
 	}
 
 	db.AutoMigrate(&models.Route{}, &models.Certificate{})
@@ -26,7 +30,6 @@ func main() {
 		Settings: settings,
 		DB:       db,
 	}
-	logger := lager.NewLogger("cdn-service-broker")
 	credentials := brokerapi.BrokerCredentials{
 		Username: settings.BrokerUser,
 		Password: settings.BrokerPass,

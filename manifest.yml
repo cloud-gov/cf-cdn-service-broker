@@ -5,3 +5,7 @@ services:
   - cdn-rds
 applications:
   - name: cdn-broker
+    command: cdn-broker
+  - name: cdn-cron
+    command: cdn-cron
+    no-route: true

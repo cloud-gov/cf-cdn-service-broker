@@ -27,7 +27,7 @@ A Cloud Foundry service broker for CloudFront and Let's Encrypt
 * Deploy application
 
     ```
-    $ GOOS=linux GOARCH=amd64 go build . && cf push
+    $ cf push
     ```
 
 * Add to Cloud Foundry
