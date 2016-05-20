@@ -14,14 +14,17 @@ import (
 )
 
 func main() {
-	settings := config.NewSettings()
-
 	logger := lager.NewLogger("cdn-service-broker")
 	logger.RegisterSink(lager.NewWriterSink(os.Stderr, lager.INFO))
 
-	db, err := config.Connect()
+	settings, err := config.NewSettings()
 	if err != nil {
-		logger.Fatal("Error", err)
+		logger.Fatal("new-settings", err)
+	}
+
+	db, err := config.Connect(settings)
+	if err != nil {
+		logger.Fatal("connect", err)
 	}
 
 	db.AutoMigrate(&models.Route{}, &models.Certificate{})
@@ -31,8 +34,8 @@ func main() {
 		DB:       db,
 	}
 	credentials := brokerapi.BrokerCredentials{
-		Username: settings.BrokerUser,
-		Password: settings.BrokerPass,
+		Username: settings.Username,
+		Password: settings.Password,
 	}
 
 	brokerAPI := brokerapi.New(&broker, logger, credentials)

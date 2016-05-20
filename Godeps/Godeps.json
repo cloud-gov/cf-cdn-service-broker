@@ -166,6 +166,11 @@
 			"Rev": "0b12d6b521d83fc7f755e7cfc1b1fbdd35a01a74"
 		},
 		{
+			"ImportPath": "github.com/kelseyhightower/envconfig",
+			"Comment": "1.1.0-17-g91921eb",
+			"Rev": "91921eb4cf999321cdbeebdba5a03555800d493b"
+		},
+		{
 			"ImportPath": "github.com/lib/pq",
 			"Comment": "go1.0-cutoff-96-gee1442b",
 			"Rev": "ee1442bda7bd1b6a84e913bdb421cb1874ec629d"

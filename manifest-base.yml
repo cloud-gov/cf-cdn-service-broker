@@ -1,5 +1,4 @@
 ---
 buildpack: go_buildpack
 services:
-  - cdn-creds
   - cdn-rds

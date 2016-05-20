@@ -40,7 +40,7 @@ type HTTPProvider struct {
 }
 
 func (p *HTTPProvider) Present(domain, token, keyAuth string) error {
-	svc := s3.New(session.New(&aws.Config{Region: aws.String(p.settings.AwsRegion)}))
+	svc := s3.New(session.New())
 
 	_, err := svc.PutObject(&s3.PutObjectInput{
 		Bucket: aws.String(p.settings.Bucket),
@@ -52,7 +52,7 @@ func (p *HTTPProvider) Present(domain, token, keyAuth string) error {
 }
 
 func (p *HTTPProvider) CleanUp(domain, token, keyAuth string) error {
-	svc := s3.New(session.New(&aws.Config{Region: aws.String(p.settings.AwsRegion)}))
+	svc := s3.New(session.New())
 
 	_, err := svc.DeleteObject(&s3.DeleteObjectInput{
 		Bucket: aws.String(p.settings.Bucket),
