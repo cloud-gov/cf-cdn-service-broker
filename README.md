@@ -1,44 +1,51 @@
-# cf-cdn-service-broker [![Build Status](https://travis-ci.org/18F/cf-cdn-service-broker.svg?branch=master)](https://travis-ci.org/18F/cf-cdn-service-broker)
+# Cloud Foundry CDN Service Broker [![Build Status](https://travis-ci.org/18F/cf-cdn-service-broker.svg?branch=master)](https://travis-ci.org/18F/cf-cdn-service-broker)
 
-A Cloud Foundry service broker for CloudFront and Let's Encrypt
+A [Cloud Foundry](https://www.cloudfoundry.org/) [service broker](http://docs.cloudfoundry.org/services/) for [CloudFront](https://aws.amazon.com/cloudfront/) and [Let's Encrypt](https://letsencrypt.org/).
 
 ## Deployment
 
-* Create services
+### Automated
 
-    Note: the following credentials must be available in the `cdn-creds` service or in top-level environment variables:
+The easiest/recommended way to deploy the broker is via the [Concourse](http://concourse.ci/) pipeline.
 
-    * PORT
-    * BROKER_USER
-    * BROKER_PASS
-    * DATABASE_URL
-    * EMAIL
-    * ACME_URL
-    * BUCKET
-    * AWS_ACCESS_KEY_ID
-    * AWS_SECRET_ACCESS_KEY
-    * AWS_DEFAULT_REGION
+1. Create a `ci/credentials.yml` file, and fill in the templated values from [the pipeline](ci/pipeline.yml).
+1. Deploy the pipeline.
 
-    ```
-    $ cf create-service rds micro-psql cdn-rds
-    $ cf create-user-provided-service cdn-creds -p '{"AWS_ACCESS_KEY_ID": "[key-id]", ...}'
+    ```bash
+    fly -t lite set-pipeline -n -c ci/pipeline.yml -p deploy-cdn-broker -l ci/credentials.yml
     ```
 
-* Deploy application
+### Manual
 
+1. Clone this repository, and `cd` into it.
+1. Target the space you want to deploy the broker to.
+
+    ```bash
+    $ cf target -o <org> -s <space>
     ```
+
+1. Set the `environment_variables` listed in [the deploy pipeline](ci/pipeline.yml).
+1. Deploy the broker as an application.
+
+    ```bash
     $ cf push
     ```
 
-* Add to Cloud Foundry
+1. [Register the broker](http://docs.cloudfoundry.org/services/managing-service-brokers.html#register-broker).
 
-    ```
+    ```bash
     $ cf create-service-broker cdn-route [username] [password] [app-url] --space-scoped
     ```
 
 ## Usage
 
-* Create service
+1. Target the space your application is running in.
+
+    ```bash
+    $ cf target -o <org> -s <space>
+    ```
+
+1. Create a service instance.
 
     ```
     $ cf create-service cdn-route cdn-route my-cdn-route \
@@ -47,7 +54,7 @@ A Cloud Foundry service broker for CloudFront and Let's Encrypt
     Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
     ```
 
-* Get CNAME instructions
+1. Get the DNS instructions.
 
     ```
     $ cf service my-cdn-route
@@ -57,11 +64,9 @@ A Cloud Foundry service broker for CloudFront and Let's Encrypt
     Message: Provisioning in progress; CNAME domain "my.domain.gov" to "d3kajwa62y9xrp.cloudfront.net."
     ```
 
-* Update CNAME
-
-* Wait for changes to propagate (may take 30 minutes)
-
-* Visit `my.domain.gov`
+1. Create/update your DNS configuration.
+1. Wait thirty minutes for the CloudFront distribution to be provisioned and the DNS changes to propagate.
+1. Visit `my.domain.gov`, and see that you have a valid certificate (i.e. that visiting your site in a modern browser doesn't give you a certificate warning).
 
 ## Tests
 
