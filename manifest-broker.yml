@@ -1,0 +1,5 @@
+---
+inherit: manifest-base.yml
+applications:
+  - name: cdn-broker
+    command: cdn-broker
