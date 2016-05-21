@@ -32,6 +32,12 @@ A [Cloud Foundry](https://www.cloudfoundry.org/) [service broker](http://docs.cl
 
 ## Usage
 
+1. Target the space your application is running in
+
+    ```bash
+    $ cf target -o <org> -s <space>
+    ```
+
 1. Create service instance
 
     ```bash
@@ -52,7 +58,21 @@ A [Cloud Foundry](https://www.cloudfoundry.org/) [service broker](http://docs.cl
     ```
 
 1. Create/update your CNAME in your DNS configuration
-1. Wait for changes to propagate (may take 30 minutes)
+1. Create a [private domain](http://docs.cloudfoundry.org/devguide/deploy-apps/routes-domains.html#private-domains) in your Cloud Foundry organization
+
+    ```bash
+    $ cf create-domain <org> <domain>
+    ```
+
+1. [Add the `domain` to your manifest](https://docs.cloudfoundry.org/devguide/deploy-apps/manifest.html#domain) to connect that domain to your application, then `cf push`.
+    1. If you aren't using a manifest (which you should), [create a route manually](http://docs.cloudfoundry.org/devguide/deploy-apps/routes-domains.html#create-route-without-hostname).
+
+        ```bash
+        $ cf create-route <space> <domain>
+        $ cf map-route <app> <domain>
+        ```
+
+1. Wait for DNS changes to propagate (may take 30 minutes)
 1. Visit `my.domain.gov`, and see that you have a valid certificate (i.e. that visiting your site in a modern browser doesn't give you a certificate warning)
 
 ## Contributing
