@@ -1,0 +1,71 @@
+---
+jobs:
+- name: push-cf-cdn-service-broker
+  plan:
+  - get: broker-src
+    trigger: true
+  - put: broker-deploy
+    params:
+      path: broker-src
+      manifest: broker-src/manifest-broker.yml
+      environment_variables: &cfenv
+        USERNAME: {{cdn-broker-user}}
+        PASSWORD: {{cdn-broker-pass}}
+        EMAIL: {{cdn-broker-email}}
+        ACME_URL: {{cdn-broker-acme-url}}
+        BUCKET: {{cdn-broker-bucket}}
+        AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id}}
+        AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key}}
+        AWS_DEFAULT_REGION: {{cdn-broker-region}}
+  - put: broker-deploy
+    params:
+      path: broker-src
+      manifest: broker-src/manifest-cron.yml
+      environment_variables:
+        <<: *cfenv
+    on_failure:
+      put: slack
+      params:
+        text: |
+          :x: FAILED to deploy cf-cdn-service-broker on {{cf-api-url}}
+          <https://ci.cloud.gov/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
+        channel: {{slack-channel}}
+        username: {{slack-username}}
+        icon_url: {{slack-icon-url}}
+    on_success:
+      put: slack
+      params:
+        text: |
+          :white_check_mark: Successfully deployed cf-cdn-service-broker on {{cf-api-url}}
+          <https://ci.cloud.gov/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
+        channel: {{slack-channel}}
+        username: {{slack-username}}
+        icon_url: {{slack-icon-url}}
+
+resources:
+- name: broker-src
+  type: git
+  source:
+    uri: {{cf-cdn-broker-git-url}}
+    branch: {{cf-cdn-broker-git-branch}}
+
+- name: broker-deploy
+  type: cf
+  source:
+    api: {{cf-api-url}}
+    username: {{cf-deploy-username}}
+    password: {{cf-deploy-password}}
+    organization: {{cf-organization}}
+    space: {{cf-space}}
+    skip_cert_check: false
+
+- name: slack
+  type: slack-notification
+  source:
+    url: {{slack-webhook-url}}
+
+resource_types:
+- name: slack-notification
+  type: docker-image
+  source:
+    repository: cfcommunity/slack-notification-resource
