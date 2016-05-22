@@ -4,20 +4,26 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
-	"github.com/aws/aws-sdk-go/service/iam"
-
-	"github.com/xenolf/lego/acme"
 
 	"github.com/18F/cf-cdn-service-broker/config"
 )
 
-func CreateDistribution(settings config.Settings, domain, origin string) (*cloudfront.Distribution, error) {
-	svc := cloudfront.New(session.New())
+type DistributionIface interface {
+	Create(domain, origin string) (*cloudfront.Distribution, error)
+	Get(distId string) (*cloudfront.Distribution, error)
+	SetCertificate(distId, certId string) error
+	Disable(distId string) error
+	Delete(distId string) (bool, error)
+}
 
-	resp, err := svc.CreateDistribution(&cloudfront.CreateDistributionInput{
+type Distribution struct {
+	Settings config.Settings
+	Service  *cloudfront.CloudFront
+}
+
+func (d *Distribution) Create(domain, origin string) (*cloudfront.Distribution, error) {
+	resp, err := d.Service.CreateDistribution(&cloudfront.CreateDistributionInput{
 		DistributionConfig: &cloudfront.DistributionConfig{
 			CallerReference: aws.String(fmt.Sprintf("cdn-route-%s", domain)),
 			Comment:         aws.String("cdn route service"),
@@ -74,8 +80,8 @@ func CreateDistribution(settings config.Settings, domain, origin string) (*cloud
 						},
 					},
 					{
-						DomainName: aws.String(fmt.Sprintf("%s.s3.amazonaws.com", settings.Bucket)),
-						Id:         aws.String(fmt.Sprintf("s3-%s-%s", settings.Bucket, domain)),
+						DomainName: aws.String(fmt.Sprintf("%s.s3.amazonaws.com", d.Settings.Bucket)),
+						Id:         aws.String(fmt.Sprintf("s3-%s-%s", d.Settings.Bucket, domain)),
 						S3OriginConfig: &cloudfront.S3OriginConfig{
 							OriginAccessIdentity: aws.String(""),
 						},
@@ -87,7 +93,7 @@ func CreateDistribution(settings config.Settings, domain, origin string) (*cloud
 				Items: []*cloudfront.CacheBehavior{
 					{
 						PathPattern:    aws.String("/.well-known/acme-challenge/*"),
-						TargetOriginId: aws.String(fmt.Sprintf("s3-%s-%s", settings.Bucket, domain)),
+						TargetOriginId: aws.String(fmt.Sprintf("s3-%s-%s", d.Settings.Bucket, domain)),
 						ForwardedValues: &cloudfront.ForwardedValues{
 							QueryString: aws.Bool(false),
 							Cookies: &cloudfront.CookiePreference{
@@ -119,100 +125,18 @@ func CreateDistribution(settings config.Settings, domain, origin string) (*cloud
 	return resp.Distribution, nil
 }
 
-func DisableDistribution(distId string) error {
-	svc := cloudfront.New(session.New())
-
-	resp, err := svc.GetDistributionConfig(&cloudfront.GetDistributionConfigInput{
+func (d *Distribution) Get(distId string) (*cloudfront.Distribution, error) {
+	resp, err := d.Service.GetDistribution(&cloudfront.GetDistributionInput{
 		Id: aws.String(distId),
 	})
 	if err != nil {
-		return err
+		return &cloudfront.Distribution{}, err
 	}
-
-	DistributionConfig, ETag := resp.DistributionConfig, resp.ETag
-	DistributionConfig.Enabled = aws.Bool(false)
-
-	_, err = svc.UpdateDistribution(&cloudfront.UpdateDistributionInput{
-		Id:                 aws.String(distId),
-		IfMatch:            ETag,
-		DistributionConfig: DistributionConfig,
-	})
-
-	return err
+	return resp.Distribution, nil
 }
 
-func DeleteDistribution(domain, distId string) (bool, error) {
-	svc := cloudfront.New(session.New())
-
-	resp, err := svc.GetDistribution(&cloudfront.GetDistributionInput{
-		Id: aws.String(distId),
-	})
-	if err != nil {
-		return false, err
-	}
-
-	if *resp.Distribution.Status != "Deployed" {
-		return false, nil
-	}
-
-	_, err = svc.DeleteDistribution(&cloudfront.DeleteDistributionInput{
-		Id:      aws.String(distId),
-		IfMatch: resp.ETag,
-	})
-
-	err = deleteCert(fmt.Sprintf("cdn-route-%s", domain))
-	if err != nil {
-		return false, err
-	}
-
-	return err == nil, err
-}
-
-// Deploy certificate to distribution without downtime: upload to IAM with a
-// "new" prefix, add to CloudFront by ID, delete existing certificate if exists,
-// and rename new certificate.
-func DeployCert(domain, distId string, cert acme.CertificateResource) error {
-	prev := fmt.Sprintf("cdn-route-%s-new", domain)
-	next := fmt.Sprintf("cdn-route-%s", domain)
-
-	certId, err := uploadCert(prev, cert)
-	if err != nil {
-		return err
-	}
-
-	err = setDistributionCert(certId, distId)
-	if err != nil {
-		return err
-	}
-
-	return renameCert(prev, next)
-}
-
-func uploadCert(name string, cert acme.CertificateResource) (string, error) {
-	svc := iam.New(session.New())
-
-	err := deleteCert(name)
-	if err != nil {
-		return "", err
-	}
-
-	resp, err := svc.UploadServerCertificate(&iam.UploadServerCertificateInput{
-		CertificateBody:       aws.String(string(cert.Certificate)),
-		PrivateKey:            aws.String(string(cert.PrivateKey)),
-		ServerCertificateName: aws.String(name),
-		Path: aws.String("/cloudfront/letsencrypt/"),
-	})
-	if err != nil {
-		return "", err
-	}
-
-	return *resp.ServerCertificateMetadata.ServerCertificateId, nil
-}
-
-func setDistributionCert(certId, distId string) error {
-	svc := cloudfront.New(session.New())
-
-	resp, err := svc.GetDistributionConfig(&cloudfront.GetDistributionConfigInput{
+func (d *Distribution) SetCertificate(distId, certId string) error {
+	resp, err := d.Service.GetDistributionConfig(&cloudfront.GetDistributionConfigInput{
 		Id: aws.String(distId),
 	})
 	if err != nil {
@@ -228,7 +152,7 @@ func setDistributionCert(certId, distId string) error {
 	DistributionConfig.ViewerCertificate.MinimumProtocolVersion = aws.String("TLSv1")
 	DistributionConfig.ViewerCertificate.CloudFrontDefaultCertificate = aws.Bool(false)
 
-	_, err = svc.UpdateDistribution(&cloudfront.UpdateDistributionInput{
+	_, err = d.Service.UpdateDistribution(&cloudfront.UpdateDistributionInput{
 		Id:                 aws.String(distId),
 		IfMatch:            ETag,
 		DistributionConfig: DistributionConfig,
@@ -237,35 +161,42 @@ func setDistributionCert(certId, distId string) error {
 	return err
 }
 
-func renameCert(prev, next string) error {
-	svc := iam.New(session.New())
-
-	err := deleteCert(next)
+func (d *Distribution) Disable(distId string) error {
+	resp, err := d.Service.GetDistributionConfig(&cloudfront.GetDistributionConfigInput{
+		Id: aws.String(distId),
+	})
 	if err != nil {
 		return err
 	}
 
-	_, err = svc.UpdateServerCertificate(&iam.UpdateServerCertificateInput{
-		ServerCertificateName:    aws.String(prev),
-		NewServerCertificateName: aws.String(next),
+	DistributionConfig, ETag := resp.DistributionConfig, resp.ETag
+	DistributionConfig.Enabled = aws.Bool(false)
+
+	_, err = d.Service.UpdateDistribution(&cloudfront.UpdateDistributionInput{
+		Id:                 aws.String(distId),
+		IfMatch:            ETag,
+		DistributionConfig: DistributionConfig,
 	})
 
 	return err
 }
 
-func deleteCert(name string) error {
-	svc := iam.New(session.New())
-
-	_, err := svc.DeleteServerCertificate(&iam.DeleteServerCertificateInput{
-		ServerCertificateName: aws.String(name),
+func (d *Distribution) Delete(distId string) (bool, error) {
+	resp, err := d.Service.GetDistribution(&cloudfront.GetDistributionInput{
+		Id: aws.String(distId),
 	})
-
 	if err != nil {
-		failure := err.(awserr.RequestFailure)
-		if failure.StatusCode() != 404 {
-			return err
-		}
+		return false, err
 	}
 
-	return nil
+	if *resp.Distribution.Status != "Deployed" {
+		return false, nil
+	}
+
+	_, err = d.Service.DeleteDistribution(&cloudfront.DeleteDistributionInput{
+		Id:      aws.String(distId),
+		IfMatch: resp.ETag,
+	})
+
+	return err == nil, err
 }
