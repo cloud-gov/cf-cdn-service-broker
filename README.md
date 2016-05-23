@@ -64,15 +64,14 @@ A [Cloud Foundry](https://www.cloudfoundry.org/) [service broker](http://docs.cl
     $ cf create-domain <org> <domain>
     ```
 
-1. [Add the `domain` to your manifest](https://docs.cloudfoundry.org/devguide/deploy-apps/manifest.html#domain) to connect that domain to your application, then `cf push`.
-    1. If you aren't using a manifest (which you should), [create a route manually](http://docs.cloudfoundry.org/devguide/deploy-apps/routes-domains.html#create-route-without-hostname).
+1. Add the following under the application entry in your [manifest](https://docs.cloudfoundry.org/devguide/deploy-apps/manifest.html)
 
-        ```bash
-        $ cf create-route <space> <domain>
-        $ cf map-route <app> <domain>
-        ```
+    ```yaml
+    domain: <domain>
+    no-hostname: true
+    ```
 
-1. Wait for DNS changes to propagate (may take 30 minutes)
+1. Wait thirty minutes for the CloudFront distribution to be provisioned and the DNS changes to propagate.
 1. Visit `my.domain.gov`, and see that you have a valid certificate (i.e. that visiting your site in a modern browser doesn't give you a certificate warning)
 
 ## Contributing
