@@ -57,6 +57,11 @@ func (b *CdnServiceBroker) Provision(
 		return spec, errors.New("must be invoked with `domain` and `origin` keys")
 	}
 
+	_, err = b.Manager.Get(instanceId)
+	if err == nil {
+		return spec, brokerapi.ErrInstanceAlreadyExists
+	}
+
 	_, err = b.Manager.Create(instanceId, options.Domain, options.Origin)
 	if err != nil {
 		return spec, err
