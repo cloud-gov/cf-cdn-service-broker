@@ -10,8 +10,8 @@ import (
 
 type Settings struct {
 	Port               string `envconfig:"port";default:"3000"`
-	Username           string `envconfig:"username";required:"true"`
-	Password           string `envconfig:"password";required:"true"`
+	BrokerUsername     string `envconfig:"broker_username";required:"true"`
+	BrokerPassword     string `envconfig:"broker_password";required:"true"`
 	DatabaseUrl        string `envconfig:"database_url";required:"true"`
 	Email              string `envconfig:"email";required:"true"`
 	AcmeUrl            string `envconfig:"acme_url";required:"true"`

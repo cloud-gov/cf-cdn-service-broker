@@ -46,8 +46,8 @@ func main() {
 		Manager: &manager,
 	}
 	credentials := brokerapi.BrokerCredentials{
-		Username: settings.Username,
-		Password: settings.Password,
+		Username: settings.BrokerUsername,
+		Password: settings.BrokerPassword,
 	}
 
 	brokerAPI := brokerapi.New(&broker, logger, credentials)
