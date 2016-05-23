@@ -1,6 +1,11 @@
 language: go
+
 go:
-- '1.6'
+- "1.6"
 - tip
-# assume all dependencies have been vendored
+
+# Dependencies live in /vendor/
 install: true
+
+# Skip vendor tests
+script: go test -v $(go list ./... | grep -v /vendor/)

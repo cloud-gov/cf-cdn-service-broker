@@ -7,8 +7,14 @@ import (
 	"github.com/pivotal-golang/lager"
 	"github.com/robfig/cron"
 
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/cloudfront"
+	"github.com/aws/aws-sdk-go/service/iam"
+	"github.com/aws/aws-sdk-go/service/s3"
+
 	"github.com/18F/cf-cdn-service-broker/config"
 	"github.com/18F/cf-cdn-service-broker/models"
+	"github.com/18F/cf-cdn-service-broker/utils"
 )
 
 func main() {
@@ -25,11 +31,19 @@ func main() {
 		logger.Fatal("connect", err)
 	}
 
+	session := session.New()
+	manager := models.RouteManager{
+		Iam:        &utils.Iam{iam.New(session)},
+		CloudFront: &utils.Distribution{settings, cloudfront.New(session)},
+		Acme:       &utils.Acme{settings, s3.New(session)},
+		DB:         db,
+	}
+
 	c := cron.New()
 
 	c.AddFunc("0 0 * * * *", func() {
 		logger.Info("Running renew")
-		models.Renew(settings, db)
+		manager.RenewAll()
 	})
 
 	logger.Info("Starting cron")

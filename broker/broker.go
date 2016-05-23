@@ -6,10 +6,8 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"github.com/jinzhu/gorm"
 	"github.com/pivotal-cf/brokerapi"
 
-	"github.com/18F/cf-cdn-service-broker/config"
 	"github.com/18F/cf-cdn-service-broker/models"
 )
 
@@ -19,8 +17,7 @@ type ProvisionOptions struct {
 }
 
 type CdnServiceBroker struct {
-	Settings config.Settings
-	DB       *gorm.DB
+	Manager models.RouteManagerIface
 }
 
 func (*CdnServiceBroker) Services() []brokerapi.Service {
@@ -60,22 +57,30 @@ func (b *CdnServiceBroker) Provision(
 		return spec, errors.New("must be invoked with `domain` and `origin` keys")
 	}
 
-	_, err = models.NewRoute(b.Settings, b.DB, instanceId, options.Domain, options.Origin)
+	_, err = b.Manager.Get(instanceId)
+	if err == nil {
+		return spec, brokerapi.ErrInstanceAlreadyExists
+	}
+
+	_, err = b.Manager.Create(instanceId, options.Domain, options.Origin)
 	if err != nil {
 		return spec, err
 	}
+
 	return brokerapi.ProvisionedServiceSpec{IsAsync: true}, nil
 }
 
 func (b *CdnServiceBroker) LastOperation(instanceId string) (brokerapi.LastOperation, error) {
-	route, err := b.getRoute(instanceId)
+	route, err := b.Manager.Get(instanceId)
 	if err != nil {
 		return brokerapi.LastOperation{
 			State:       brokerapi.Failed,
 			Description: "Service instance not found",
 		}, nil
 	}
-	err = route.Update(b.Settings, b.DB)
+
+	b.Manager.Update(route)
+
 	switch route.State {
 	case "provisioning":
 		return brokerapi.LastOperation{
@@ -103,15 +108,16 @@ func (b *CdnServiceBroker) Deprovision(instanceId string, details brokerapi.Depr
 		return false, brokerapi.ErrAsyncRequired
 	}
 
-	route, err := b.getRoute(instanceId)
+	route, err := b.Manager.Get(instanceId)
 	if err != nil {
 		return false, err
 	}
 
-	err = route.Disable(b.DB)
+	err = b.Manager.Disable(route)
 	if err != nil {
-		return false, err
+		return false, nil
 	}
+
 	return true, nil
 }
 
@@ -124,14 +130,5 @@ func (b *CdnServiceBroker) Unbind(instanceId, bindingId string, details brokerap
 }
 
 func (b *CdnServiceBroker) Update(instanceId string, details brokerapi.UpdateDetails, asyncAllowed bool) (brokerapi.IsAsync, error) {
-	return true, nil
-}
-
-func (b *CdnServiceBroker) getRoute(instanceId string) (models.Route, error) {
-	route := models.Route{}
-	b.DB.First(&route, models.Route{InstanceId: instanceId})
-	if route.InstanceId == instanceId {
-		return route, nil
-	}
-	return models.Route{}, brokerapi.ErrInstanceDoesNotExist
+	return false, errors.New("service does not support update")
 }

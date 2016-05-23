@@ -63,6 +63,12 @@ A Cloud Foundry service broker for CloudFront and Let's Encrypt
 
 * Visit `my.domain.gov`
 
+## Tests
+
+```
+go test -v $(go list ./... | grep -v /vendor/)
+```
+
 ## Contributing
 
 See [CONTRIBUTING](CONTRIBUTING.md) for additional information.

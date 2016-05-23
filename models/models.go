@@ -6,13 +6,9 @@ import (
 	"time"
 
 	"github.com/jinzhu/gorm"
+	"github.com/pivotal-cf/brokerapi"
 	"github.com/xenolf/lego/acme"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/cloudfront"
-
-	"github.com/18F/cf-cdn-service-broker/config"
 	"github.com/18F/cf-cdn-service-broker/utils"
 )
 
@@ -27,11 +23,35 @@ type Route struct {
 	Certificate    Certificate
 }
 
-func NewRoute(settings config.Settings, db *gorm.DB, instanceId, domain, origin string) (Route, error) {
-	dist, err := utils.CreateDistribution(settings, domain, origin)
+type Certificate struct {
+	gorm.Model
+	acme.CertificateResource
+	RouteId uint
+	Expires time.Time `gorm:"index"`
+}
+
+type RouteManagerIface interface {
+	Create(instanceId, domain, origin string) (Route, error)
+	Get(instanceId string) (Route, error)
+	Update(route Route) error
+	Disable(route Route) error
+	Renew(route Route) error
+	RenewAll()
+}
+
+type RouteManager struct {
+	Iam        utils.IamIface
+	CloudFront utils.DistributionIface
+	Acme       utils.AcmeIface
+	DB         *gorm.DB
+}
+
+func (m *RouteManager) Create(instanceId, domain, origin string) (Route, error) {
+	dist, err := m.CloudFront.Create(domain, origin)
 	if err != nil {
 		return Route{}, err
 	}
+
 	route := Route{
 		InstanceId:     instanceId,
 		State:          "provisioning",
@@ -40,32 +60,57 @@ func NewRoute(settings config.Settings, db *gorm.DB, instanceId, domain, origin 
 		DistId:         *dist.Id,
 		Origin:         origin,
 	}
-	db.Create(&route)
+
+	m.DB.Create(&route)
 	return route, nil
 }
 
-func (r *Route) Update(settings config.Settings, db *gorm.DB) error {
+func (m *RouteManager) Get(instanceId string) (Route, error) {
+	route := Route{}
+	result := m.DB.First(&route, Route{InstanceId: instanceId})
+	if result.Error == nil {
+		return route, nil
+	} else if result.RecordNotFound() {
+		return Route{}, brokerapi.ErrInstanceDoesNotExist
+	} else {
+		return Route{}, result.Error
+	}
+}
+
+func (m *RouteManager) Update(r Route) error {
 	switch r.State {
 	case "provisioning":
-		return r.updateProvisioning(settings, db)
+		return m.updateProvisioning(r)
 	case "deprovisioning":
-		return r.updateDeprovisioning(db)
+		return m.updateDeprovisioning(r)
 	default:
 		return nil
 	}
 }
 
-func (r *Route) Renew(settings config.Settings, db *gorm.DB) error {
-	var certRow Certificate
-
-	db.Model(&r).Related(&certRow, "Certificate")
-
-	certResource, err := utils.RenewCertificate(settings, certRow.CertificateResource)
+func (m *RouteManager) Disable(r Route) error {
+	err := m.CloudFront.Disable(r.DistId)
 	if err != nil {
 		return err
 	}
 
-	err = utils.DeployCert(r.DomainExternal, r.DistId, certResource)
+	r.State = "deprovisioning"
+	m.DB.Save(&r)
+
+	return nil
+}
+
+func (m *RouteManager) Renew(r Route) error {
+	var certRow Certificate
+
+	m.DB.Model(&r).Related(&certRow, "Certificate")
+
+	certResource, err := m.Acme.RenewCertificate(certRow.CertificateResource)
+	if err != nil {
+		return err
+	}
+
+	err = m.deployCertificate(r.DomainExternal, r.DistId, certResource)
 	if err != nil {
 		return err
 	}
@@ -77,26 +122,30 @@ func (r *Route) Renew(settings config.Settings, db *gorm.DB) error {
 
 	certRow.CertificateResource = certResource
 	certRow.Expires = expires
-	db.Save(&certRow)
+	m.DB.Save(&certRow)
 
 	return nil
 }
 
-func (r *Route) Disable(db *gorm.DB) error {
-	err := utils.DisableDistribution(r.DistId)
-	if err != nil {
-		return err
+func (m *RouteManager) RenewAll() {
+	routes := []Route{}
+
+	m.DB.Where(
+		"state = ? and expires < now() + interval '30 days'", "provisioned",
+	).Joins(
+		"join certificates on routes.id = certificates.route_id",
+	).Preload(
+		"Certificate",
+	).Find(&routes)
+
+	for _, route := range routes {
+		m.Renew(route)
 	}
-
-	r.State = "deprovisioning"
-	db.Save(&r)
-
-	return nil
 }
 
-func (r *Route) updateProvisioning(settings config.Settings, db *gorm.DB) error {
-	if r.checkCNAME() && r.checkDistribution() {
-		certResource, err := r.provisionCert(settings)
+func (m *RouteManager) updateProvisioning(r Route) error {
+	if m.checkCNAME(r) && m.checkDistribution(r) {
+		certResource, err := m.provisionCert(r)
 		if err != nil {
 			return err
 		}
@@ -110,37 +159,42 @@ func (r *Route) updateProvisioning(settings config.Settings, db *gorm.DB) error 
 			CertificateResource: certResource,
 			Expires:             expires,
 		}
-		db.Create(&certRow)
+		m.DB.Create(&certRow)
 
 		r.State = "provisioned"
 		r.Certificate = certRow
-		db.Save(&r)
+		m.DB.Save(&r)
 	}
 
 	return nil
 }
 
-func (r *Route) updateDeprovisioning(db *gorm.DB) error {
-	deleted, err := utils.DeleteDistribution(r.DomainExternal, r.DistId)
+func (m *RouteManager) updateDeprovisioning(r Route) error {
+	deleted, err := m.CloudFront.Delete(r.DistId)
 	if err != nil {
 		return err
 	}
 
 	if deleted {
+		err = m.Iam.DeleteCertificate(fmt.Sprintf("cdn-route-%s", r.DomainExternal))
+		if err != nil {
+			return err
+		}
+
 		r.State = "deprovisioned"
-		db.Save(&r)
+		m.DB.Save(&r)
 	}
 
 	return nil
 }
 
-func (r *Route) provisionCert(settings config.Settings) (acme.CertificateResource, error) {
-	cert, err := utils.ObtainCertificate(settings, r.DomainExternal)
+func (m *RouteManager) provisionCert(r Route) (acme.CertificateResource, error) {
+	cert, err := m.Acme.ObtainCertificate(r.DomainExternal)
 	if err != nil {
 		return acme.CertificateResource{}, err
 	}
 
-	err = utils.DeployCert(r.DomainExternal, r.DistId, cert)
+	err = m.deployCertificate(r.DomainExternal, r.DistId, cert)
 	if err != nil {
 		return acme.CertificateResource{}, err
 	}
@@ -148,7 +202,7 @@ func (r *Route) provisionCert(settings config.Settings) (acme.CertificateResourc
 	return cert, nil
 }
 
-func (r *Route) checkCNAME() bool {
+func (m *RouteManager) checkCNAME(r Route) bool {
 	cname, err := net.LookupCNAME(r.DomainExternal)
 	if err != nil {
 		return false
@@ -157,37 +211,28 @@ func (r *Route) checkCNAME() bool {
 	return cname == fmt.Sprintf("%s.", r.DomainInternal)
 }
 
-func (r *Route) checkDistribution() bool {
-	svc := cloudfront.New(session.New())
-
-	resp, err := svc.GetDistribution(&cloudfront.GetDistributionInput{
-		Id: aws.String(r.DistId),
-	})
+func (m *RouteManager) checkDistribution(r Route) bool {
+	dist, err := m.CloudFront.Get(r.DistId)
 	if err != nil {
 		return false
 	}
 
-	return *resp.Distribution.Status == "Deployed" && *resp.Distribution.DistributionConfig.Enabled
+	return *dist.Status == "Deployed" && *dist.DistributionConfig.Enabled
 }
 
-type Certificate struct {
-	gorm.Model
-	acme.CertificateResource
-	RouteId uint
-	Expires time.Time `gorm:"index"`
-}
+func (m *RouteManager) deployCertificate(domain, distId string, cert acme.CertificateResource) error {
+	prev := fmt.Sprintf("cdn-route-%s-new", domain)
+	next := fmt.Sprintf("cdn-route-%s", domain)
 
-func Renew(settings config.Settings, db *gorm.DB) {
-	routes := []Route{}
-	db.Where(
-		"state = ? and expires < now() + interval '30 days'", "provisioned",
-	).Joins(
-		"join certificates on routes.id = certificates.route_id",
-	).Preload(
-		"Certificate",
-	).Find(&routes)
-
-	for _, route := range routes {
-		route.Renew(settings, db)
+	certId, err := m.Iam.UploadCertificate(prev, cert)
+	if err != nil {
+		return err
 	}
+
+	err = m.CloudFront.SetCertificate(certId, distId)
+	if err != nil {
+		return err
+	}
+
+	return m.Iam.RenameCertificate(prev, next)
 }

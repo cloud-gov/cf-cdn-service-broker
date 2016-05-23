@@ -132,6 +132,10 @@
 			"Rev": "18fa650ff6b7b4f6bd8f8611408d1533eb54a918"
 		},
 		{
+			"ImportPath": "github.com/davecgh/go-spew/spew",
+			"Rev": "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d"
+		},
+		{
 			"ImportPath": "github.com/go-ini/ini",
 			"Comment": "v1.11.0",
 			"Rev": "12f418cc7edc5a618a51407b7ac1f1f512139df3"
@@ -206,9 +210,28 @@
 			"Rev": "7639e31ce6622c55c15aa64144b85d5f4873d127"
 		},
 		{
+			"ImportPath": "github.com/pmezard/go-difflib/difflib",
+			"Rev": "792786c7400a136282c1664665ae0a8db921c6c2"
+		},
+		{
 			"ImportPath": "github.com/robfig/cron",
 			"Comment": "v1-18-g8dc4916",
 			"Rev": "8dc4916d418b9d0b2e23c9c1e68351dc9a1d6573"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/assert",
+			"Comment": "v1.1.3-16-g6cb3b85",
+			"Rev": "6cb3b85ef5a0efef77caef88363ec4d4b5c0976d"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/require",
+			"Comment": "v1.1.3-16-g6cb3b85",
+			"Rev": "6cb3b85ef5a0efef77caef88363ec4d4b5c0976d"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/suite",
+			"Comment": "v1.1.3-16-g6cb3b85",
+			"Rev": "6cb3b85ef5a0efef77caef88363ec4d4b5c0976d"
 		},
 		{
 			"ImportPath": "github.com/xenolf/lego/acme",
