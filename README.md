@@ -1,4 +1,4 @@
-# cf-cdn-service-broker
+# cf-cdn-service-broker [![Build Status](https://travis-ci.org/18F/cf-cdn-service-broker.svg?branch=master)](https://travis-ci.org/18F/cf-cdn-service-broker)
 
 A Cloud Foundry service broker for CloudFront and Let's Encrypt
 
