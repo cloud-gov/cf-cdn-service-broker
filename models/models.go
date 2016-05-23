@@ -67,11 +67,14 @@ func (m *RouteManager) Create(instanceId, domain, origin string) (Route, error) 
 
 func (m *RouteManager) Get(instanceId string) (Route, error) {
 	route := Route{}
-	m.DB.First(&route, Route{InstanceId: instanceId})
-	if route.InstanceId == instanceId {
+	result := m.DB.First(&route, Route{InstanceId: instanceId})
+	if result.Error == nil {
 		return route, nil
+	} else if result.RecordNotFound() {
+		return Route{}, brokerapi.ErrInstanceDoesNotExist
+	} else {
+		return Route{}, result.Error
 	}
-	return Route{}, brokerapi.ErrInstanceDoesNotExist
 }
 
 func (m *RouteManager) Update(r Route) error {
