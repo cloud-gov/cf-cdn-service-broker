@@ -12,14 +12,17 @@ import (
 )
 
 func main() {
-	settings := config.NewSettings()
-
 	logger := lager.NewLogger("cdn-cron")
 	logger.RegisterSink(lager.NewWriterSink(os.Stderr, lager.INFO))
 
-	db, err := config.Connect()
+	settings, err := config.NewSettings()
 	if err != nil {
-		logger.Fatal("Error", err)
+		logger.Fatal("new-settings", err)
+	}
+
+	db, err := config.Connect(settings)
+	if err != nil {
+		logger.Fatal("connect", err)
 	}
 
 	c := cron.New()
