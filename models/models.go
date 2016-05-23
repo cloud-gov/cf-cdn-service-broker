@@ -1,6 +1,7 @@
 package models
 
 import (
+	"database/sql/driver"
 	"fmt"
 	"net"
 	"time"
@@ -12,10 +13,32 @@ import (
 	"github.com/18F/cf-cdn-service-broker/utils"
 )
 
+type State string
+
+const (
+	Provisioning   State = "provisioning"
+	Provisioned          = "provisioned"
+	Deprovisioning       = "deprovisioning"
+	Deprovisioned        = "deprovisioned"
+)
+
+func (s State) Value() (driver.Value, error) {
+	return string(s), nil
+}
+
+func (s *State) Scan(value interface{}) error {
+	bytes, ok := value.([]byte)
+	if !ok {
+		return fmt.Errorf("error scanning status %s", value)
+	}
+	*s = State(bytes)
+	return nil
+}
+
 type Route struct {
 	gorm.Model
-	InstanceId     string `gorm:"unique_index"`
-	State          string `gorm:"index"`
+	InstanceId     string `gorm:"not null;unique_index"`
+	State          State  `gorm:"not null;index"`
 	DomainExternal string
 	DomainInternal string
 	DistId         string
@@ -54,7 +77,7 @@ func (m *RouteManager) Create(instanceId, domain, origin string) (Route, error) 
 
 	route := Route{
 		InstanceId:     instanceId,
-		State:          "provisioning",
+		State:          Provisioning,
 		DomainExternal: domain,
 		DomainInternal: *dist.DomainName,
 		DistId:         *dist.Id,
@@ -79,9 +102,9 @@ func (m *RouteManager) Get(instanceId string) (Route, error) {
 
 func (m *RouteManager) Update(r Route) error {
 	switch r.State {
-	case "provisioning":
+	case Provisioning:
 		return m.updateProvisioning(r)
-	case "deprovisioning":
+	case Deprovisioning:
 		return m.updateDeprovisioning(r)
 	default:
 		return nil
@@ -94,7 +117,7 @@ func (m *RouteManager) Disable(r Route) error {
 		return err
 	}
 
-	r.State = "deprovisioning"
+	r.State = Deprovisioning
 	m.DB.Save(&r)
 
 	return nil
@@ -131,7 +154,7 @@ func (m *RouteManager) RenewAll() {
 	routes := []Route{}
 
 	m.DB.Where(
-		"state = ? and expires < now() + interval '30 days'", "provisioned",
+		"state = ? and expires < now() + interval '30 days'", string(Provisioned),
 	).Joins(
 		"join certificates on routes.id = certificates.route_id",
 	).Preload(
@@ -161,7 +184,7 @@ func (m *RouteManager) updateProvisioning(r Route) error {
 		}
 		m.DB.Create(&certRow)
 
-		r.State = "provisioned"
+		r.State = Provisioned
 		r.Certificate = certRow
 		m.DB.Save(&r)
 	}
@@ -181,7 +204,7 @@ func (m *RouteManager) updateDeprovisioning(r Route) error {
 			return err
 		}
 
-		r.State = "deprovisioned"
+		r.State = Deprovisioned
 		m.DB.Save(&r)
 	}
 

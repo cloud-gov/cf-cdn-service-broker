@@ -57,7 +57,7 @@ type ProvisionSuite struct {
 func (s *ProvisionSuite) SetupTest() {
 	s.Broker = broker.CdnServiceBroker{
 		Manager: &FakeRouteManager{
-			RouteCreate: models.Route{State: "provisioned"},
+			RouteCreate: models.Route{State: models.Provisioned},
 			ErrorCreate: nil,
 			RouteGet:    models.Route{},
 			ErrorGet:    errors.New("not found"),
@@ -88,9 +88,9 @@ func (s *ProvisionSuite) TestWithoutOptions() {
 func (s *ProvisionSuite) TestInstanceExists() {
 	b := broker.CdnServiceBroker{
 		Manager: &FakeRouteManager{
-			RouteCreate: models.Route{State: "provisioned"},
+			RouteCreate: models.Route{State: models.Provisioned},
 			ErrorCreate: nil,
-			RouteGet:    models.Route{State: "provisioned"},
+			RouteGet:    models.Route{State: models.Provisioned},
 			ErrorGet:    nil,
 		},
 	}
@@ -125,7 +125,7 @@ func TestLastOperationMissing(t *testing.T) {
 func TestLastOperationSucceeded(t *testing.T) {
 	b := broker.CdnServiceBroker{
 		Manager: &FakeRouteManager{
-			RouteGet: models.Route{State: "provisioned"},
+			RouteGet: models.Route{State: models.Provisioned},
 			ErrorGet: nil,
 		},
 	}
@@ -138,7 +138,7 @@ func TestLastOperationSucceeded(t *testing.T) {
 func TestLastOperationProvisioning(t *testing.T) {
 	b := broker.CdnServiceBroker{
 		Manager: &FakeRouteManager{
-			RouteGet: models.Route{State: "provisioning"},
+			RouteGet: models.Route{State: models.Provisioning},
 			ErrorGet: nil,
 		},
 	}
@@ -151,7 +151,7 @@ func TestLastOperationProvisioning(t *testing.T) {
 func TestLastOperationDeprovisioning(t *testing.T) {
 	b := broker.CdnServiceBroker{
 		Manager: &FakeRouteManager{
-			RouteGet: models.Route{State: "deprovisioning"},
+			RouteGet: models.Route{State: models.Deprovisioning},
 			ErrorGet: nil,
 		},
 	}
