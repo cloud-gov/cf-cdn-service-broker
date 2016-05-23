@@ -224,6 +224,16 @@
 			"Rev": "6cb3b85ef5a0efef77caef88363ec4d4b5c0976d"
 		},
 		{
+			"ImportPath": "github.com/stretchr/testify/require",
+			"Comment": "v1.1.3-16-g6cb3b85",
+			"Rev": "6cb3b85ef5a0efef77caef88363ec4d4b5c0976d"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/suite",
+			"Comment": "v1.1.3-16-g6cb3b85",
+			"Rev": "6cb3b85ef5a0efef77caef88363ec4d4b5c0976d"
+		},
+		{
 			"ImportPath": "github.com/xenolf/lego/acme",
 			"Comment": "v0.3.1-6-gb5d5eee",
 			"Rev": "b5d5eee2dd269f88f181d7a437be80194bfd0235"
