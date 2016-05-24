@@ -22,10 +22,12 @@ const (
 	Deprovisioned        = "deprovisioned"
 )
 
+// Marshal a `State` to a `string` when saving to the database
 func (s State) Value() (driver.Value, error) {
 	return string(s), nil
 }
 
+// Unmarshal an `interface{}` to a `State` when reading from the database
 func (s *State) Scan(value interface{}) error {
 	bytes, ok := value.([]byte)
 	if !ok {
