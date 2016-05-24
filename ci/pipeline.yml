@@ -4,13 +4,15 @@ jobs:
   plan:
   - get: broker-src
     trigger: true
+  - task: run_tests
+    file: broker-src/ci/run_tests.yml
   - put: broker-deploy
     params:
       path: broker-src
       manifest: broker-src/manifest-broker.yml
       environment_variables: &cfenv
-        USERNAME: {{cdn-broker-user}}
-        PASSWORD: {{cdn-broker-pass}}
+        BROKER_USERNAME: {{cdn-broker-user}}
+        BROKER_PASSWORD: {{cdn-broker-pass}}
         EMAIL: {{cdn-broker-email}}
         ACME_URL: {{cdn-broker-acme-url}}
         BUCKET: {{cdn-broker-bucket}}
