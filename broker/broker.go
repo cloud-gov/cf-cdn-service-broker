@@ -22,7 +22,7 @@ type CdnServiceBroker struct {
 
 func (*CdnServiceBroker) Services() []brokerapi.Service {
 	var service brokerapi.Service
-	buf, err := ioutil.ReadFile("./catalog.json")
+	buf, err := ioutil.ReadFile('./catalog.json')
 	if err != nil {
 		return []brokerapi.Service{}
 	}
