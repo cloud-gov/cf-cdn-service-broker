@@ -82,7 +82,7 @@ func (b *CdnServiceBroker) LastOperation(instanceId string) (brokerapi.LastOpera
 	b.Manager.Update(route)
 
 	switch route.State {
-	case "provisioning":
+	case models.Provisioning:
 		return brokerapi.LastOperation{
 			State: brokerapi.InProgress,
 			Description: fmt.Sprintf(
@@ -90,7 +90,7 @@ func (b *CdnServiceBroker) LastOperation(instanceId string) (brokerapi.LastOpera
 				route.DomainExternal, route.DomainInternal,
 			),
 		}, nil
-	case "deprovisioning":
+	case models.Deprovisioning:
 		return brokerapi.LastOperation{
 			State:       brokerapi.InProgress,
 			Description: "Deprovisioning in progress",
