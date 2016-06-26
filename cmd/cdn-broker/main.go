@@ -37,7 +37,7 @@ func main() {
 
 	session := session.New()
 	manager := models.RouteManager{
-		Iam:        &utils.Iam{iam.New(session)},
+		Iam:        &utils.Iam{settings, iam.New(session)},
 		CloudFront: &utils.Distribution{settings, cloudfront.New(session)},
 		Acme:       &utils.Acme{settings, s3.New(session)},
 		DB:         db,

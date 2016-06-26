@@ -16,6 +16,8 @@ type Settings struct {
 	Email              string `envconfig:"email";required:"true"`
 	AcmeUrl            string `envconfig:"acme_url";required:"true"`
 	Bucket             string `envconfig:"bucket";required:"true"`
+	IamPathPrefix      string `envconfig:"iam_path_prefix";default:"letsencrypt"`
+	CloudFrontPrefix   string `envconfig:"cloudfront_prefix";default:""`
 	AwsAccessKeyId     string `envconfig:"aws_access_key_id";required:"true"`
 	AwsSecretAccessKey string `envconfig:"aws_secret_access_key";required:"true"`
 	AwsDefaultRegion   string `envconfig:"aws_default_region";required:"true"`

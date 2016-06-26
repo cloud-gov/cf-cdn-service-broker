@@ -22,14 +22,22 @@ type Distribution struct {
 	Service  *cloudfront.CloudFront
 }
 
+func (d *Distribution) getDistributionId(domain string) string {
+	return fmt.Sprintf("%scdn-route-%s", d.Settings.CloudFrontPrefix, domain)
+}
+
+func (d *Distribution) getOriginId(domain string) string {
+	return fmt.Sprintf("cdn-route-%s", domain)
+}
+
 func (d *Distribution) Create(domain, origin string) (*cloudfront.Distribution, error) {
 	resp, err := d.Service.CreateDistribution(&cloudfront.CreateDistributionInput{
 		DistributionConfig: &cloudfront.DistributionConfig{
-			CallerReference: aws.String(fmt.Sprintf("cdn-route-%s", domain)),
+			CallerReference: aws.String(d.getDistributionId(domain)),
 			Comment:         aws.String("cdn route service"),
 			Enabled:         aws.Bool(true),
 			DefaultCacheBehavior: &cloudfront.DefaultCacheBehavior{
-				TargetOriginId: aws.String(fmt.Sprintf("cdn-route-%s", domain)),
+				TargetOriginId: aws.String(d.getOriginId(domain)),
 				ForwardedValues: &cloudfront.ForwardedValues{
 					Cookies: &cloudfront.CookiePreference{
 						Forward: aws.String("all"),
@@ -60,7 +68,7 @@ func (d *Distribution) Create(domain, origin string) (*cloudfront.Distribution, 
 				Items: []*cloudfront.Origin{
 					{
 						DomainName: aws.String(origin),
-						Id:         aws.String(fmt.Sprintf("cdn-route-%s", domain)),
+						Id:         aws.String(d.getOriginId(domain)),
 						OriginPath: aws.String(""),
 						CustomHeaders: &cloudfront.CustomHeaders{
 							Quantity: aws.Int64(0),
