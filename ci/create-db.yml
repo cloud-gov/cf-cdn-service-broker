@@ -1,0 +1,13 @@
+---
+platform: linux
+
+image_resource:
+  type: docker-image
+  source:
+    repository: governmentpaas/cf-cli
+
+inputs:
+- name: broker-src
+
+run:
+  path: broker-src/ci/create-db.sh

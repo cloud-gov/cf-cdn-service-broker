@@ -4,8 +4,18 @@ jobs:
   plan:
   - get: broker-src
     trigger: true
-  - task: run_tests
-    file: broker-src/ci/run_tests.yml
+
+  - task: run-tests
+    file: broker-src/ci/run-tests.yml
+
+  - task: create-db
+    file: broker-src/ci/create-service.yml
+    params:
+      SERVICE_TYPE: aws-rds
+      SERVICE_NAME: rds-cdn-broker
+      SERVICE_PLAN: shared-psql
+      <<: *cf-creds
+
   - put: broker-deploy
     params:
       path: broker-src
@@ -19,6 +29,7 @@ jobs:
         AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id}}
         AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key}}
         AWS_DEFAULT_REGION: {{cdn-broker-region}}
+
   - put: broker-deploy
     params:
       path: broker-src
@@ -43,6 +54,16 @@ jobs:
         channel: {{slack-channel}}
         username: {{slack-username}}
         icon_url: {{slack-icon-url}}
+
+  - task: update-broker
+    file: broker-src/ci/update-broker.yml
+    params:
+      # Note: name must match application name in manifest
+      BROKER_NAME: cdn-broker
+      AUTH_USER: {{staging-auth-name}}
+      AUTH_PASS: {{staging-auth-pass}}
+      PLAN_NAME: cdn-broker
+      <<: *cf-creds
 
 resources:
 - name: broker-src
@@ -71,3 +92,10 @@ resource_types:
   type: docker-image
   source:
     repository: cfcommunity/slack-notification-resource
+
+cf-creds: &cf-creds
+  CF_API_URL: {{cf-api-url}}
+  CF_DEPLOY_USERNAME: {{cf-deploy-username}}
+  CF_DEPLOY_PASSWORD: {{cf-deploy-password}}
+  CF_ORGANIZATION: {{cf-organization}}
+  CF_SPACE: {{cf-space}}
