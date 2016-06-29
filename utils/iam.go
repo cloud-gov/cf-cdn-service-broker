@@ -15,7 +15,7 @@ import (
 type IamIface interface {
 	UploadCertificate(name string, cert acme.CertificateResource) (string, error)
 	RenameCertificate(prev, next string) error
-	DeleteCertificate(name string) error
+	DeleteCertificate(name string, allowError bool) error
 }
 
 type Iam struct {
@@ -38,7 +38,7 @@ func (i *Iam) UploadCertificate(name string, cert acme.CertificateResource) (str
 }
 
 func (i *Iam) RenameCertificate(prev, next string) error {
-	err := i.DeleteCertificate(next)
+	err := i.DeleteCertificate(next, true)
 	if err != nil {
 		return err
 	}
@@ -51,14 +51,17 @@ func (i *Iam) RenameCertificate(prev, next string) error {
 	return err
 }
 
-func (i *Iam) DeleteCertificate(name string) error {
+func (i *Iam) DeleteCertificate(name string, allowError bool) error {
 	_, err := i.Service.DeleteServerCertificate(&iam.DeleteServerCertificateInput{
 		ServerCertificateName: aws.String(name),
 	})
 
-	if err != nil {
-		failure := err.(awserr.RequestFailure)
-		if failure.StatusCode() != 404 {
+	// If caller passes `allowError`, ignore 403 and 404 errors;
+	// deleting a non-existing certificate may throw either error
+	// depending on permissions.
+	if err != nil && allowError {
+		code := err.(awserr.RequestFailure).StatusCode()
+		if code != 403 && code != 404 {
 			return err
 		}
 	}

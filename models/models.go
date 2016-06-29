@@ -201,7 +201,7 @@ func (m *RouteManager) updateDeprovisioning(r Route) error {
 	}
 
 	if deleted {
-		err = m.Iam.DeleteCertificate(fmt.Sprintf("cdn-route-%s", r.DomainExternal))
+		err = m.Iam.DeleteCertificate(fmt.Sprintf("cdn-route-%s", r.DomainExternal), false)
 		if err != nil {
 			return err
 		}
@@ -254,7 +254,7 @@ func (m *RouteManager) deployCertificate(domain, distId string, cert acme.Certif
 		return err
 	}
 
-	err = m.CloudFront.SetCertificate(certId, distId)
+	err = m.CloudFront.SetCertificate(distId, certId)
 	if err != nil {
 		return err
 	}
