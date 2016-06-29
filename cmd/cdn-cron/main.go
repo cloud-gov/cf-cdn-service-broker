@@ -7,6 +7,7 @@ import (
 	"github.com/pivotal-golang/lager"
 	"github.com/robfig/cron"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"github.com/aws/aws-sdk-go/service/iam"
@@ -31,7 +32,7 @@ func main() {
 		logger.Fatal("connect", err)
 	}
 
-	session := session.New()
+	session := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
 	manager := models.RouteManager{
 		Iam:        &utils.Iam{settings, iam.New(session)},
 		CloudFront: &utils.Distribution{settings, cloudfront.New(session)},

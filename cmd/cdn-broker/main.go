@@ -8,6 +8,7 @@ import (
 	"github.com/pivotal-cf/brokerapi"
 	"github.com/pivotal-golang/lager"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"github.com/aws/aws-sdk-go/service/iam"
@@ -35,7 +36,7 @@ func main() {
 
 	db.AutoMigrate(&models.Route{}, &models.Certificate{})
 
-	session := session.New()
+	session := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
 	manager := models.RouteManager{
 		Iam:        &utils.Iam{settings, iam.New(session)},
 		CloudFront: &utils.Distribution{settings, cloudfront.New(session)},
