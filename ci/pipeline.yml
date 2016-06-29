@@ -9,8 +9,9 @@ jobs:
     file: broker-src/ci/run-tests.yml
 
   - task: create-db
-    file: broker-src/ci/create-service.yml
+    file: broker-src/ci/create-db.yml
     params:
+      # Note: Name must match service name in manifest
       SERVICE_TYPE: aws-rds
       SERVICE_NAME: rds-cdn-broker
       SERVICE_PLAN: shared-psql
@@ -26,6 +27,7 @@ jobs:
         EMAIL: {{cdn-broker-email}}
         ACME_URL: {{cdn-broker-acme-url}}
         BUCKET: {{cdn-broker-bucket}}
+        IAM_PATH_PREFIX: {{cdn-broker-iam-path-prefix}}
         AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id}}
         AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key}}
         AWS_DEFAULT_REGION: {{cdn-broker-region}}
@@ -58,11 +60,11 @@ jobs:
   - task: update-broker
     file: broker-src/ci/update-broker.yml
     params:
-      # Note: name must match application name in manifest
+      # Note: Name must match application name in manifest
       BROKER_NAME: cdn-broker
-      AUTH_USER: {{staging-auth-name}}
-      AUTH_PASS: {{staging-auth-pass}}
-      PLAN_NAME: cdn-broker
+      AUTH_USER: {{cdn-broker-user}}
+      AUTH_PASS: {{cdn-broker-pass}}
+      PLAN_NAME: cdn-route
       <<: *cf-creds
 
 resources:
