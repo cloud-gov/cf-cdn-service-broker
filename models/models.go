@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -228,12 +229,17 @@ func (m *RouteManager) provisionCert(r Route) (acme.CertificateResource, error) 
 }
 
 func (m *RouteManager) checkCNAME(r Route) bool {
-	cname, err := net.LookupCNAME(r.DomainExternal)
-	if err != nil {
-		return false
+	domains := strings.Split(r.DomainExternal, ",")
+	expects := fmt.Sprintf("%s.", r.DomainInternal)
+
+	for _, d := range domains {
+		cname, err := net.LookupCNAME(d)
+		if err != nil || cname != expects {
+			return false
+		}
 	}
 
-	return cname == fmt.Sprintf("%s.", r.DomainInternal)
+	return true
 }
 
 func (m *RouteManager) checkDistribution(r Route) bool {

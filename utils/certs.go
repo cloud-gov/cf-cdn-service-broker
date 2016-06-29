@@ -74,7 +74,7 @@ func (a *Acme) ObtainCertificate(domain string) (acme.CertificateResource, error
 		return acme.CertificateResource{}, err
 	}
 
-	domains := []string{domain}
+	domains := strings.Split(domain, ",")
 	certificate, failures := client.ObtainCertificate(domains, true, nil)
 
 	if len(failures) > 0 {
