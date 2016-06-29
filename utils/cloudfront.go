@@ -123,6 +123,7 @@ func (d *Distribution) Create(domain, origin string) (*cloudfront.Distribution, 
 					aws.String(domain),
 				},
 			},
+			PriceClass: aws.String("PriceClass_100"),
 		},
 	})
 
