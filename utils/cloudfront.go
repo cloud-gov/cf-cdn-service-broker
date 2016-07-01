@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
@@ -10,7 +11,7 @@ import (
 )
 
 type DistributionIface interface {
-	Create(domain, origin string) (*cloudfront.Distribution, error)
+	Create(domains []string, origin string) (*cloudfront.Distribution, error)
 	Get(distId string) (*cloudfront.Distribution, error)
 	SetCertificate(distId, certId string) error
 	Disable(distId string) error
@@ -22,22 +23,33 @@ type Distribution struct {
 	Service  *cloudfront.CloudFront
 }
 
-func (d *Distribution) getDistributionId(domain string) string {
-	return fmt.Sprintf("%scdn-route-%s", d.Settings.CloudFrontPrefix, domain)
+func (d *Distribution) getDistributionId(domains []string) string {
+	return fmt.Sprintf("%scdn-route-%s", d.Settings.CloudFrontPrefix, strings.Join(domains, ":"))
 }
 
-func (d *Distribution) getOriginId(domain string) string {
-	return fmt.Sprintf("cdn-route-%s", domain)
+func (d *Distribution) getOriginId(domains []string) string {
+	return fmt.Sprintf("cdn-route-%s", strings.Join(domains, ":"))
 }
 
-func (d *Distribution) Create(domain, origin string) (*cloudfront.Distribution, error) {
+func (d *Distribution) getAliases(domains []string) *cloudfront.Aliases {
+	var items []*string
+	for _, d := range domains {
+		items = append(items, aws.String(d))
+	}
+	return &cloudfront.Aliases{
+		Quantity: aws.Int64(int64(len(domains))),
+		Items:    items,
+	}
+}
+
+func (d *Distribution) Create(domains []string, origin string) (*cloudfront.Distribution, error) {
 	resp, err := d.Service.CreateDistribution(&cloudfront.CreateDistributionInput{
 		DistributionConfig: &cloudfront.DistributionConfig{
-			CallerReference: aws.String(d.getDistributionId(domain)),
+			CallerReference: aws.String(d.getDistributionId(domains)),
 			Comment:         aws.String("cdn route service"),
 			Enabled:         aws.Bool(true),
 			DefaultCacheBehavior: &cloudfront.DefaultCacheBehavior{
-				TargetOriginId: aws.String(d.getOriginId(domain)),
+				TargetOriginId: aws.String(d.getOriginId(domains)),
 				ForwardedValues: &cloudfront.ForwardedValues{
 					Cookies: &cloudfront.CookiePreference{
 						Forward: aws.String("all"),
@@ -68,7 +80,7 @@ func (d *Distribution) Create(domain, origin string) (*cloudfront.Distribution, 
 				Items: []*cloudfront.Origin{
 					{
 						DomainName: aws.String(origin),
-						Id:         aws.String(d.getOriginId(domain)),
+						Id:         aws.String(d.getOriginId(domains)),
 						OriginPath: aws.String(""),
 						CustomHeaders: &cloudfront.CustomHeaders{
 							Quantity: aws.Int64(0),
@@ -89,7 +101,7 @@ func (d *Distribution) Create(domain, origin string) (*cloudfront.Distribution, 
 					},
 					{
 						DomainName: aws.String(fmt.Sprintf("%s.s3.amazonaws.com", d.Settings.Bucket)),
-						Id:         aws.String(fmt.Sprintf("s3-%s-%s", d.Settings.Bucket, domain)),
+						Id:         aws.String(fmt.Sprintf("s3-%s-%s", d.Settings.Bucket, domains)),
 						S3OriginConfig: &cloudfront.S3OriginConfig{
 							OriginAccessIdentity: aws.String(""),
 						},
@@ -101,7 +113,7 @@ func (d *Distribution) Create(domain, origin string) (*cloudfront.Distribution, 
 				Items: []*cloudfront.CacheBehavior{
 					{
 						PathPattern:    aws.String("/.well-known/acme-challenge/*"),
-						TargetOriginId: aws.String(fmt.Sprintf("s3-%s-%s", d.Settings.Bucket, domain)),
+						TargetOriginId: aws.String(fmt.Sprintf("s3-%s-%s", d.Settings.Bucket, domains)),
 						ForwardedValues: &cloudfront.ForwardedValues{
 							QueryString: aws.Bool(false),
 							Cookies: &cloudfront.CookiePreference{
@@ -117,12 +129,7 @@ func (d *Distribution) Create(domain, origin string) (*cloudfront.Distribution, 
 					},
 				},
 			},
-			Aliases: &cloudfront.Aliases{
-				Quantity: aws.Int64(1),
-				Items: []*string{
-					aws.String(domain),
-				},
-			},
+			Aliases:    d.getAliases(domains),
 			PriceClass: aws.String("PriceClass_100"),
 		},
 	})

@@ -49,6 +49,10 @@ type Route struct {
 	Certificate    Certificate
 }
 
+func (r *Route) GetDomains() []string {
+	return strings.Split(r.DomainExternal, ",")
+}
+
 type Certificate struct {
 	gorm.Model
 	acme.CertificateResource
@@ -73,19 +77,20 @@ type RouteManager struct {
 }
 
 func (m *RouteManager) Create(instanceId, domain, origin string) (Route, error) {
-	dist, err := m.CloudFront.Create(domain, origin)
-	if err != nil {
-		return Route{}, err
-	}
-
 	route := Route{
 		InstanceId:     instanceId,
 		State:          Provisioning,
 		DomainExternal: domain,
-		DomainInternal: *dist.DomainName,
-		DistId:         *dist.Id,
 		Origin:         origin,
 	}
+
+	dist, err := m.CloudFront.Create(route.GetDomains(), origin)
+	if err != nil {
+		return Route{}, err
+	}
+
+	route.DomainInternal = *dist.DomainName
+	route.DistId = *dist.Id
 
 	m.DB.Create(&route)
 	return route, nil
@@ -215,7 +220,7 @@ func (m *RouteManager) updateDeprovisioning(r Route) error {
 }
 
 func (m *RouteManager) provisionCert(r Route) (acme.CertificateResource, error) {
-	cert, err := m.Acme.ObtainCertificate(r.DomainExternal)
+	cert, err := m.Acme.ObtainCertificate(r.GetDomains())
 	if err != nil {
 		return acme.CertificateResource{}, err
 	}
@@ -229,10 +234,9 @@ func (m *RouteManager) provisionCert(r Route) (acme.CertificateResource, error) 
 }
 
 func (m *RouteManager) checkCNAME(r Route) bool {
-	domains := strings.Split(r.DomainExternal, ",")
 	expects := fmt.Sprintf("%s.", r.DomainInternal)
 
-	for _, d := range domains {
+	for _, d := range r.GetDomains() {
 		cname, err := net.LookupCNAME(d)
 		if err != nil || cname != expects {
 			return false
