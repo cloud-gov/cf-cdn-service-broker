@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"path"
 	"strings"
 
@@ -59,7 +60,7 @@ func (p *HTTPProvider) CleanUp(domain, token, keyAuth string) error {
 }
 
 type AcmeIface interface {
-	ObtainCertificate(domain string) (acme.CertificateResource, error)
+	ObtainCertificate(domains []string) (acme.CertificateResource, error)
 	RenewCertificate(cert acme.CertificateResource) (acme.CertificateResource, error)
 }
 
@@ -68,17 +69,16 @@ type Acme struct {
 	Service  *s3.S3
 }
 
-func (a *Acme) ObtainCertificate(domain string) (acme.CertificateResource, error) {
+func (a *Acme) ObtainCertificate(domains []string) (acme.CertificateResource, error) {
 	client, err := a.newClient()
 	if err != nil {
 		return acme.CertificateResource{}, err
 	}
 
-	domains := []string{domain}
 	certificate, failures := client.ObtainCertificate(domains, true, nil)
 
 	if len(failures) > 0 {
-		return acme.CertificateResource{}, failures[domain]
+		return acme.CertificateResource{}, fmt.Errorf("Error(s) obtaining cert: %s", failures)
 	}
 
 	return certificate, nil

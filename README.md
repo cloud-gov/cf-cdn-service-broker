@@ -54,6 +54,15 @@ The easiest/recommended way to deploy the broker is via the [Concourse](http://c
     Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
     ```
 
+    If you have more than one domain you can pass a comma-delimited list to the `domain` parameter, just keep in mind that the broker will wait until all domains are CNAME'd:
+
+    ```
+    $ cf create-service cdn-route cdn-route my-cdn-route \
+        -c '{"domain": "my.domain.gov,www.my.domain.gov", "origin": "my-app.apps.cloud.gov"}'
+
+    Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
+    ```
+
 1. Get the DNS instructions.
 
     ```
