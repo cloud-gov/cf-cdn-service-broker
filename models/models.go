@@ -55,9 +55,19 @@ func (r *Route) GetDomains() []string {
 
 type Certificate struct {
 	gorm.Model
-	acme.CertificateResource
-	RouteId uint
-	Expires time.Time `gorm:"index"`
+	RouteId     uint
+	Domain      string
+	CertURL     string
+	Certificate []byte
+	Expires     time.Time `gorm:"index"`
+}
+
+func (c Certificate) Resource() acme.CertificateResource {
+	return acme.CertificateResource{
+		Domain:      c.Domain,
+		CertURL:     c.CertURL,
+		Certificate: c.Certificate,
+	}
 }
 
 type RouteManagerIface interface {
@@ -136,7 +146,7 @@ func (m *RouteManager) Renew(r Route) error {
 
 	m.DB.Model(&r).Related(&certRow, "Certificate")
 
-	certResource, err := m.Acme.RenewCertificate(certRow.CertificateResource)
+	certResource, err := m.Acme.RenewCertificate(certRow.Resource())
 	if err != nil {
 		return err
 	}
@@ -151,7 +161,9 @@ func (m *RouteManager) Renew(r Route) error {
 		return err
 	}
 
-	certRow.CertificateResource = certResource
+	certRow.Domain = certResource.Domain
+	certRow.CertURL = certResource.CertURL
+	certRow.Certificate = certResource.Certificate
 	certRow.Expires = expires
 	m.DB.Save(&certRow)
 
@@ -187,8 +199,10 @@ func (m *RouteManager) updateProvisioning(r Route) error {
 		}
 
 		certRow := Certificate{
-			CertificateResource: certResource,
-			Expires:             expires,
+			Domain:      certResource.Domain,
+			CertURL:     certResource.CertURL,
+			Certificate: certResource.Certificate,
+			Expires:     expires,
 		}
 		m.DB.Create(&certRow)
 
