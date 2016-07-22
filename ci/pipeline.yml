@@ -31,6 +31,7 @@ jobs:
         AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id}}
         AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key}}
         AWS_DEFAULT_REGION: {{cdn-broker-region}}
+        SERVER_SIDE_ENCRYPTION: AES256
 
   - put: broker-deploy
     params:

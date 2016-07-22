@@ -41,11 +41,15 @@ type HTTPProvider struct {
 }
 
 func (p *HTTPProvider) Present(domain, token, keyAuth string) error {
-	_, err := p.Service.PutObject(&s3.PutObjectInput{
+	input := s3.PutObjectInput{
 		Bucket: aws.String(p.Settings.Bucket),
-		Body:   strings.NewReader(keyAuth),
 		Key:    aws.String(path.Join(".well-known", "acme-challenge", token)),
-	})
+		Body:   strings.NewReader(keyAuth),
+	}
+	if p.Settings.ServerSideEncryption != "" {
+		input.ServerSideEncryption = aws.String(p.Settings.ServerSideEncryption)
+	}
+	_, err := p.Service.PutObject(&input)
 
 	return err
 }
