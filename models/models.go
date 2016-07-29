@@ -4,6 +4,8 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"net"
+	"reflect"
+	"sort"
 	"strings"
 	"time"
 
@@ -187,7 +189,7 @@ func (m *RouteManager) RenewAll() {
 }
 
 func (m *RouteManager) updateProvisioning(r Route) error {
-	if m.checkCNAME(r) && m.checkDistribution(r) {
+	if (m.checkCNAME(r) || m.checkHosts(r)) && m.checkDistribution(r) {
 		certResource, err := m.provisionCert(r)
 		if err != nil {
 			return err
@@ -253,6 +255,27 @@ func (m *RouteManager) checkCNAME(r Route) bool {
 	for _, d := range r.GetDomains() {
 		cname, err := net.LookupCNAME(d)
 		if err != nil || cname != expects {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (m *RouteManager) checkHosts(r Route) bool {
+	hosts, err := net.LookupHost(r.DomainInternal)
+	if err != nil {
+		return false
+	}
+	sort.Strings(hosts)
+
+	for _, d := range r.GetDomains() {
+		obsHosts, err := net.LookupHost(d)
+		if err != nil {
+			return false
+		}
+		sort.Strings(obsHosts)
+		if !reflect.DeepEqual(hosts, obsHosts) {
 			return false
 		}
 	}
