@@ -21,7 +21,7 @@ type FakeRouteManager struct {
 	ErrorGet    error
 }
 
-func (m *FakeRouteManager) Create(instanceId, domain, origin string) (models.Route, error) {
+func (m *FakeRouteManager) Create(instanceId, domain, origin, path string) (models.Route, error) {
 	return m.RouteCreate, m.ErrorCreate
 }
 
