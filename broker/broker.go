@@ -12,9 +12,10 @@ import (
 )
 
 type ProvisionOptions struct {
-	Domain string `json:"domain"`
-	Origin string `json:"origin"`
-	Path   string `json:"path"`
+	Domain         string `json:"domain"`
+	Origin         string `json:"origin"`
+	Path           string `json:"path"`
+	InsecureOrigin bool   `json:"insecure_origin"`
 }
 
 type CdnServiceBroker struct {
@@ -63,7 +64,7 @@ func (b *CdnServiceBroker) Provision(
 		return spec, brokerapi.ErrInstanceAlreadyExists
 	}
 
-	_, err = b.Manager.Create(instanceId, options.Domain, options.Origin, options.Path)
+	_, err = b.Manager.Create(instanceId, options.Domain, options.Origin, options.Path, options.InsecureOrigin)
 	if err != nil {
 		return spec, err
 	}
