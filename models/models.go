@@ -75,7 +75,7 @@ func (c Certificate) Resource() acme.CertificateResource {
 }
 
 type RouteManagerIface interface {
-	Create(instanceId, domain, origin, path string, insecure_origin bool) (Route, error)
+	Create(instanceId, domain, origin, path string, insecureOrigin bool) (Route, error)
 	Get(instanceId string) (Route, error)
 	Update(route Route) error
 	Disable(route Route) error
@@ -90,17 +90,17 @@ type RouteManager struct {
 	DB         *gorm.DB
 }
 
-func (m *RouteManager) Create(instanceId, domain, origin, path string, insecure_origin bool) (Route, error) {
+func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureOrigin bool) (Route, error) {
 	route := Route{
 		InstanceId:     instanceId,
 		State:          Provisioning,
 		DomainExternal: domain,
 		Origin:         origin,
 		Path:           path,
-		InsecureOrigin: insecure_origin,
+		InsecureOrigin: insecureOrigin,
 	}
 
-	dist, err := m.CloudFront.Create(route.GetDomains(), origin, path, insecure_origin)
+	dist, err := m.CloudFront.Create(route.GetDomains(), origin, path, insecureOrigin)
 	if err != nil {
 		return Route{}, err
 	}

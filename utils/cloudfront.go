@@ -11,7 +11,7 @@ import (
 )
 
 type DistributionIface interface {
-	Create(domains []string, origin, path string, insecure_origin bool) (*cloudfront.Distribution, error)
+	Create(domains []string, origin, path string, insecureOrigin bool) (*cloudfront.Distribution, error)
 	Get(distId string) (*cloudfront.Distribution, error)
 	SetCertificate(distId, certId string) error
 	Disable(distId string) error
@@ -42,7 +42,7 @@ func (d *Distribution) getAliases(domains []string) *cloudfront.Aliases {
 	}
 }
 
-func (d *Distribution) Create(domains []string, origin, path string, insecure_origin bool) (*cloudfront.Distribution, error) {
+func (d *Distribution) Create(domains []string, origin, path string, insecureOrigin bool) (*cloudfront.Distribution, error) {
 	resp, err := d.Service.CreateDistribution(&cloudfront.CreateDistributionInput{
 		DistributionConfig: &cloudfront.DistributionConfig{
 			CallerReference: aws.String(d.getDistributionId(domains)),
@@ -88,7 +88,7 @@ func (d *Distribution) Create(domains []string, origin, path string, insecure_or
 						CustomOriginConfig: &cloudfront.CustomOriginConfig{
 							HTTPPort:             aws.Int64(80),
 							HTTPSPort:            aws.Int64(443),
-							OriginProtocolPolicy: getOriginProtocolPolicy(insecure_origin),
+							OriginProtocolPolicy: getOriginProtocolPolicy(insecureOrigin),
 							OriginSslProtocols: &cloudfront.OriginSslProtocols{
 								Quantity: aws.Int64(3),
 								Items: []*string{
@@ -218,12 +218,8 @@ func (d *Distribution) Delete(distId string) (bool, error) {
 }
 
 func getOriginProtocolPolicy(insecure bool) *string {
-	var policy string
 	if insecure {
-		policy = "http-only"
-	} else {
-		policy = "https-only"
+		return aws.String("http-only")
 	}
-
-	return &policy
+	return aws.String("https-only")
 }

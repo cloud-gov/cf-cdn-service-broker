@@ -72,7 +72,6 @@ The easiest/recommended way to deploy the broker is via the [Concourse](http://c
     Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
     ```
 
-
 1. Get the DNS instructions.
 
     ```
