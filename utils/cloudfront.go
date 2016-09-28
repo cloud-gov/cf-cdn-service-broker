@@ -11,7 +11,7 @@ import (
 )
 
 type DistributionIface interface {
-	Create(domains []string, origin string) (*cloudfront.Distribution, error)
+	Create(domains []string, origin, path string) (*cloudfront.Distribution, error)
 	Get(distId string) (*cloudfront.Distribution, error)
 	SetCertificate(distId, certId string) error
 	Disable(distId string) error
@@ -42,7 +42,7 @@ func (d *Distribution) getAliases(domains []string) *cloudfront.Aliases {
 	}
 }
 
-func (d *Distribution) Create(domains []string, origin string) (*cloudfront.Distribution, error) {
+func (d *Distribution) Create(domains []string, origin, path string) (*cloudfront.Distribution, error) {
 	resp, err := d.Service.CreateDistribution(&cloudfront.CreateDistributionInput{
 		DistributionConfig: &cloudfront.DistributionConfig{
 			CallerReference: aws.String(d.getDistributionId(domains)),
@@ -81,7 +81,7 @@ func (d *Distribution) Create(domains []string, origin string) (*cloudfront.Dist
 					{
 						DomainName: aws.String(origin),
 						Id:         aws.String(d.getOriginId(domains)),
-						OriginPath: aws.String(""),
+						OriginPath: aws.String(path),
 						CustomHeaders: &cloudfront.CustomHeaders{
 							Quantity: aws.Int64(0),
 						},
