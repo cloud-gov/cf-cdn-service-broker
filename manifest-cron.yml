@@ -1,5 +1,7 @@
 ---
 inherit: manifest-base.yml
 applications:
-  - name: cdn-broker
-    command: cdn-broker
+- name: cdn-cron
+  command: cdn-cron
+  health-check-type: none
+  no-route: true
