@@ -67,7 +67,16 @@ The easiest/recommended way to deploy the broker is via the [Concourse](http://c
 
     ```
     $ cf create-service cdn-route cdn-route my-cdn-route \
-        -c '{"domain": "my.domain.gov", "origin": "my-app.apps.cloud.gov", "path":"/myfolder/"}'
+        -c '{"domain": "my.domain.gov", "origin": "my-app.apps.cloud.gov", "path":"/myfolder"}'
+
+    Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
+    ```
+    
+    If your origin is non-HTTPS, you'll need to add another parameter, as well:
+    
+    ```
+    $ cf create-service cdn-route cdn-route my-cdn-route \
+        -c '{"domain": "my.domain.gov", "origin": "my-app.apps.cloud.gov", "insecure_origin": true}'
 
     Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
     ```
