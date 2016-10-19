@@ -42,7 +42,7 @@ func main() {
 
 	c := cron.New()
 
-	c.AddFunc("0 0 * * * *", func() {
+	c.AddFunc(settings.Schedule, func() {
 		logger.Info("Running renew")
 		manager.RenewAll()
 	})
