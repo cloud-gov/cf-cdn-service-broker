@@ -48,6 +48,7 @@ func (d *Distribution) Create(domains []string, origin, path string, insecureOri
 			CallerReference: aws.String(d.getDistributionId(domains)),
 			Comment:         aws.String("cdn route service"),
 			Enabled:         aws.Bool(true),
+			IsIPV6Enabled:   aws.Bool(true),
 			DefaultCacheBehavior: &cloudfront.DefaultCacheBehavior{
 				TargetOriginId: aws.String(d.getOriginId(domains)),
 				ForwardedValues: &cloudfront.ForwardedValues{
