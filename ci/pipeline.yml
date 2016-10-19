@@ -37,14 +37,13 @@ jobs:
     params:
       path: broker-src
       manifest: broker-src/manifest-cron.yml
-      environment_variables:
-        <<: *cfenv
+      environment_variables: *cfenv
     on_failure:
       put: slack
       params:
         text: |
           :x: FAILED to deploy cf-cdn-service-broker on {{cf-api-url}}
-          <https://$ATC_EXTERNAL_URL/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
+          <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
         channel: {{slack-channel}}
         username: {{slack-username}}
         icon_url: {{slack-icon-url}}
@@ -53,7 +52,7 @@ jobs:
       params:
         text: |
           :white_check_mark: Successfully deployed cf-cdn-service-broker on {{cf-api-url}}
-          <https://$ATC_EXTERNAL_URL/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
+          <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
         channel: {{slack-channel}}
         username: {{slack-username}}
         icon_url: {{slack-icon-url}}
