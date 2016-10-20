@@ -34,6 +34,7 @@ func main() {
 
 	session := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
 	manager := models.RouteManager{
+		Logger:     logger,
 		Iam:        &utils.Iam{settings, iam.New(session)},
 		CloudFront: &utils.Distribution{settings, cloudfront.New(session)},
 		Acme:       &utils.Acme{settings, s3.New(session)},
