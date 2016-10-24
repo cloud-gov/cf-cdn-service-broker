@@ -88,19 +88,25 @@ func (b *CdnServiceBroker) LastOperation(instanceId string) (brokerapi.LastOpera
 		return brokerapi.LastOperation{
 			State: brokerapi.InProgress,
 			Description: fmt.Sprintf(
-				`Provisioning in progress; CNAME domain "%s" to "%s."`,
-				route.DomainExternal, route.DomainInternal,
+				"Provisioning in progress [%s => %s]; CNAME domain %s to %s.",
+				route.DomainExternal, route.Origin, route.DomainExternal, route.DomainInternal,
 			),
 		}, nil
 	case models.Deprovisioning:
 		return brokerapi.LastOperation{
-			State:       brokerapi.InProgress,
-			Description: "Deprovisioning in progress",
+			State: brokerapi.InProgress,
+			Description: fmt.Sprintf(
+				"Deprovisioning in progress [%s => %s]",
+				route.DomainExternal, route.Origin,
+			),
 		}, nil
 	default:
 		return brokerapi.LastOperation{
-			State:       brokerapi.Succeeded,
-			Description: "Service instance provisioned",
+			State: brokerapi.Succeeded,
+			Description: fmt.Sprintf(
+				"Service instance provisioned [%s => %s]",
+				route.DomainExternal, route.Origin,
+			),
 		}, nil
 	}
 }
