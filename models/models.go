@@ -11,6 +11,7 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/pivotal-cf/brokerapi"
+	"github.com/pivotal-golang/lager"
 	"github.com/xenolf/lego/acme"
 
 	"github.com/18F/cf-cdn-service-broker/utils"
@@ -84,6 +85,7 @@ type RouteManagerIface interface {
 }
 
 type RouteManager struct {
+	Logger     lager.Logger
 	Iam        utils.IamIface
 	CloudFront utils.DistributionIface
 	Acme       utils.AcmeIface
@@ -188,7 +190,12 @@ func (m *RouteManager) RenewAll() {
 	).Find(&routes)
 
 	for _, route := range routes {
-		m.Renew(route)
+		err := m.Renew(route)
+		m.Logger.Info("Renewing certificate", lager.Data{
+			"domain": route.DomainExternal,
+			"origin": route.Origin,
+			"status": err,
+		})
 	}
 }
 
