@@ -181,13 +181,7 @@ func (m *RouteManager) Renew(r Route) error {
 func (m *RouteManager) RenewAll() {
 	routes := []Route{}
 
-	m.DB.Where(
-		"state = ? and expires < now() + interval '30 days'", string(Provisioned),
-	).Joins(
-		"join certificates on routes.id = certificates.route_id",
-	).Preload(
-		"Certificate",
-	).Find(&routes)
+	m.DB.Find(&routes)
 
 	for _, route := range routes {
 		err := m.Renew(route)
