@@ -67,14 +67,6 @@ type Certificate struct {
 	Expires     time.Time `gorm:"index"`
 }
 
-func (c Certificate) Resource() acme.CertificateResource {
-	return acme.CertificateResource{
-		Domain:      c.Domain,
-		CertURL:     c.CertURL,
-		Certificate: c.Certificate,
-	}
-}
-
 type RouteManagerIface interface {
 	Create(instanceId, domain, origin, path string, insecureOrigin bool) (Route, error)
 	Get(instanceId string) (Route, error)
@@ -129,7 +121,7 @@ func (m *RouteManager) Get(instanceId string) (Route, error) {
 func (m *RouteManager) Update(r Route) error {
 	switch r.State {
 	case Provisioning:
-		return m.getCert(r)
+		return m.updateProvisioning(r)
 	case Deprovisioning:
 		return m.updateDeprovisioning(r)
 	default:
@@ -150,8 +142,27 @@ func (m *RouteManager) Disable(r Route) error {
 }
 
 func (m *RouteManager) Renew(r Route) error {
-	m.getCert(r)
-	return nil
+	var certRow Certificate
+	err := m.DB.Model(&r).Related(&certRow, "Certificate").Error
+	if err != nil {
+		return err
+	}
+
+	certResource, err := m.provisionCert(r)
+	if err != nil {
+		return err
+	}
+
+	expires, err := acme.GetPEMCertExpiration(certResource.Certificate)
+	if err != nil {
+		return err
+	}
+
+	certRow.Domain = certResource.Domain
+	certRow.CertURL = certResource.CertURL
+	certRow.Certificate = certResource.Certificate
+	certRow.Expires = expires
+	return m.DB.Save(&certRow).Error
 }
 
 func (m *RouteManager) RenewAll() {
@@ -175,7 +186,7 @@ func (m *RouteManager) RenewAll() {
 	}
 }
 
-func (m *RouteManager) getCert(r Route) error {
+func (m *RouteManager) updateProvisioning(r Route) error {
 	if (m.checkCNAME(r) || m.checkHosts(r)) && m.checkDistribution(r) {
 		certResource, err := m.provisionCert(r)
 		if err != nil {
