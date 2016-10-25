@@ -129,7 +129,7 @@ func (m *RouteManager) Get(instanceId string) (Route, error) {
 func (m *RouteManager) Update(r Route) error {
 	switch r.State {
 	case Provisioning:
-		return m.updateProvisioning(r)
+		return m.getCert(r)
 	case Deprovisioning:
 		return m.updateDeprovisioning(r)
 	default:
@@ -150,31 +150,7 @@ func (m *RouteManager) Disable(r Route) error {
 }
 
 func (m *RouteManager) Renew(r Route) error {
-	var certRow Certificate
-
-	m.DB.Model(&r).Related(&certRow, "Certificate")
-
-	certResource, err := m.Acme.RenewCertificate(certRow.Resource())
-	if err != nil {
-		return err
-	}
-
-	err = m.deployCertificate(r.DomainExternal, r.DistId, certResource)
-	if err != nil {
-		return err
-	}
-
-	expires, err := acme.GetPEMCertExpiration(certResource.Certificate)
-	if err != nil {
-		return err
-	}
-
-	certRow.Domain = certResource.Domain
-	certRow.CertURL = certResource.CertURL
-	certRow.Certificate = certResource.Certificate
-	certRow.Expires = expires
-	m.DB.Save(&certRow)
-
+	m.getCert(r)
 	return nil
 }
 
@@ -199,7 +175,7 @@ func (m *RouteManager) RenewAll() {
 	}
 }
 
-func (m *RouteManager) updateProvisioning(r Route) error {
+func (m *RouteManager) getCert(r Route) error {
 	if (m.checkCNAME(r) || m.checkHosts(r)) && m.checkDistribution(r) {
 		certResource, err := m.provisionCert(r)
 		if err != nil {
