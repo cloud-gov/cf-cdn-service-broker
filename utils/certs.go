@@ -65,7 +65,6 @@ func (p *HTTPProvider) CleanUp(domain, token, keyAuth string) error {
 
 type AcmeIface interface {
 	ObtainCertificate(domains []string) (acme.CertificateResource, error)
-	RenewCertificate(cert acme.CertificateResource) (acme.CertificateResource, error)
 }
 
 type Acme struct {
@@ -86,15 +85,6 @@ func (a *Acme) ObtainCertificate(domains []string) (acme.CertificateResource, er
 	}
 
 	return certificate, nil
-}
-
-func (a *Acme) RenewCertificate(cert acme.CertificateResource) (acme.CertificateResource, error) {
-	client, err := a.newClient()
-	if err != nil {
-		return acme.CertificateResource{}, err
-	}
-
-	return client.RenewCertificate(cert, true)
 }
 
 func (a *Acme) newClient() (*acme.Client, error) {
