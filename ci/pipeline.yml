@@ -17,36 +17,37 @@ jobs:
       SERVICE_PLAN: shared-psql
       <<: *cf-creds
 
-  - put: broker-deploy
-    params:
-      path: broker-src
-      manifest: broker-src/manifest-broker.yml
-      environment_variables: &cfenv
-        BROKER_USERNAME: {{cdn-broker-user}}
-        BROKER_PASSWORD: {{cdn-broker-pass}}
-        EMAIL: {{cdn-broker-email}}
-        ACME_URL: {{cdn-broker-acme-url}}
-        BUCKET: {{cdn-broker-bucket}}
-        IAM_PATH_PREFIX: {{cdn-broker-iam-path-prefix}}
-        AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id}}
-        AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key}}
-        AWS_DEFAULT_REGION: {{cdn-broker-region}}
-        SERVER_SIDE_ENCRYPTION: AES256
-
-  - put: broker-deploy
-    params:
-      path: broker-src
-      manifest: broker-src/manifest-cron.yml
-      environment_variables: *cfenv
-    on_failure:
-      put: slack
+  - aggregate:
+    - put: broker-deploy
       params:
-        text: |
-          :x: FAILED to deploy cf-cdn-service-broker on {{cf-api-url}}
-          <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
-        channel: {{slack-channel}}
-        username: {{slack-username}}
-        icon_url: {{slack-icon-url}}
+        path: broker-src
+        manifest: broker-src/manifest-broker.yml
+        environment_variables: &cfenv
+          BROKER_USERNAME: {{cdn-broker-user}}
+          BROKER_PASSWORD: {{cdn-broker-pass}}
+          EMAIL: {{cdn-broker-email}}
+          ACME_URL: {{cdn-broker-acme-url}}
+          BUCKET: {{cdn-broker-bucket}}
+          IAM_PATH_PREFIX: {{cdn-broker-iam-path-prefix}}
+          AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id}}
+          AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key}}
+          AWS_DEFAULT_REGION: {{cdn-broker-region}}
+          SERVER_SIDE_ENCRYPTION: AES256
+
+    - put: broker-deploy
+      params:
+        path: broker-src
+        manifest: broker-src/manifest-cron.yml
+        environment_variables: *cfenv
+      on_failure:
+        put: slack
+        params:
+          text: |
+            :x: FAILED to deploy cf-cdn-service-broker on {{cf-api-url}}
+            <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
+          channel: {{slack-channel}}
+          username: {{slack-username}}
+          icon_url: {{slack-icon-url}}
     on_success:
       put: slack
       params:
