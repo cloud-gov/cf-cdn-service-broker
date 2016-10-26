@@ -67,14 +67,6 @@ type Certificate struct {
 	Expires     time.Time `gorm:"index"`
 }
 
-func (c Certificate) Resource() acme.CertificateResource {
-	return acme.CertificateResource{
-		Domain:      c.Domain,
-		CertURL:     c.CertURL,
-		Certificate: c.Certificate,
-	}
-}
-
 type RouteManagerIface interface {
 	Create(instanceId, domain, origin, path string, insecureOrigin bool) (Route, error)
 	Get(instanceId string) (Route, error)
@@ -151,15 +143,12 @@ func (m *RouteManager) Disable(r Route) error {
 
 func (m *RouteManager) Renew(r Route) error {
 	var certRow Certificate
-
-	m.DB.Model(&r).Related(&certRow, "Certificate")
-
-	certResource, err := m.Acme.RenewCertificate(certRow.Resource())
+	err := m.DB.Model(&r).Related(&certRow, "Certificate").Error
 	if err != nil {
 		return err
 	}
 
-	err = m.deployCertificate(r.DomainExternal, r.DistId, certResource)
+	certResource, err := m.provisionCert(r)
 	if err != nil {
 		return err
 	}
@@ -173,9 +162,7 @@ func (m *RouteManager) Renew(r Route) error {
 	certRow.CertURL = certResource.CertURL
 	certRow.Certificate = certResource.Certificate
 	certRow.Expires = expires
-	m.DB.Save(&certRow)
-
-	return nil
+	return m.DB.Save(&certRow).Error
 }
 
 func (m *RouteManager) RenewAll() {
