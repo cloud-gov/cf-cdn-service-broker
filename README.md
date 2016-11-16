@@ -67,7 +67,7 @@ The easiest/recommended way to deploy the broker is via the [Concourse](http://c
 
     ```
     $ cf create-service cdn-route cdn-route my-cdn-route \
-        -c '{"domain": "my.domain.gov", "origin": "my-app.apps.cloud.gov", "path":"/myfolder"}'
+        -c '{"domain": "my.domain.gov", "origin": "my-app.apps.cloud.gov", "path": "/myfolder"}'
 
     Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
     ```
@@ -94,6 +94,15 @@ The easiest/recommended way to deploy the broker is via the [Concourse](http://c
 1. Create/update your DNS configuration.
 1. Wait up to 30 minutes for the CloudFront distribution to be provisioned and the DNS changes to propagate.
 1. Visit `my.domain.gov`, and see that you have a valid certificate (i.e. that visiting your site in a modern browser doesn't give you a certificate warning).
+
+## Debugging
+
+By default, Cloud Controller will expire asynchronous services instances that have been pending for over one week. If your instance expires, run a dummy update
+to restore it to the pending state so that Cloud Controller will continue to check for updates:
+
+```bash
+cf update-service my-cdn-route -c '{"timestamp": 20161001}'
+```
 
 ## Tests
 

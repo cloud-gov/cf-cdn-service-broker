@@ -138,5 +138,9 @@ func (b *CdnServiceBroker) Unbind(instanceId, bindingId string, details brokerap
 }
 
 func (b *CdnServiceBroker) Update(instanceId string, details brokerapi.UpdateDetails, asyncAllowed bool) (brokerapi.IsAsync, error) {
-	return false, errors.New("service does not support update")
+	if !asyncAllowed {
+		return false, brokerapi.ErrAsyncRequired
+	}
+
+	return true, nil
 }
