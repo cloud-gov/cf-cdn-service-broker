@@ -260,12 +260,25 @@ func (m *RouteManager) checkCNAME(r Route) bool {
 	return true
 }
 
+func removeV6hosts(hosts []string) []string {
+	v4hosts := []string{}
+
+	for _, host := range hosts {
+		if strings.Index(host, ":") == -1 {
+			v4hosts = append(v4hosts, host)
+		}
+	}
+
+	return v4hosts
+}
+
 func (m *RouteManager) checkHosts(r Route) bool {
 	hosts, err := net.LookupHost(r.DomainInternal)
 	if err != nil {
 		return false
 	}
 	sort.Strings(hosts)
+	hosts = removeV6hosts(hosts)
 
 	for _, d := range r.GetDomains() {
 		obsHosts, err := net.LookupHost(d)
@@ -273,6 +286,7 @@ func (m *RouteManager) checkHosts(r Route) bool {
 			return false
 		}
 		sort.Strings(obsHosts)
+		obsHosts = removeV6hosts(obsHosts)
 		if !reflect.DeepEqual(hosts, obsHosts) {
 			return false
 		}
