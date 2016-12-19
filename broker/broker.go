@@ -167,5 +167,11 @@ func (b *CdnServiceBroker) Update(instanceId string, details brokerapi.UpdateDet
 		return false, brokerapi.ErrAsyncRequired
 	}
 
+	_, originExists := details.Parameters["origin"]
+	_, domainExists := details.Parameters["domain"]
+	if !(originExists || domainExists) {
+		return false, errors.New("must be invoked with `domain` or `origin` keys")
+	}
+
 	return true, nil
 }
