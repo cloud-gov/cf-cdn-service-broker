@@ -175,21 +175,21 @@ func (b *CdnServiceBroker) Update(instanceId string, details brokerapi.UpdateDet
 	}
 	origin := ""
 	domain := ""
-	var err error
+	var ok bool
 	if originExists {
-		origin, err = convertInterfaceToString(originData)
-		if err != nil {
-			return false, err
+		origin, ok = convertInterfaceToString(originData)
+		if !ok {
+			return false, fmt.Errorf("value for 'origin' %v cannot be converted to a string", originData)
 		}
 	}
 	if domainExists {
-		domain, err = convertInterfaceToString(domainData)
-		if err != nil {
-			return false, err
+		domain, ok = convertInterfaceToString(domainData)
+		if !ok {
+			return false, fmt.Errorf("value for 'domain' %v cannot be converted to a string", domainData)
 		}
 	}
 
-	err = b.Manager.Update(instanceId, origin, domain)
+	err := b.Manager.Update(instanceId, origin, domain)
 	if err != nil {
 		return false, err
 	}
@@ -197,9 +197,9 @@ func (b *CdnServiceBroker) Update(instanceId string, details brokerapi.UpdateDet
 	return true, nil
 }
 
-func convertInterfaceToString(data interface{}) (string, error) {
+func convertInterfaceToString(data interface{}) (string, bool) {
 	if str, ok := data.(string); ok {
-		return str, nil
+		return str, true
 	}
-	return "", fmt.Errorf("Unable to convert %v to a string", data)
+	return "", false
 }

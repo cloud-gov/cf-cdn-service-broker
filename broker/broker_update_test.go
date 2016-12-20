@@ -36,3 +36,37 @@ func (s *UpdateSuite) TestWithoutOptions() {
 	s.NotNil(err)
 	s.Equal(err.Error(), "must be invoked with `domain` or `origin` keys")
 }
+
+func (s *UpdateSuite) TestBadOrigin() {
+	details := brokerapi.UpdateDetails{
+		Parameters: map[string]interface{}{
+			"origin": 4,
+		},
+	}
+	_, err := s.Broker.Update("", details, true)
+	s.NotNil(err)
+	s.Equal(err.Error(), "value for 'origin' 4 cannot be converted to a string")
+}
+
+func (s *UpdateSuite) TestBadDomain() {
+	details := brokerapi.UpdateDetails{
+		Parameters: map[string]interface{}{
+			"domain": 3,
+		},
+	}
+	_, err := s.Broker.Update("", details, true)
+	s.NotNil(err)
+	s.Equal(err.Error(), "value for 'domain' 3 cannot be converted to a string")
+}
+
+func (s *UpdateSuite) TestValid() {
+	details := brokerapi.UpdateDetails{
+		Parameters: map[string]interface{}{
+			"domain": "domain.gov",
+			"origin": "origin.gov",
+		},
+	}
+	s.Manager.On("Update", "", "origin.gov", "domain.gov").Return(nil)
+	_, err := s.Broker.Update("", details, true)
+	s.Nil(err)
+}
