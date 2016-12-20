@@ -164,8 +164,6 @@ func (d *Distribution) Update(distId string, domains []string, origin, path stri
 		return dist, err
 	}
 
-	// TODO: Override the distribution config
-
 	// Call the UpdateDistribution function
 	resp, err := d.Service.UpdateDistribution(&cloudfront.UpdateDistributionInput{
 		Id: dist.Id,
