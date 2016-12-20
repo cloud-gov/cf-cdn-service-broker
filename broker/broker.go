@@ -35,6 +35,24 @@ func (*CdnServiceBroker) Services() []brokerapi.Service {
 	return []brokerapi.Service{service}
 }
 
+func parseProvisionOptions(details brokerapi.ProvisionDetails) (options ProvisionOptions, err error) {
+	if len(details.RawParameters) == 0 {
+		err = errors.New("must be invoked with configuration parameters")
+		return
+	}
+
+	err = json.Unmarshal(details.RawParameters, &options)
+	if err != nil {
+		return
+	}
+	if options.Domain == "" || options.Origin == "" {
+		err = errors.New("must be invoked with `domain` and `origin` keys")
+		return
+	}
+
+	return
+}
+
 func (b *CdnServiceBroker) Provision(
 	instanceId string,
 	details brokerapi.ProvisionDetails,
@@ -46,17 +64,9 @@ func (b *CdnServiceBroker) Provision(
 		return spec, brokerapi.ErrAsyncRequired
 	}
 
-	if len(details.RawParameters) == 0 {
-		return spec, errors.New("must be invoked with configuration parameters")
-	}
-
-	var options ProvisionOptions
-	err := json.Unmarshal(details.RawParameters, &options)
+	options, err := parseProvisionOptions(details)
 	if err != nil {
 		return spec, err
-	}
-	if options.Domain == "" || options.Origin == "" {
-		return spec, errors.New("must be invoked with `domain` and `origin` keys")
 	}
 
 	_, err = b.Manager.Get(instanceId)
