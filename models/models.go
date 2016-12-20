@@ -133,7 +133,6 @@ func (m *RouteManager) Update(instanceId, domain, origin string) error {
 	if origin != "" {
 		route.Origin = origin
 	}
-	// TODO: do we want to set the state as "Provisioning"?
 
 	// Update the distribution
 	dist, err := m.CloudFront.Update(route.DistId, route.GetDomains(),
@@ -141,6 +140,7 @@ func (m *RouteManager) Update(instanceId, domain, origin string) error {
 	if err != nil {
 		return err
 	}
+	route.State = Provisioning
 
 	// Get the updated domain name and dist id.
 	route.DomainExternal = *dist.DomainName
