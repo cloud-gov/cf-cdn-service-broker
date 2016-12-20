@@ -5,3 +5,5 @@ applications:
   command: cdn-cron
   health-check-type: none
   no-route: true
+  env:
+    GO_INSTALL_PACKAGE_SPEC: "github.com/18F/cf-cdn-service-broker/cmd/cdn-cron"
