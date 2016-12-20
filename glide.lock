@@ -1,0 +1,99 @@
+hash: 3081c011a68e518db56fae114204e0691f3aba46b2a1066bb7cd29a037fc31a9
+updated: 2016-12-20T11:55:08.599745654-05:00
+imports:
+- name: github.com/aws/aws-sdk-go
+  version: 1a651d9028d1203f4a0ba9fee91b207536cd4ca2
+  subpackages:
+  - aws
+  - aws/awserr
+  - aws/awsutil
+  - aws/client
+  - aws/client/metadata
+  - aws/corehandlers
+  - aws/credentials
+  - aws/credentials/ec2rolecreds
+  - aws/credentials/endpointcreds
+  - aws/credentials/stscreds
+  - aws/defaults
+  - aws/ec2metadata
+  - aws/request
+  - aws/session
+  - aws/signer/v4
+  - private/endpoints
+  - private/protocol
+  - private/protocol/query
+  - private/protocol/query/queryutil
+  - private/protocol/rest
+  - private/protocol/restxml
+  - private/protocol/xml/xmlutil
+  - private/waiter
+  - service/cloudfront
+  - service/iam
+  - service/s3
+  - service/sts
+- name: github.com/davecgh/go-spew
+  version: 5215b55f46b2b919f50a1df0eaa5886afe4e3b3d
+  subpackages:
+  - spew
+- name: github.com/go-ini/ini
+  version: 12f418cc7edc5a618a51407b7ac1f1f512139df3
+- name: github.com/gorilla/context
+  version: a8d44e7d8e4d532b6a27a02dd82abb31cc1b01bd
+- name: github.com/gorilla/mux
+  version: 9c19ed558d5df4da88e2ade9c8940d742aef0e7e
+- name: github.com/jinzhu/gorm
+  version: 57c72125b3087e1ed02c16f23a1f381cde3aaf2c
+  subpackages:
+  - dialects/postgres
+- name: github.com/jinzhu/inflection
+  version: 3272df6c21d04180007eb3349844c89a3856bc25
+- name: github.com/jmespath/go-jmespath
+  version: 0b12d6b521d83fc7f755e7cfc1b1fbdd35a01a74
+- name: github.com/kelseyhightower/envconfig
+  version: 91921eb4cf999321cdbeebdba5a03555800d493b
+- name: github.com/lib/pq
+  version: ee1442bda7bd1b6a84e913bdb421cb1874ec629d
+  subpackages:
+  - hstore
+  - oid
+- name: github.com/miekg/dns
+  version: 48ab6605c66ac797e07f615101c3e9e10e932b66
+- name: github.com/pivotal-cf/brokerapi
+  version: 3abc5864a39f7b204e1daaa0677433f8d4568f81
+  subpackages:
+  - auth
+- name: github.com/pivotal-golang/lager
+  version: 7639e31ce6622c55c15aa64144b85d5f4873d127
+- name: github.com/pmezard/go-difflib
+  version: 792786c7400a136282c1664665ae0a8db921c6c2
+  subpackages:
+  - difflib
+- name: github.com/robfig/cron
+  version: 8dc4916d418b9d0b2e23c9c1e68351dc9a1d6573
+- name: github.com/stretchr/objx
+  version: cbeaeb16a013161a98496fad62933b1d21786672
+- name: github.com/stretchr/testify
+  version: 6cb3b85ef5a0efef77caef88363ec4d4b5c0976d
+  subpackages:
+  - assert
+  - mock
+  - require
+  - suite
+- name: github.com/xenolf/lego
+  version: b5d5eee2dd269f88f181d7a437be80194bfd0235
+  subpackages:
+  - acme
+- name: golang.org/x/crypto
+  version: 1e61df8d9ea476e2e1504cd9a32b40280c7c6c7e
+  subpackages:
+  - ocsp
+- name: golang.org/x/net
+  version: 96dbb961a39ddccf16860cdd355bfa639c497f23
+  subpackages:
+  - publicsuffix
+- name: gopkg.in/square/go-jose.v1
+  version: e3f973b66b91445ec816dd7411ad1b6495a5a2fc
+  subpackages:
+  - cipher
+  - json
+testImports: []
