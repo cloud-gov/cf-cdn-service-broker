@@ -68,7 +68,7 @@ type Certificate struct {
 }
 
 type RouteManagerIface interface {
-	Create(instanceId, domain, origin, path string, insecureOrigin bool) (Route, error)
+	Create(instanceId, domain, origin, path string, insecureOrigin bool, tags map[string]string) (Route, error)
 	Get(instanceId string) (Route, error)
 	Update(route Route) error
 	Disable(route Route) error
@@ -84,7 +84,7 @@ type RouteManager struct {
 	DB         *gorm.DB
 }
 
-func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureOrigin bool) (Route, error) {
+func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureOrigin bool, tags map[string]string) (Route, error) {
 	route := Route{
 		InstanceId:     instanceId,
 		State:          Provisioning,
@@ -94,7 +94,7 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 		InsecureOrigin: insecureOrigin,
 	}
 
-	dist, err := m.CloudFront.Create(route.GetDomains(), origin, path, insecureOrigin)
+	dist, err := m.CloudFront.Create(route.GetDomains(), origin, path, insecureOrigin, tags)
 	if err != nil {
 		return Route{}, err
 	}

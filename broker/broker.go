@@ -64,7 +64,14 @@ func (b *CdnServiceBroker) Provision(
 		return spec, brokerapi.ErrInstanceAlreadyExists
 	}
 
-	_, err = b.Manager.Create(instanceId, options.Domain, options.Origin, options.Path, options.InsecureOrigin)
+	tags := map[string]string{
+		"Organization": details.OrganizationGUID,
+		"Space":        details.SpaceGUID,
+		"Service":      details.ServiceID,
+		"Plan":         details.PlanID,
+	}
+
+	_, err = b.Manager.Create(instanceId, options.Domain, options.Origin, options.Path, options.InsecureOrigin, tags)
 	if err != nil {
 		return spec, err
 	}
