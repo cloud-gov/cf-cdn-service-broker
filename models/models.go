@@ -69,6 +69,7 @@ type Certificate struct {
 
 type RouteManagerIface interface {
 	Create(instanceId, domain, origin, path string, insecureOrigin bool, tags map[string]string) (*Route, error)
+	Update(instanceId string, domain, origin string) error
 	Get(instanceId string) (*Route, error)
 	Poll(route *Route) error
 	Disable(route *Route) error
@@ -116,6 +117,41 @@ func (m *RouteManager) Get(instanceId string) (*Route, error) {
 	} else {
 		return nil, result.Error
 	}
+}
+
+func (m *RouteManager) Update(instanceId, domain, origin string) error {
+	// Get current route
+	route, err := m.Get(instanceId)
+	if err != nil {
+		return err
+	}
+
+	// Override any settings that are new.
+	if domain != "" {
+		route.DomainExternal = domain
+	}
+	if origin != "" {
+		route.Origin = origin
+	}
+	// TODO: do we want to set the state as "Provisioning"?
+
+	// Update the distribution
+	dist, err := m.CloudFront.Update(route.DistId, route.GetDomains(),
+		route.Origin, route.Path, route.InsecureOrigin)
+	if err != nil {
+		return err
+	}
+
+	// Get the updated domain name and dist id.
+	route.DomainExternal = *dist.DomainName
+	route.DistId = *dist.Id
+
+	// Save the database.
+	result := m.DB.Save(&route)
+	if result.Error != nil {
+		return result.Error
+	}
+	return nil
 }
 
 func (m *RouteManager) Poll(r *Route) error {

@@ -167,11 +167,39 @@ func (b *CdnServiceBroker) Update(instanceId string, details brokerapi.UpdateDet
 		return false, brokerapi.ErrAsyncRequired
 	}
 
-	_, originExists := details.Parameters["origin"]
-	_, domainExists := details.Parameters["domain"]
+	// Get the origin and domain data.
+	originData, originExists := details.Parameters["origin"]
+	domainData, domainExists := details.Parameters["domain"]
 	if !(originExists || domainExists) {
 		return false, errors.New("must be invoked with `domain` or `origin` keys")
 	}
+	origin := ""
+	domain := ""
+	var err error
+	if originExists {
+		origin, err = convertInterfaceToString(originData)
+		if err != nil {
+			return false, err
+		}
+	}
+	if domainExists {
+		domain, err = convertInterfaceToString(domainData)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	err = b.Manager.Update(instanceId, origin, domain)
+	if err != nil {
+		return false, err
+	}
 
 	return true, nil
+}
+
+func convertInterfaceToString(data interface{}) (string, error) {
+	if str, ok := data.(string); ok {
+		return str, nil
+	}
+	return "", fmt.Errorf("Unable to convert %v to a string", data)
 }

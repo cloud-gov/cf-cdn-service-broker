@@ -12,6 +12,7 @@ import (
 
 type DistributionIface interface {
 	Create(domains []string, origin, path string, insecureOrigin bool, tags map[string]string) (*cloudfront.Distribution, error)
+	Update(distId string, domains []string, origin, path string, insecureOrigin bool) (*cloudfront.Distribution, error)
 	Get(distId string) (*cloudfront.Distribution, error)
 	SetCertificate(distId, certId string) error
 	Disable(distId string) error
@@ -153,6 +154,25 @@ func (d *Distribution) Create(domains []string, origin, path string, insecureOri
 		return &cloudfront.Distribution{}, err
 	}
 
+	return resp.Distribution, nil
+}
+
+func (d *Distribution) Update(distId string, domains []string, origin, path string, insecureOrigin bool) (*cloudfront.Distribution, error) {
+	// Get the current distribution
+	dist, err := d.Get(distId)
+	if err != nil {
+		return dist, err
+	}
+
+	// TODO: Override the distribution config
+
+	// Call the UpdateDistribution function
+	resp, err := d.Service.UpdateDistribution(&cloudfront.UpdateDistributionInput{
+	// TODO: fill in config
+	})
+	if err != nil {
+		return &cloudfront.Distribution{}, err
+	}
 	return resp.Distribution, nil
 }
 
