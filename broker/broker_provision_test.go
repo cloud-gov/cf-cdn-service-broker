@@ -10,6 +10,7 @@ import (
 
 	"github.com/18F/cf-cdn-service-broker/broker"
 	"github.com/18F/cf-cdn-service-broker/models"
+	"github.com/18F/cf-cdn-service-broker/models/mocks"
 )
 
 func TestProvisioning(t *testing.T) {
@@ -18,17 +19,14 @@ func TestProvisioning(t *testing.T) {
 
 type ProvisionSuite struct {
 	suite.Suite
-	Broker broker.CdnServiceBroker
+	Manager mocks.RouteManagerIface
+	Broker  broker.CdnServiceBroker
 }
 
 func (s *ProvisionSuite) SetupTest() {
+	s.Manager = mocks.RouteManagerIface{}
 	s.Broker = broker.CdnServiceBroker{
-		Manager: &FakeRouteManager{
-			RouteCreate: models.Route{State: models.Provisioned},
-			ErrorCreate: nil,
-			RouteGet:    models.Route{},
-			ErrorGet:    errors.New("not found"),
-		},
+		Manager: &s.Manager,
 	}
 }
 
@@ -53,25 +51,27 @@ func (s *ProvisionSuite) TestWithoutOptions() {
 }
 
 func (s *ProvisionSuite) TestInstanceExists() {
-	b := broker.CdnServiceBroker{
-		Manager: &FakeRouteManager{
-			RouteCreate: models.Route{State: models.Provisioned},
-			ErrorCreate: nil,
-			RouteGet:    models.Route{State: models.Provisioned},
-			ErrorGet:    nil,
-		},
+	route := models.Route{
+		State: models.Provisioned,
 	}
+	s.Manager.On("Get", "123").Return(route, nil)
+
 	details := brokerapi.ProvisionDetails{
 		RawParameters: []byte(`{"domain": "domain.gov", "origin": "origin.gov"}`),
 	}
-	_, err := b.Provision("", details, true)
+	_, err := s.Broker.Provision("123", details, true)
 	s.Equal(err, brokerapi.ErrInstanceAlreadyExists)
 }
 
 func (s *ProvisionSuite) TestSuccess() {
+	s.Manager.On("Get", "123").Return(models.Route{}, errors.New("not found"))
+	route := models.Route{State: models.Provisioning}
+	s.Manager.On("Create", "123", "domain.gov", "origin.gov", "", false,
+		map[string]string{"Organization": "", "Space": "", "Service": "", "Plan": ""}).Return(route, nil)
+
 	details := brokerapi.ProvisionDetails{
 		RawParameters: []byte(`{"domain": "domain.gov", "origin": "origin.gov"}`),
 	}
-	_, err := s.Broker.Provision("", details, true)
+	_, err := s.Broker.Provision("123", details, true)
 	s.Nil(err)
 }
