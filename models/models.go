@@ -70,7 +70,7 @@ type Certificate struct {
 type RouteManagerIface interface {
 	Create(instanceId, domain, origin, path string, insecureOrigin bool, tags map[string]string) (*Route, error)
 	Get(instanceId string) (*Route, error)
-	Update(route *Route) error
+	Poll(route *Route) error
 	Disable(route *Route) error
 	Renew(route *Route) error
 	RenewAll()
@@ -118,7 +118,7 @@ func (m *RouteManager) Get(instanceId string) (*Route, error) {
 	}
 }
 
-func (m *RouteManager) Update(r *Route) error {
+func (m *RouteManager) Poll(r *Route) error {
 	switch r.State {
 	case Provisioning:
 		return m.updateProvisioning(r)
