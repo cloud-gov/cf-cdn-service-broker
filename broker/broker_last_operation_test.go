@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/pivotal-cf/brokerapi"
 
@@ -14,7 +14,24 @@ import (
 	"github.com/18F/cf-cdn-service-broker/models/mocks"
 )
 
-func TestLastOperationMissing(t *testing.T) {
+func TestLastOperation(t *testing.T) {
+	suite.Run(t, new(LastOperationSuite))
+}
+
+type LastOperationSuite struct {
+	suite.Suite
+	Manager mocks.RouteManagerIface
+	Broker  broker.CdnServiceBroker
+}
+
+func (s *LastOperationSuite) SetupTest() {
+	s.Manager = mocks.RouteManagerIface{}
+	s.Broker = broker.CdnServiceBroker{
+		Manager: &s.Manager,
+	}
+}
+
+func (s *LastOperationSuite) TestLastOperationMissing() {
 	manager := mocks.RouteManagerIface{}
 	manager.On("Get", "").Return(models.Route{}, errors.New("not found"))
 	b := broker.CdnServiceBroker{
@@ -22,12 +39,12 @@ func TestLastOperationMissing(t *testing.T) {
 	}
 
 	operation, err := b.LastOperation("")
-	assert.Equal(t, operation.State, brokerapi.Failed)
-	assert.Equal(t, operation.Description, "Service instance not found")
-	assert.Nil(t, err)
+	s.Equal(operation.State, brokerapi.Failed)
+	s.Equal(operation.Description, "Service instance not found")
+	s.Nil(err)
 }
 
-func TestLastOperationSucceeded(t *testing.T) {
+func (s *LastOperationSuite) TestLastOperationSucceeded() {
 	manager := mocks.RouteManagerIface{}
 	route := models.Route{
 		State:          models.Provisioned,
@@ -41,12 +58,12 @@ func TestLastOperationSucceeded(t *testing.T) {
 	}
 
 	operation, err := b.LastOperation("123")
-	assert.Equal(t, operation.State, brokerapi.Succeeded)
-	assert.Equal(t, operation.Description, "Service instance provisioned [cdn.cloud.gov => cdn.apps.cloud.gov]")
-	assert.Nil(t, err)
+	s.Equal(operation.State, brokerapi.Succeeded)
+	s.Equal(operation.Description, "Service instance provisioned [cdn.cloud.gov => cdn.apps.cloud.gov]")
+	s.Nil(err)
 }
 
-func TestLastOperationProvisioning(t *testing.T) {
+func (s *LastOperationSuite) TestLastOperationProvisioning() {
 	manager := mocks.RouteManagerIface{}
 	route := models.Route{
 		State:          models.Provisioning,
@@ -60,12 +77,12 @@ func TestLastOperationProvisioning(t *testing.T) {
 	}
 
 	operation, err := b.LastOperation("123")
-	assert.Equal(t, operation.State, brokerapi.InProgress)
-	assert.True(t, strings.Contains(operation.Description, "Provisioning in progress [cdn.cloud.gov => cdn.apps.cloud.gov]"))
-	assert.Nil(t, err)
+	s.Equal(operation.State, brokerapi.InProgress)
+	s.True(strings.Contains(operation.Description, "Provisioning in progress [cdn.cloud.gov => cdn.apps.cloud.gov]"))
+	s.Nil(err)
 }
 
-func TestLastOperationDeprovisioning(t *testing.T) {
+func (s *LastOperationSuite) TestLastOperationDeprovisioning() {
 	manager := mocks.RouteManagerIface{}
 	route := models.Route{
 		State:          models.Deprovisioning,
@@ -79,19 +96,7 @@ func TestLastOperationDeprovisioning(t *testing.T) {
 	}
 
 	operation, err := b.LastOperation("123")
-	assert.Equal(t, operation.State, brokerapi.InProgress)
-	assert.Equal(t, operation.Description, "Deprovisioning in progress [cdn.cloud.gov => cdn.apps.cloud.gov]")
-	assert.Nil(t, err)
-}
-
-func TestBind(t *testing.T) {
-	b := broker.CdnServiceBroker{}
-	_, err := b.Bind("", "", brokerapi.BindDetails{})
-	assert.NotNil(t, err)
-}
-
-func TestUnbind(t *testing.T) {
-	b := broker.CdnServiceBroker{}
-	err := b.Unbind("", "", brokerapi.UnbindDetails{})
-	assert.NotNil(t, err)
+	s.Equal(operation.State, brokerapi.InProgress)
+	s.Equal(operation.Description, "Deprovisioning in progress [cdn.cloud.gov => cdn.apps.cloud.gov]")
+	s.Nil(err)
 }
