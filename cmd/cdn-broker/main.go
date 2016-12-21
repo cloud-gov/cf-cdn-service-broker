@@ -46,6 +46,7 @@ func main() {
 	}
 	broker := broker.CdnServiceBroker{
 		Manager: &manager,
+		Logger:  logger,
 	}
 	credentials := brokerapi.BrokerCredentials{
 		Username: settings.BrokerUsername,
