@@ -1,13 +1,17 @@
 ---
 jobs:
-- name: push-cf-cdn-service-broker
+- name: test-cdn-broker
   plan:
   - get: broker-src
     trigger: true
-
   - task: run-tests
     file: broker-src/ci/run-tests.yml
 
+- name: push-cf-cdn-service-broker-staging
+  plan:
+  - get: broker-src
+    passed: [test-cdn-broker]
+    trigger: true
   - task: create-db
     file: broker-src/ci/create-db.yml
     params:
@@ -15,58 +19,117 @@ jobs:
       SERVICE_TYPE: aws-rds
       SERVICE_NAME: rds-cdn-broker
       SERVICE_PLAN: shared-psql
-      <<: *cf-creds
-
+      <<: *cf-creds-staging
   - aggregate:
-    - put: broker-deploy
+    - put: broker-deploy-staging
       params:
         path: broker-src
         manifest: broker-src/manifest-broker.yml
-        environment_variables: &cfenv
-          BROKER_USERNAME: {{cdn-broker-user}}
-          BROKER_PASSWORD: {{cdn-broker-pass}}
-          EMAIL: {{cdn-broker-email}}
-          ACME_URL: {{cdn-broker-acme-url}}
-          BUCKET: {{cdn-broker-bucket}}
-          IAM_PATH_PREFIX: {{cdn-broker-iam-path-prefix}}
-          AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id}}
-          AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key}}
-          AWS_DEFAULT_REGION: {{cdn-broker-region}}
+        environment_variables: &cfenv-staging
+          BROKER_USERNAME: {{cdn-broker-user-staging}}
+          BROKER_PASSWORD: {{cdn-broker-pass-staging}}
+          EMAIL: {{cdn-broker-email-staging}}
+          ACME_URL: {{cdn-broker-acme-url-staging}}
+          BUCKET: {{cdn-broker-bucket-staging}}
+          IAM_PATH_PREFIX: {{cdn-broker-iam-path-prefix-staging}}
+          AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id-staging}}
+          AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key-staging}}
+          AWS_DEFAULT_REGION: {{cdn-broker-region-staging}}
           SERVER_SIDE_ENCRYPTION: AES256
-
-    - put: broker-deploy
+    - put: broker-deploy-staging
       params:
         path: broker-src
         manifest: broker-src/manifest-cron.yml
-        environment_variables: *cfenv
-      on_failure:
-        put: slack
-        params:
-          text: |
-            :x: FAILED to deploy cf-cdn-service-broker on {{cf-api-url}}
-            <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
-          channel: {{slack-channel}}
-          username: {{slack-username}}
-          icon_url: {{slack-icon-url}}
-    on_success:
-      put: slack
-      params:
-        text: |
-          :white_check_mark: Successfully deployed cf-cdn-service-broker on {{cf-api-url}}
-          <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
-        channel: {{slack-channel}}
-        username: {{slack-username}}
-        icon_url: {{slack-icon-url}}
-
+        environment_variables: *cfenv-staging
   - task: update-broker
     file: broker-src/ci/update-broker.yml
     params:
       # Note: Name must match application name in manifest
       BROKER_NAME: cdn-broker
-      AUTH_USER: {{cdn-broker-user}}
-      AUTH_PASS: {{cdn-broker-pass}}
+      AUTH_USER: {{cdn-broker-user-staging}}
+      AUTH_PASS: {{cdn-broker-pass-staging}}
       PLAN_NAME: cdn-route
-      <<: *cf-creds
+      <<: *cf-creds-staging
+  on_failure:
+    put: slack
+    params:
+      text: |
+        :x: FAILED to deploy cf-cdn-service-broker on {{cf-api-url-staging}}
+        <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
+      channel: {{slack-channel}}
+      username: {{slack-username}}
+      icon_url: {{slack-icon-url}}
+  on_success:
+    put: slack
+    params:
+      text: |
+        :white_check_mark: Successfully deployed cf-cdn-service-broker on {{cf-api-url-staging}}
+        <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
+      channel: {{slack-channel}}
+      username: {{slack-username}}
+      icon_url: {{slack-icon-url}}
+
+- name: push-cf-cdn-service-broker-production
+  plan:
+  - get: broker-src
+    passed: [push-cf-cdn-service-broker-staging]
+    trigger: true
+  - task: create-db
+    file: broker-src/ci/create-db.yml
+    params:
+      # Note: Name must match service name in manifest
+      SERVICE_TYPE: aws-rds
+      SERVICE_NAME: rds-cdn-broker
+      SERVICE_PLAN: shared-psql
+      <<: *cf-creds-production
+  - aggregate:
+    - put: broker-deploy-production
+      params:
+        path: broker-src
+        manifest: broker-src/manifest-broker.yml
+        environment_variables: &cfenv-production
+          BROKER_USERNAME: {{cdn-broker-user-production}}
+          BROKER_PASSWORD: {{cdn-broker-pass-production}}
+          EMAIL: {{cdn-broker-email-production}}
+          ACME_URL: {{cdn-broker-acme-url-production}}
+          BUCKET: {{cdn-broker-bucket-production}}
+          IAM_PATH_PREFIX: {{cdn-broker-iam-path-prefix-production}}
+          AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id-production}}
+          AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key-production}}
+          AWS_DEFAULT_REGION: {{cdn-broker-region-production}}
+          SERVER_SIDE_ENCRYPTION: AES256
+    - put: broker-deploy-production
+      params:
+        path: broker-src
+        manifest: broker-src/manifest-cron.yml
+        environment_variables: *cfenv-production
+  - task: update-broker
+    file: broker-src/ci/update-broker.yml
+    params:
+      # Note: Name must match application name in manifest
+      BROKER_NAME: cdn-broker
+      AUTH_USER: {{cdn-broker-user-production}}
+      AUTH_PASS: {{cdn-broker-pass-production}}
+      PLAN_NAME: cdn-route
+      <<: *cf-creds-production
+  on_failure:
+    put: slack
+    params:
+      text: |
+        :x: FAILED to deploy cf-cdn-service-broker on {{cf-api-url-production}}
+        <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
+      channel: {{slack-channel}}
+      username: {{slack-username}}
+      icon_url: {{slack-icon-url}}
+  on_success:
+    put: slack
+    params:
+      text: |
+        :white_check_mark: Successfully deployed cf-cdn-service-broker on {{cf-api-url-production}}
+        <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
+      channel: {{slack-channel}}
+      username: {{slack-username}}
+      icon_url: {{slack-icon-url}}
 
 resources:
 - name: broker-src
@@ -75,15 +138,23 @@ resources:
     uri: {{cf-cdn-broker-git-url}}
     branch: {{cf-cdn-broker-git-branch}}
 
-- name: broker-deploy
+- name: broker-deploy-staging
   type: cf
   source:
-    api: {{cf-api-url}}
-    username: {{cf-deploy-username}}
-    password: {{cf-deploy-password}}
-    organization: {{cf-organization}}
-    space: {{cf-space}}
-    skip_cert_check: false
+    api: {{cf-api-url-staging}}
+    username: {{cf-deploy-username-staging}}
+    password: {{cf-deploy-password-staging}}
+    organization: {{cf-organization-staging}}
+    space: {{cf-space-staging}}
+
+- name: broker-deploy-production
+  type: cf
+  source:
+    api: {{cf-api-url-production}}
+    username: {{cf-deploy-username-production}}
+    password: {{cf-deploy-password-production}}
+    organization: {{cf-organization-production}}
+    space: {{cf-space-production}}
 
 - name: slack
   type: slack-notification
@@ -96,9 +167,16 @@ resource_types:
   source:
     repository: cfcommunity/slack-notification-resource
 
-cf-creds: &cf-creds
-  CF_API_URL: {{cf-api-url}}
-  CF_DEPLOY_USERNAME: {{cf-deploy-username}}
-  CF_DEPLOY_PASSWORD: {{cf-deploy-password}}
-  CF_ORGANIZATION: {{cf-organization}}
-  CF_SPACE: {{cf-space}}
+meta:
+  cf-creds-staging: &cf-creds-staging
+    CF_API_URL: {{cf-api-url-staging}}
+    CF_DEPLOY_USERNAME: {{cf-deploy-username-staging}}
+    CF_DEPLOY_PASSWORD: {{cf-deploy-password-staging}}
+    CF_ORGANIZATION: {{cf-organization-staging}}
+    CF_SPACE: {{cf-space-staging}}
+  cf-creds-production: &cf-creds-production
+    CF_API_URL: {{cf-api-url-production}}
+    CF_DEPLOY_USERNAME: {{cf-deploy-username-production}}
+    CF_DEPLOY_PASSWORD: {{cf-deploy-password-production}}
+    CF_ORGANIZATION: {{cf-organization-production}}
+    CF_SPACE: {{cf-space-production}}
