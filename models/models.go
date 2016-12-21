@@ -70,7 +70,7 @@ type Certificate struct {
 type RouteManagerIface interface {
 	Create(instanceId, domain, origin, path string, insecureOrigin bool, tags map[string]string) (Route, error)
 	Get(instanceId string) (Route, error)
-	Update(route Route) error
+	Update(route *Route) error
 	Disable(route Route) error
 	Renew(route Route) error
 	RenewAll()
@@ -118,7 +118,7 @@ func (m *RouteManager) Get(instanceId string) (Route, error) {
 	}
 }
 
-func (m *RouteManager) Update(r Route) error {
+func (m *RouteManager) Update(r *Route) error {
 	switch r.State {
 	case Provisioning:
 		return m.updateProvisioning(r)
@@ -186,9 +186,9 @@ func (m *RouteManager) RenewAll() {
 	}
 }
 
-func (m *RouteManager) updateProvisioning(r Route) error {
-	if (m.checkCNAME(r) || m.checkHosts(r)) && m.checkDistribution(r) {
-		certResource, err := m.provisionCert(r)
+func (m *RouteManager) updateProvisioning(r *Route) error {
+	if (m.checkCNAME(*r) || m.checkHosts(*r)) && m.checkDistribution(*r) {
+		certResource, err := m.provisionCert(*r)
 		if err != nil {
 			return err
 		}
@@ -214,7 +214,7 @@ func (m *RouteManager) updateProvisioning(r Route) error {
 	return nil
 }
 
-func (m *RouteManager) updateDeprovisioning(r Route) error {
+func (m *RouteManager) updateDeprovisioning(r *Route) error {
 	deleted, err := m.CloudFront.Delete(r.DistId)
 	if err != nil {
 		return err

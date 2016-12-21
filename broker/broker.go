@@ -100,7 +100,7 @@ func (b *CdnServiceBroker) LastOperation(instanceId string) (brokerapi.LastOpera
 		}, nil
 	}
 
-	err = b.Manager.Update(route)
+	err = b.Manager.Update(&route)
 	if err != nil {
 		b.Logger.Error("Error during update", err, lager.Data{
 			"domain": route.DomainExternal,

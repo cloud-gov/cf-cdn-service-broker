@@ -84,11 +84,11 @@ func (_m *RouteManagerIface) RenewAll() {
 }
 
 // Update provides a mock function with given fields: route
-func (_m *RouteManagerIface) Update(route models.Route) error {
+func (_m *RouteManagerIface) Update(route *models.Route) error {
 	ret := _m.Called(route)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(models.Route) error); ok {
+	if rf, ok := ret.Get(0).(func(*models.Route) error); ok {
 		r0 = rf(route)
 	} else {
 		r0 = ret.Error(0)
