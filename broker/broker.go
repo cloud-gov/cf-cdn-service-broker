@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 
 	"github.com/pivotal-cf/brokerapi"
 
@@ -98,7 +99,10 @@ func (b *CdnServiceBroker) LastOperation(instanceId string) (brokerapi.LastOpera
 		}, nil
 	}
 
-	b.Manager.Update(route)
+	err = b.Manager.Update(route)
+	if err != nil {
+		log.Printf("[%s] Error during %s: %s", route.DomainExternal, route.State, err)
+	}
 
 	switch route.State {
 	case models.Provisioning:
