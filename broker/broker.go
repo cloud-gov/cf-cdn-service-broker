@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 
 	"github.com/pivotal-cf/brokerapi"
+	"github.com/pivotal-golang/lager"
 
 	"github.com/18F/cf-cdn-service-broker/models"
 )
@@ -21,6 +21,7 @@ type ProvisionOptions struct {
 
 type CdnServiceBroker struct {
 	Manager models.RouteManagerIface
+	Logger  lager.Logger
 }
 
 func (*CdnServiceBroker) Services() []brokerapi.Service {
@@ -101,7 +102,10 @@ func (b *CdnServiceBroker) LastOperation(instanceId string) (brokerapi.LastOpera
 
 	err = b.Manager.Update(route)
 	if err != nil {
-		log.Printf("[%s] Error during %s: %s", route.DomainExternal, route.State, err)
+		b.Logger.Error("Error during update", err, lager.Data{
+			"domain": route.DomainExternal,
+			"state":  route.State,
+		})
 	}
 
 	switch route.State {
