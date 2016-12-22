@@ -208,7 +208,7 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 
 		r.State = Provisioned
 		r.Certificate = certRow
-		m.DB.Save(&r)
+		m.DB.Save(r)
 	}
 
 	return nil
@@ -227,7 +227,7 @@ func (m *RouteManager) updateDeprovisioning(r *Route) error {
 		}
 
 		r.State = Deprovisioned
-		m.DB.Save(&r)
+		m.DB.Save(r)
 	}
 
 	return nil
