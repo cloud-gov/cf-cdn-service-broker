@@ -51,7 +51,7 @@ func (s *ProvisionSuite) TestWithoutOptions() {
 }
 
 func (s *ProvisionSuite) TestInstanceExists() {
-	route := models.Route{
+	route := &models.Route{
 		State: models.Provisioned,
 	}
 	s.Manager.On("Get", "123").Return(route, nil)
@@ -64,8 +64,8 @@ func (s *ProvisionSuite) TestInstanceExists() {
 }
 
 func (s *ProvisionSuite) TestSuccess() {
-	s.Manager.On("Get", "123").Return(models.Route{}, errors.New("not found"))
-	route := models.Route{State: models.Provisioning}
+	s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
+	route := &models.Route{State: models.Provisioning}
 	s.Manager.On("Create", "123", "domain.gov", "origin.gov", "", false,
 		map[string]string{"Organization": "", "Space": "", "Service": "", "Plan": ""}).Return(route, nil)
 

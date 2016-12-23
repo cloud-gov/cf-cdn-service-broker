@@ -33,7 +33,7 @@ func (s *LastOperationSuite) SetupTest() {
 
 func (s *LastOperationSuite) TestLastOperationMissing() {
 	manager := mocks.RouteManagerIface{}
-	manager.On("Get", "").Return(models.Route{}, errors.New("not found"))
+	manager.On("Get", "").Return(&models.Route{}, errors.New("not found"))
 	b := broker.CdnServiceBroker{
 		Manager: &manager,
 	}
@@ -46,13 +46,13 @@ func (s *LastOperationSuite) TestLastOperationMissing() {
 
 func (s *LastOperationSuite) TestLastOperationSucceeded() {
 	manager := mocks.RouteManagerIface{}
-	route := models.Route{
+	route := &models.Route{
 		State:          models.Provisioned,
 		DomainExternal: "cdn.cloud.gov",
 		Origin:         "cdn.apps.cloud.gov",
 	}
 	manager.On("Get", "123").Return(route, nil)
-	manager.On("Update", &route).Return(nil)
+	manager.On("Update", route).Return(nil)
 	b := broker.CdnServiceBroker{
 		Manager: &manager,
 	}
@@ -65,13 +65,13 @@ func (s *LastOperationSuite) TestLastOperationSucceeded() {
 
 func (s *LastOperationSuite) TestLastOperationProvisioning() {
 	manager := mocks.RouteManagerIface{}
-	route := models.Route{
+	route := &models.Route{
 		State:          models.Provisioning,
 		DomainExternal: "cdn.cloud.gov",
 		Origin:         "cdn.apps.cloud.gov",
 	}
 	manager.On("Get", "123").Return(route, nil)
-	manager.On("Update", &route).Return(nil)
+	manager.On("Update", route).Return(nil)
 	b := broker.CdnServiceBroker{
 		Manager: &manager,
 	}
@@ -84,13 +84,13 @@ func (s *LastOperationSuite) TestLastOperationProvisioning() {
 
 func (s *LastOperationSuite) TestLastOperationDeprovisioning() {
 	manager := mocks.RouteManagerIface{}
-	route := models.Route{
+	route := &models.Route{
 		State:          models.Deprovisioning,
 		DomainExternal: "cdn.cloud.gov",
 		Origin:         "cdn.apps.cloud.gov",
 	}
 	manager.On("Get", "123").Return(route, nil)
-	manager.On("Update", &route).Return(nil)
+	manager.On("Update", route).Return(nil)
 	b := broker.CdnServiceBroker{
 		Manager: &manager,
 	}

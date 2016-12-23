@@ -9,14 +9,16 @@ type RouteManagerIface struct {
 }
 
 // Create provides a mock function with given fields: instanceId, domain, origin, path, insecureOrigin, tags
-func (_m *RouteManagerIface) Create(instanceId string, domain string, origin string, path string, insecureOrigin bool, tags map[string]string) (models.Route, error) {
+func (_m *RouteManagerIface) Create(instanceId string, domain string, origin string, path string, insecureOrigin bool, tags map[string]string) (*models.Route, error) {
 	ret := _m.Called(instanceId, domain, origin, path, insecureOrigin, tags)
 
-	var r0 models.Route
-	if rf, ok := ret.Get(0).(func(string, string, string, string, bool, map[string]string) models.Route); ok {
+	var r0 *models.Route
+	if rf, ok := ret.Get(0).(func(string, string, string, string, bool, map[string]string) *models.Route); ok {
 		r0 = rf(instanceId, domain, origin, path, insecureOrigin, tags)
 	} else {
-		r0 = ret.Get(0).(models.Route)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.Route)
+		}
 	}
 
 	var r1 error
@@ -30,11 +32,11 @@ func (_m *RouteManagerIface) Create(instanceId string, domain string, origin str
 }
 
 // Disable provides a mock function with given fields: route
-func (_m *RouteManagerIface) Disable(route models.Route) error {
+func (_m *RouteManagerIface) Disable(route *models.Route) error {
 	ret := _m.Called(route)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(models.Route) error); ok {
+	if rf, ok := ret.Get(0).(func(*models.Route) error); ok {
 		r0 = rf(route)
 	} else {
 		r0 = ret.Error(0)
@@ -44,14 +46,16 @@ func (_m *RouteManagerIface) Disable(route models.Route) error {
 }
 
 // Get provides a mock function with given fields: instanceId
-func (_m *RouteManagerIface) Get(instanceId string) (models.Route, error) {
+func (_m *RouteManagerIface) Get(instanceId string) (*models.Route, error) {
 	ret := _m.Called(instanceId)
 
-	var r0 models.Route
-	if rf, ok := ret.Get(0).(func(string) models.Route); ok {
+	var r0 *models.Route
+	if rf, ok := ret.Get(0).(func(string) *models.Route); ok {
 		r0 = rf(instanceId)
 	} else {
-		r0 = ret.Get(0).(models.Route)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.Route)
+		}
 	}
 
 	var r1 error
@@ -65,11 +69,11 @@ func (_m *RouteManagerIface) Get(instanceId string) (models.Route, error) {
 }
 
 // Renew provides a mock function with given fields: route
-func (_m *RouteManagerIface) Renew(route models.Route) error {
+func (_m *RouteManagerIface) Renew(route *models.Route) error {
 	ret := _m.Called(route)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(models.Route) error); ok {
+	if rf, ok := ret.Get(0).(func(*models.Route) error); ok {
 		r0 = rf(route)
 	} else {
 		r0 = ret.Error(0)
