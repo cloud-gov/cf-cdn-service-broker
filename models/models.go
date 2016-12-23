@@ -187,7 +187,7 @@ func (m *RouteManager) RenewAll() {
 }
 
 func (m *RouteManager) updateProvisioning(r *Route) error {
-	if (m.checkCNAME(*r) || m.checkHosts(*r)) && m.checkDistribution(*r) {
+	if (m.checkCNAME(r) || m.checkHosts(r)) && m.checkDistribution(r) {
 		certResource, err := m.provisionCert(r)
 		if err != nil {
 			return err
@@ -247,7 +247,7 @@ func (m *RouteManager) provisionCert(r *Route) (acme.CertificateResource, error)
 	return cert, nil
 }
 
-func (m *RouteManager) checkCNAME(r Route) bool {
+func (m *RouteManager) checkCNAME(r *Route) bool {
 	expects := fmt.Sprintf("%s.", r.DomainInternal)
 
 	for _, d := range r.GetDomains() {
@@ -272,7 +272,7 @@ func removeV6hosts(hosts []string) []string {
 	return v4hosts
 }
 
-func (m *RouteManager) checkHosts(r Route) bool {
+func (m *RouteManager) checkHosts(r *Route) bool {
 	hosts, err := net.LookupHost(r.DomainInternal)
 	if err != nil {
 		return false
@@ -295,7 +295,7 @@ func (m *RouteManager) checkHosts(r Route) bool {
 	return true
 }
 
-func (m *RouteManager) checkDistribution(r Route) bool {
+func (m *RouteManager) checkDistribution(r *Route) bool {
 	dist, err := m.CloudFront.Get(r.DistId)
 	if err != nil {
 		return false
