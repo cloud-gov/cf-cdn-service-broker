@@ -9,9 +9,11 @@ jobs:
 
 - name: push-cf-cdn-service-broker-staging
   plan:
-  - get: broker-src
-    passed: [test-cdn-broker]
-    trigger: true
+  - aggregate:
+    - get: broker-src
+      passed: [test-cdn-broker]
+      trigger: true
+    - get: pipeline-tasks
   - task: create-db
     file: broker-src/ci/create-db.yml
     params:
@@ -42,14 +44,13 @@ jobs:
         manifest: broker-src/manifest-cron.yml
         environment_variables: *cfenv-staging
   - task: update-broker
-    file: broker-src/ci/update-broker.yml
+    file: pipeline-tasks/register-service-broker.yml
     params:
-      # Note: Name must match application name in manifest
+      <<: *cf-creds-staging
       BROKER_NAME: cdn-broker
       AUTH_USER: {{cdn-broker-user-staging}}
       AUTH_PASS: {{cdn-broker-pass-staging}}
-      PLAN_NAME: cdn-route
-      <<: *cf-creds-staging
+      SERVICES: cdn-route
   on_failure:
     put: slack
     params:
@@ -104,14 +105,13 @@ jobs:
         manifest: broker-src/manifest-cron.yml
         environment_variables: *cfenv-production
   - task: update-broker
-    file: broker-src/ci/update-broker.yml
+    file: pipeline-tasks/register-service-broker.yml
     params:
-      # Note: Name must match application name in manifest
+      <<: *cf-creds-production
       BROKER_NAME: cdn-broker
       AUTH_USER: {{cdn-broker-user-production}}
       AUTH_PASS: {{cdn-broker-pass-production}}
-      PLAN_NAME: cdn-route
-      <<: *cf-creds-production
+      SERVICES: cdn-route
   on_failure:
     put: slack
     params:
@@ -137,6 +137,12 @@ resources:
   source:
     uri: {{cf-cdn-broker-git-url}}
     branch: {{cf-cdn-broker-git-branch}}
+
+- name: pipeline-tasks
+  type: git
+  source:
+    uri: {{pipeline-tasks-git-url}}
+    branch: {{pipeline-tasks-git-branch}}
 
 - name: broker-deploy-staging
   type: cf
@@ -170,13 +176,13 @@ resource_types:
 meta:
   cf-creds-staging: &cf-creds-staging
     CF_API_URL: {{cf-api-url-staging}}
-    CF_DEPLOY_USERNAME: {{cf-deploy-username-staging}}
-    CF_DEPLOY_PASSWORD: {{cf-deploy-password-staging}}
+    CF_USERNAME: {{cf-deploy-username-staging}}
+    CF_PASSWORD: {{cf-deploy-password-staging}}
     CF_ORGANIZATION: {{cf-organization-staging}}
     CF_SPACE: {{cf-space-staging}}
   cf-creds-production: &cf-creds-production
     CF_API_URL: {{cf-api-url-production}}
-    CF_DEPLOY_USERNAME: {{cf-deploy-username-production}}
-    CF_DEPLOY_PASSWORD: {{cf-deploy-password-production}}
+    CF_USERNAME: {{cf-deploy-username-production}}
+    CF_PASSWORD: {{cf-deploy-password-production}}
     CF_ORGANIZATION: {{cf-organization-production}}
     CF_SPACE: {{cf-space-production}}
