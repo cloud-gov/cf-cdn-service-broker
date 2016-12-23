@@ -68,11 +68,11 @@ type Certificate struct {
 }
 
 type RouteManagerIface interface {
-	Create(instanceId, domain, origin, path string, insecureOrigin bool, tags map[string]string) (Route, error)
-	Get(instanceId string) (Route, error)
-	Update(route Route) error
-	Disable(route Route) error
-	Renew(route Route) error
+	Create(instanceId, domain, origin, path string, insecureOrigin bool, tags map[string]string) (*Route, error)
+	Get(instanceId string) (*Route, error)
+	Update(route *Route) error
+	Disable(route *Route) error
+	Renew(route *Route) error
 	RenewAll()
 }
 
@@ -84,8 +84,8 @@ type RouteManager struct {
 	DB         *gorm.DB
 }
 
-func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureOrigin bool, tags map[string]string) (Route, error) {
-	route := Route{
+func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureOrigin bool, tags map[string]string) (*Route, error) {
+	route := &Route{
 		InstanceId:     instanceId,
 		State:          Provisioning,
 		DomainExternal: domain,
@@ -96,29 +96,29 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 
 	dist, err := m.CloudFront.Create(route.GetDomains(), origin, path, insecureOrigin, tags)
 	if err != nil {
-		return Route{}, err
+		return nil, err
 	}
 
 	route.DomainInternal = *dist.DomainName
 	route.DistId = *dist.Id
 
-	m.DB.Create(&route)
+	m.DB.Create(route)
 	return route, nil
 }
 
-func (m *RouteManager) Get(instanceId string) (Route, error) {
+func (m *RouteManager) Get(instanceId string) (*Route, error) {
 	route := Route{}
 	result := m.DB.First(&route, Route{InstanceId: instanceId})
 	if result.Error == nil {
-		return route, nil
+		return &route, nil
 	} else if result.RecordNotFound() {
-		return Route{}, brokerapi.ErrInstanceDoesNotExist
+		return nil, brokerapi.ErrInstanceDoesNotExist
 	} else {
-		return Route{}, result.Error
+		return nil, result.Error
 	}
 }
 
-func (m *RouteManager) Update(r Route) error {
+func (m *RouteManager) Update(r *Route) error {
 	switch r.State {
 	case Provisioning:
 		return m.updateProvisioning(r)
@@ -129,21 +129,21 @@ func (m *RouteManager) Update(r Route) error {
 	}
 }
 
-func (m *RouteManager) Disable(r Route) error {
+func (m *RouteManager) Disable(r *Route) error {
 	err := m.CloudFront.Disable(r.DistId)
 	if err != nil {
 		return err
 	}
 
 	r.State = Deprovisioning
-	m.DB.Save(&r)
+	m.DB.Save(r)
 
 	return nil
 }
 
-func (m *RouteManager) Renew(r Route) error {
+func (m *RouteManager) Renew(r *Route) error {
 	var certRow Certificate
-	err := m.DB.Model(&r).Related(&certRow, "Certificate").Error
+	err := m.DB.Model(r).Related(&certRow, "Certificate").Error
 	if err != nil {
 		return err
 	}
@@ -177,7 +177,7 @@ func (m *RouteManager) RenewAll() {
 	).Find(&routes)
 
 	for _, route := range routes {
-		err := m.Renew(route)
+		err := m.Renew(&route)
 		m.Logger.Info("Renewing certificate", lager.Data{
 			"domain": route.DomainExternal,
 			"origin": route.Origin,
@@ -186,7 +186,7 @@ func (m *RouteManager) RenewAll() {
 	}
 }
 
-func (m *RouteManager) updateProvisioning(r Route) error {
+func (m *RouteManager) updateProvisioning(r *Route) error {
 	if (m.checkCNAME(r) || m.checkHosts(r)) && m.checkDistribution(r) {
 		certResource, err := m.provisionCert(r)
 		if err != nil {
@@ -208,13 +208,13 @@ func (m *RouteManager) updateProvisioning(r Route) error {
 
 		r.State = Provisioned
 		r.Certificate = certRow
-		m.DB.Save(&r)
+		m.DB.Save(r)
 	}
 
 	return nil
 }
 
-func (m *RouteManager) updateDeprovisioning(r Route) error {
+func (m *RouteManager) updateDeprovisioning(r *Route) error {
 	deleted, err := m.CloudFront.Delete(r.DistId)
 	if err != nil {
 		return err
@@ -227,13 +227,13 @@ func (m *RouteManager) updateDeprovisioning(r Route) error {
 		}
 
 		r.State = Deprovisioned
-		m.DB.Save(&r)
+		m.DB.Save(r)
 	}
 
 	return nil
 }
 
-func (m *RouteManager) provisionCert(r Route) (acme.CertificateResource, error) {
+func (m *RouteManager) provisionCert(r *Route) (acme.CertificateResource, error) {
 	cert, err := m.Acme.ObtainCertificate(r.GetDomains())
 	if err != nil {
 		return acme.CertificateResource{}, err
@@ -247,7 +247,7 @@ func (m *RouteManager) provisionCert(r Route) (acme.CertificateResource, error) 
 	return cert, nil
 }
 
-func (m *RouteManager) checkCNAME(r Route) bool {
+func (m *RouteManager) checkCNAME(r *Route) bool {
 	expects := fmt.Sprintf("%s.", r.DomainInternal)
 
 	for _, d := range r.GetDomains() {
@@ -272,7 +272,7 @@ func removeV6hosts(hosts []string) []string {
 	return v4hosts
 }
 
-func (m *RouteManager) checkHosts(r Route) bool {
+func (m *RouteManager) checkHosts(r *Route) bool {
 	hosts, err := net.LookupHost(r.DomainInternal)
 	if err != nil {
 		return false
@@ -295,7 +295,7 @@ func (m *RouteManager) checkHosts(r Route) bool {
 	return true
 }
 
-func (m *RouteManager) checkDistribution(r Route) bool {
+func (m *RouteManager) checkDistribution(r *Route) bool {
 	dist, err := m.CloudFront.Get(r.DistId)
 	if err != nil {
 		return false
