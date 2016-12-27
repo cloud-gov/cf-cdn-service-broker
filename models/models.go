@@ -147,7 +147,7 @@ func (m *RouteManager) Update(instanceId, domain, origin string) error {
 	route.DistId = *dist.Id
 
 	// Save the database.
-	result := m.DB.Save(&route)
+	result := m.DB.Save(route)
 	if result.Error != nil {
 		return result.Error
 	}
