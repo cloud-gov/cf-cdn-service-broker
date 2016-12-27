@@ -82,9 +82,9 @@ func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionCon
 			},
 		},
 		SmoothStreaming: aws.Bool(false),
-		DefaultTTL: aws.Int64(86400),
-		MinTTL: aws.Int64(0),
-		MaxTTL: aws.Int64(31536000),
+		DefaultTTL:      aws.Int64(86400),
+		MinTTL:          aws.Int64(0),
+		MaxTTL:          aws.Int64(31536000),
 		TrustedSigners: &cloudfront.TrustedSigners{
 			Enabled:  aws.Bool(false),
 			Quantity: aws.Int64(0),
@@ -160,13 +160,13 @@ func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionCon
 							aws.String("GET"),
 						},
 					},
-					Items:[]*string{
+					Items: []*string{
 						aws.String("HEAD"),
 						aws.String("GET"),
 					},
 					Quantity: aws.Int64(2),
 				},
-				Compress: aws.Bool(false),
+				Compress:       aws.Bool(false),
 				PathPattern:    aws.String("/.well-known/acme-challenge/*"),
 				TargetOriginId: aws.String(fmt.Sprintf("s3-%s-%s", d.Settings.Bucket, domains)),
 				ForwardedValues: &cloudfront.ForwardedValues{
@@ -182,9 +182,9 @@ func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionCon
 					},
 				},
 				SmoothStreaming: aws.Bool(false),
-				DefaultTTL: aws.Int64(86400),
-				MinTTL: aws.Int64(0),
-				MaxTTL: aws.Int64(31536000),
+				DefaultTTL:      aws.Int64(86400),
+				MinTTL:          aws.Int64(0),
+				MaxTTL:          aws.Int64(31536000),
 				TrustedSigners: &cloudfront.TrustedSigners{
 					Enabled:  aws.Bool(false),
 					Quantity: aws.Int64(0),
