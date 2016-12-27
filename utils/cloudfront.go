@@ -54,98 +54,111 @@ func (d *Distribution) getTags(tags map[string]string) *cloudfront.Tags {
 	return &cloudfront.Tags{Items: items}
 }
 
-func (d *Distribution) Create(domains []string, origin, path string, insecureOrigin bool, tags map[string]string) (*cloudfront.Distribution, error) {
-	resp, err := d.Service.CreateDistributionWithTags(&cloudfront.CreateDistributionWithTagsInput{
-		DistributionConfigWithTags: &cloudfront.DistributionConfigWithTags{
-			DistributionConfig: &cloudfront.DistributionConfig{
-				CallerReference: aws.String(d.getDistributionId(domains)),
-				Comment:         aws.String("cdn route service"),
-				Enabled:         aws.Bool(true),
-				IsIPV6Enabled:   aws.Bool(true),
-				DefaultCacheBehavior: &cloudfront.DefaultCacheBehavior{
-					TargetOriginId: aws.String(d.getOriginId(domains)),
-					ForwardedValues: &cloudfront.ForwardedValues{
-						Cookies: &cloudfront.CookiePreference{
-							Forward: aws.String("all"),
+// createDistributionConfig is a wrapper function that will get all the common config settings for
+// "cloudfront.DistributionConfig". This function is shared between "Create" and "Update".
+// In order to maintain backwards compatibility with older versions of the code where the callerReference was derived
+// from the domain(s), the callerReference has to be explicitly passed in. This is necessary because whenever we do an
+// update, the domains could change but we need to treat the CallerReference like an ID because
+// it can't be changed like the domains and instead the callerReference which was composed of the original domains must
+// be passed in.
+func (d *Distribution) createDistributionConfig(origin, path string, insecureOrigin bool, callerReference *string,
+	domains []string) *cloudfront.DistributionConfig {
+	return &cloudfront.DistributionConfig{
+		CallerReference: callerReference,
+		Comment:         aws.String("cdn route service"),
+		Enabled:         aws.Bool(true),
+		IsIPV6Enabled:   aws.Bool(true),
+		DefaultCacheBehavior: &cloudfront.DefaultCacheBehavior{
+			TargetOriginId: aws.String(d.getOriginId(domains)),
+			ForwardedValues: &cloudfront.ForwardedValues{
+				Cookies: &cloudfront.CookiePreference{
+					Forward: aws.String("all"),
+				},
+				QueryString: aws.Bool(true),
+			},
+			MinTTL: aws.Int64(0),
+			TrustedSigners: &cloudfront.TrustedSigners{
+				Enabled:  aws.Bool(false),
+				Quantity: aws.Int64(0),
+			},
+			ViewerProtocolPolicy: aws.String("redirect-to-https"),
+			AllowedMethods: &cloudfront.AllowedMethods{
+				Quantity: aws.Int64(7),
+				Items: []*string{
+					aws.String("HEAD"),
+					aws.String("GET"),
+					aws.String("OPTIONS"),
+					aws.String("PUT"),
+					aws.String("POST"),
+					aws.String("PATCH"),
+					aws.String("DELETE"),
+				},
+			},
+		},
+		Origins: &cloudfront.Origins{
+			Quantity: aws.Int64(2),
+			Items: []*cloudfront.Origin{
+				{
+					DomainName: aws.String(origin),
+					Id:         aws.String(d.getOriginId(domains)),
+					OriginPath: aws.String(path),
+					CustomHeaders: &cloudfront.CustomHeaders{
+						Quantity: aws.Int64(0),
+					},
+					CustomOriginConfig: &cloudfront.CustomOriginConfig{
+						HTTPPort:             aws.Int64(80),
+						HTTPSPort:            aws.Int64(443),
+						OriginProtocolPolicy: getOriginProtocolPolicy(insecureOrigin),
+						OriginSslProtocols: &cloudfront.OriginSslProtocols{
+							Quantity: aws.Int64(3),
+							Items: []*string{
+								aws.String("TLSv1"),
+								aws.String("TLSv1.1"),
+								aws.String("TLSv1.2"),
+							},
 						},
-						QueryString: aws.Bool(true),
+					},
+				},
+				{
+					DomainName: aws.String(fmt.Sprintf("%s.s3.amazonaws.com", d.Settings.Bucket)),
+					Id:         aws.String(fmt.Sprintf("s3-%s-%s", d.Settings.Bucket, domains)),
+					S3OriginConfig: &cloudfront.S3OriginConfig{
+						OriginAccessIdentity: aws.String(""),
+					},
+				},
+			},
+		},
+		CacheBehaviors: &cloudfront.CacheBehaviors{
+			Quantity: aws.Int64(1),
+			Items: []*cloudfront.CacheBehavior{
+				{
+					PathPattern:    aws.String("/.well-known/acme-challenge/*"),
+					TargetOriginId: aws.String(fmt.Sprintf("s3-%s-%s", d.Settings.Bucket, domains)),
+					ForwardedValues: &cloudfront.ForwardedValues{
+						QueryString: aws.Bool(false),
+						Cookies: &cloudfront.CookiePreference{
+							Forward: aws.String("none"),
+						},
 					},
 					MinTTL: aws.Int64(0),
 					TrustedSigners: &cloudfront.TrustedSigners{
 						Enabled:  aws.Bool(false),
 						Quantity: aws.Int64(0),
 					},
-					ViewerProtocolPolicy: aws.String("redirect-to-https"),
-					AllowedMethods: &cloudfront.AllowedMethods{
-						Quantity: aws.Int64(7),
-						Items: []*string{
-							aws.String("HEAD"),
-							aws.String("GET"),
-							aws.String("OPTIONS"),
-							aws.String("PUT"),
-							aws.String("POST"),
-							aws.String("PATCH"),
-							aws.String("DELETE"),
-						},
-					},
+					ViewerProtocolPolicy: aws.String("allow-all"),
 				},
-				Origins: &cloudfront.Origins{
-					Quantity: aws.Int64(2),
-					Items: []*cloudfront.Origin{
-						{
-							DomainName: aws.String(origin),
-							Id:         aws.String(d.getOriginId(domains)),
-							OriginPath: aws.String(path),
-							CustomHeaders: &cloudfront.CustomHeaders{
-								Quantity: aws.Int64(0),
-							},
-							CustomOriginConfig: &cloudfront.CustomOriginConfig{
-								HTTPPort:             aws.Int64(80),
-								HTTPSPort:            aws.Int64(443),
-								OriginProtocolPolicy: getOriginProtocolPolicy(insecureOrigin),
-								OriginSslProtocols: &cloudfront.OriginSslProtocols{
-									Quantity: aws.Int64(3),
-									Items: []*string{
-										aws.String("TLSv1"),
-										aws.String("TLSv1.1"),
-										aws.String("TLSv1.2"),
-									},
-								},
-							},
-						},
-						{
-							DomainName: aws.String(fmt.Sprintf("%s.s3.amazonaws.com", d.Settings.Bucket)),
-							Id:         aws.String(fmt.Sprintf("s3-%s-%s", d.Settings.Bucket, domains)),
-							S3OriginConfig: &cloudfront.S3OriginConfig{
-								OriginAccessIdentity: aws.String(""),
-							},
-						},
-					},
-				},
-				CacheBehaviors: &cloudfront.CacheBehaviors{
-					Quantity: aws.Int64(1),
-					Items: []*cloudfront.CacheBehavior{
-						{
-							PathPattern:    aws.String("/.well-known/acme-challenge/*"),
-							TargetOriginId: aws.String(fmt.Sprintf("s3-%s-%s", d.Settings.Bucket, domains)),
-							ForwardedValues: &cloudfront.ForwardedValues{
-								QueryString: aws.Bool(false),
-								Cookies: &cloudfront.CookiePreference{
-									Forward: aws.String("none"),
-								},
-							},
-							MinTTL: aws.Int64(0),
-							TrustedSigners: &cloudfront.TrustedSigners{
-								Enabled:  aws.Bool(false),
-								Quantity: aws.Int64(0),
-							},
-							ViewerProtocolPolicy: aws.String("allow-all"),
-						},
-					},
-				},
-				Aliases:    d.getAliases(domains),
-				PriceClass: aws.String("PriceClass_100"),
 			},
+		},
+		Aliases:    d.getAliases(domains),
+		PriceClass: aws.String("PriceClass_100"),
+	}
+}
+
+func (d *Distribution) Create(domains []string, origin, path string, insecureOrigin bool, tags map[string]string) (*cloudfront.Distribution, error) {
+	resp, err := d.Service.CreateDistributionWithTags(&cloudfront.CreateDistributionWithTagsInput{
+		DistributionConfigWithTags: &cloudfront.DistributionConfigWithTags{
+			DistributionConfig: d.createDistributionConfig(origin, path, insecureOrigin,
+				aws.String(d.getDistributionId(domains)), domains),
 			Tags: d.getTags(tags),
 		},
 	})
@@ -167,95 +180,8 @@ func (d *Distribution) Update(distId string, domains []string, origin, path stri
 	// Call the UpdateDistribution function
 	resp, err := d.Service.UpdateDistribution(&cloudfront.UpdateDistributionInput{
 		Id: dist.Id,
-		DistributionConfig: &cloudfront.DistributionConfig{
-			CallerReference: dist.DistributionConfig.CallerReference,
-			Comment:         aws.String("cdn route service"),
-			Enabled:         aws.Bool(true),
-			IsIPV6Enabled:   aws.Bool(true),
-			DefaultCacheBehavior: &cloudfront.DefaultCacheBehavior{
-				TargetOriginId: aws.String(d.getOriginId(domains)),
-				ForwardedValues: &cloudfront.ForwardedValues{
-					Cookies: &cloudfront.CookiePreference{
-						Forward: aws.String("all"),
-					},
-					QueryString: aws.Bool(true),
-				},
-				MinTTL: aws.Int64(0),
-				TrustedSigners: &cloudfront.TrustedSigners{
-					Enabled:  aws.Bool(false),
-					Quantity: aws.Int64(0),
-				},
-				ViewerProtocolPolicy: aws.String("redirect-to-https"),
-				AllowedMethods: &cloudfront.AllowedMethods{
-					Quantity: aws.Int64(7),
-					Items: []*string{
-						aws.String("HEAD"),
-						aws.String("GET"),
-						aws.String("OPTIONS"),
-						aws.String("PUT"),
-						aws.String("POST"),
-						aws.String("PATCH"),
-						aws.String("DELETE"),
-					},
-				},
-			},
-			Origins: &cloudfront.Origins{
-				Quantity: aws.Int64(2),
-				Items: []*cloudfront.Origin{
-					{
-						DomainName: aws.String(origin),
-						Id:         aws.String(d.getOriginId(domains)),
-						OriginPath: aws.String(path),
-						CustomHeaders: &cloudfront.CustomHeaders{
-							Quantity: aws.Int64(0),
-						},
-						CustomOriginConfig: &cloudfront.CustomOriginConfig{
-							HTTPPort:             aws.Int64(80),
-							HTTPSPort:            aws.Int64(443),
-							OriginProtocolPolicy: getOriginProtocolPolicy(insecureOrigin),
-							OriginSslProtocols: &cloudfront.OriginSslProtocols{
-								Quantity: aws.Int64(3),
-								Items: []*string{
-									aws.String("TLSv1"),
-									aws.String("TLSv1.1"),
-									aws.String("TLSv1.2"),
-								},
-							},
-						},
-					},
-					{
-						DomainName: aws.String(fmt.Sprintf("%s.s3.amazonaws.com", d.Settings.Bucket)),
-						Id:         aws.String(fmt.Sprintf("s3-%s-%s", d.Settings.Bucket, domains)),
-						S3OriginConfig: &cloudfront.S3OriginConfig{
-							OriginAccessIdentity: aws.String(""),
-						},
-					},
-				},
-			},
-			CacheBehaviors: &cloudfront.CacheBehaviors{
-				Quantity: aws.Int64(1),
-				Items: []*cloudfront.CacheBehavior{
-					{
-						PathPattern:    aws.String("/.well-known/acme-challenge/*"),
-						TargetOriginId: aws.String(fmt.Sprintf("s3-%s-%s", d.Settings.Bucket, domains)),
-						ForwardedValues: &cloudfront.ForwardedValues{
-							QueryString: aws.Bool(false),
-							Cookies: &cloudfront.CookiePreference{
-								Forward: aws.String("none"),
-							},
-						},
-						MinTTL: aws.Int64(0),
-						TrustedSigners: &cloudfront.TrustedSigners{
-							Enabled:  aws.Bool(false),
-							Quantity: aws.Int64(0),
-						},
-						ViewerProtocolPolicy: aws.String("allow-all"),
-					},
-				},
-			},
-			Aliases:    d.getAliases(domains),
-			PriceClass: aws.String("PriceClass_100"),
-		},
+		DistributionConfig: d.createDistributionConfig(origin, path, insecureOrigin,
+			aws.String(d.getDistributionId(domains)), domains),
 	})
 	if err != nil {
 		return &cloudfront.Distribution{}, err
