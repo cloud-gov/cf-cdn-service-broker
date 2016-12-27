@@ -66,7 +66,7 @@ func (s *UpdateSuite) TestValid() {
 			"origin": "origin.gov",
 		},
 	}
-	s.Manager.On("Update", "", "origin.gov", "domain.gov").Return(nil)
+	s.Manager.On("Update", "", "domain.gov", "origin.gov").Return(nil)
 	_, err := s.Broker.Update("", details, true)
 	s.Nil(err)
 }

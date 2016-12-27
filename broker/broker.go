@@ -189,7 +189,7 @@ func (b *CdnServiceBroker) Update(instanceId string, details brokerapi.UpdateDet
 		}
 	}
 
-	err := b.Manager.Update(instanceId, origin, domain)
+	err := b.Manager.Update(instanceId, domain, origin)
 	if err != nil {
 		return false, err
 	}
