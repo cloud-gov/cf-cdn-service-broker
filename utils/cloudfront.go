@@ -172,14 +172,17 @@ func (d *Distribution) Create(domains []string, origin, path string, insecureOri
 
 func (d *Distribution) Update(distId string, domains []string, origin, path string, insecureOrigin bool) (*cloudfront.Distribution, error) {
 	// Get the current distribution
-	dist, err := d.Get(distId)
+	dist, err := d.Service.GetDistributionConfig(&cloudfront.GetDistributionConfigInput{
+		Id: aws.String(distId),
+	})
 	if err != nil {
-		return dist, err
+		return nil, err
 	}
 
 	// Call the UpdateDistribution function
 	resp, err := d.Service.UpdateDistribution(&cloudfront.UpdateDistributionInput{
-		Id: dist.Id,
+		Id:      aws.String(distId),
+		IfMatch: dist.ETag,
 		DistributionConfig: d.createDistributionConfig(origin, path, insecureOrigin,
 			aws.String(d.getDistributionId(domains)), domains),
 	})
