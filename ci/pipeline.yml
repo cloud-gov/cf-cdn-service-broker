@@ -70,10 +70,29 @@ jobs:
       username: {{slack-username}}
       icon_url: {{slack-icon-url}}
 
-- name: push-cf-cdn-service-broker-production
+- name: acceptance-tests-staging
+  serial: true
   plan:
   - get: broker-src
     passed: [push-cf-cdn-service-broker-staging]
+    trigger: true
+  - task: acceptance-tests
+    file: broker-src/acceptance-tests.yml
+    params:
+      <<: *cf-creds-staging
+      SERVICE_NAME: cdn-route
+      PLAN_NAME: cdn-route
+      SERVICE_INSTANCE_NAME: s3-acceptance-test
+      AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id-staging}}
+      AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key-staging}}
+      HOSTED_ZONE_ID: {{hosted-zone-id-staging}}
+      ORIGIN: {{origin-url-staging}}
+      DOMAIN: {{domain-url-staging}}
+
+- name: push-cf-cdn-service-broker-production
+  plan:
+  - get: broker-src
+    passed: [acceptance-tests-staging]
     trigger: true
   - task: create-db
     file: broker-src/ci/create-db.yml
@@ -130,6 +149,25 @@ jobs:
       channel: {{slack-channel}}
       username: {{slack-username}}
       icon_url: {{slack-icon-url}}
+
+- name: acceptance-tests-production
+  serial: true
+  plan:
+  - get: broker-src
+    passed: [push-cf-cdn-service-broker-production]
+    trigger: true
+  - task: acceptance-tests
+    file: broker-src/acceptance-tests.yml
+    params:
+      <<: *cf-creds-production
+      SERVICE_NAME: cdn-route
+      PLAN_NAME: cdn-route
+      SERVICE_INSTANCE_NAME: s3-acceptance-test
+      AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id-production}}
+      AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key-production}}
+      HOSTED_ZONE_ID: {{hosted-zone-id-production}}
+      ORIGIN: {{origin-url-production}}
+      DOMAIN: {{domain-url-production}}
 
 resources:
 - name: broker-src
