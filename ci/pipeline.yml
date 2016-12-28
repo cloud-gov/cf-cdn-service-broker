@@ -77,12 +77,12 @@ jobs:
     passed: [push-cf-cdn-service-broker-staging]
     trigger: true
   - task: acceptance-tests
-    file: broker-src/acceptance-tests.yml
+    file: broker-src/ci/acceptance-tests.yml
     params:
       <<: *cf-creds-staging
       SERVICE_NAME: cdn-route
       PLAN_NAME: cdn-route
-      SERVICE_INSTANCE_NAME: s3-acceptance-test
+      SERVICE_INSTANCE_NAME: cdn-acceptance-test
       AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id-staging}}
       AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key-staging}}
       HOSTED_ZONE_ID: {{hosted-zone-id-staging}}
@@ -157,12 +157,12 @@ jobs:
     passed: [push-cf-cdn-service-broker-production]
     trigger: true
   - task: acceptance-tests
-    file: broker-src/acceptance-tests.yml
+    file: broker-src/ci/acceptance-tests.yml
     params:
       <<: *cf-creds-production
       SERVICE_NAME: cdn-route
       PLAN_NAME: cdn-route
-      SERVICE_INSTANCE_NAME: s3-acceptance-test
+      SERVICE_INSTANCE_NAME: cdn-acceptance-test
       AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id-production}}
       AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key-production}}
       HOSTED_ZONE_ID: {{hosted-zone-id-production}}
