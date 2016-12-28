@@ -194,7 +194,7 @@ func (b *CdnServiceBroker) Update(instanceId string, details brokerapi.UpdateDet
 		return false, err
 	}
 
-	err = b.Manager.Update(instanceId, options.Domain, options.Origin)
+	err = b.Manager.Update(instanceId, options.Domain, options.Origin, options.Path, options.InsecureOrigin)
 	if err != nil {
 		return false, err
 	}

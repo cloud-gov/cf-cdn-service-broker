@@ -69,7 +69,7 @@ type Certificate struct {
 
 type RouteManagerIface interface {
 	Create(instanceId, domain, origin, path string, insecureOrigin bool, tags map[string]string) (*Route, error)
-	Update(instanceId string, domain, origin string) error
+	Update(instanceId string, domain, origin string, path string, insecureOrigin bool) error
 	Get(instanceId string) (*Route, error)
 	Poll(route *Route) error
 	Disable(route *Route) error
@@ -119,19 +119,25 @@ func (m *RouteManager) Get(instanceId string) (*Route, error) {
 	}
 }
 
-func (m *RouteManager) Update(instanceId, domain, origin string) error {
+func (m *RouteManager) Update(instanceId, domain, origin string, path string, insecureOrigin bool) error {
 	// Get current route
 	route, err := m.Get(instanceId)
 	if err != nil {
 		return err
 	}
 
-	// Override any settings that are new.
+	// Override any settings that are new or different.
 	if domain != "" {
 		route.DomainExternal = domain
 	}
 	if origin != "" {
 		route.Origin = origin
+	}
+	if path != route.Path {
+		route.Path = path
+	}
+	if insecureOrigin != route.InsecureOrigin {
+		route.InsecureOrigin = insecureOrigin
 	}
 
 	// Update the distribution

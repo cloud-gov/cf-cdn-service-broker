@@ -41,7 +41,7 @@ func (s *UpdateSuite) TestUpdateSuccessOnlyDomain() {
 			"domain": "domain.gov",
 		},
 	}
-	s.Manager.On("Update", "", "domain.gov", "").Return(nil)
+	s.Manager.On("Update", "", "domain.gov", "", "", false).Return(nil)
 	_, err := s.Broker.Update("", details, true)
 	s.Nil(err)
 }
@@ -52,7 +52,7 @@ func (s *UpdateSuite) TestUpdateSuccessOnlyOrigin() {
 			"origin": "origin.gov",
 		},
 	}
-	s.Manager.On("Update", "", "", "origin.gov").Return(nil)
+	s.Manager.On("Update", "", "", "origin.gov", "", false).Return(nil)
 	_, err := s.Broker.Update("", details, true)
 	s.Nil(err)
 }
@@ -60,11 +60,13 @@ func (s *UpdateSuite) TestUpdateSuccessOnlyOrigin() {
 func (s *UpdateSuite) TestUpdateSuccess() {
 	details := brokerapi.UpdateDetails{
 		Parameters: map[string]interface{}{
-			"domain": "domain.gov",
-			"origin": "origin.gov",
+			"domain":          "domain.gov",
+			"origin":          "origin.gov",
+			"path":            ".",
+			"insecure_origin": true,
 		},
 	}
-	s.Manager.On("Update", "", "domain.gov", "origin.gov").Return(nil)
+	s.Manager.On("Update", "", "domain.gov", "origin.gov", ".", true).Return(nil)
 	_, err := s.Broker.Update("", details, true)
 	s.Nil(err)
 }

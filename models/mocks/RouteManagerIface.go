@@ -101,13 +101,13 @@ func (_m *RouteManagerIface) RenewAll() {
 	_m.Called()
 }
 
-// Update provides a mock function with given fields: instanceId, domain, origin
-func (_m *RouteManagerIface) Update(instanceId string, domain string, origin string) error {
-	ret := _m.Called(instanceId, domain, origin)
+// Update provides a mock function with given fields: instanceId, domain, origin, path, insecureOrigin
+func (_m *RouteManagerIface) Update(instanceId string, domain string, origin string, path string, insecureOrigin bool) error {
+	ret := _m.Called(instanceId, domain, origin, path, insecureOrigin)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
-		r0 = rf(instanceId, domain, origin)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, bool) error); ok {
+		r0 = rf(instanceId, domain, origin, path, insecureOrigin)
 	} else {
 		r0 = ret.Error(0)
 	}
