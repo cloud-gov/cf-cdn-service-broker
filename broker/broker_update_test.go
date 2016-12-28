@@ -28,38 +28,36 @@ func (s *UpdateSuite) SetupTest() {
 	}
 }
 
-func (s *UpdateSuite) TestWithoutOptions() {
-	details := brokerapi.UpdateDetails{
-		Parameters: make(map[string]interface{}),
-	}
+func (s *UpdateSuite) TestUpdateWithoutOptions() {
+	details := brokerapi.UpdateDetails{}
 	_, err := s.Broker.Update("", details, true)
 	s.NotNil(err)
 	s.Equal(err.Error(), "must be invoked with `domain` or `origin` keys")
 }
 
-func (s *UpdateSuite) TestBadOrigin() {
+func (s *UpdateSuite) TestUpdateSuccessOnlyDomain() {
 	details := brokerapi.UpdateDetails{
 		Parameters: map[string]interface{}{
-			"origin": 4,
+			"domain": "domain.gov",
 		},
 	}
+	s.Manager.On("Update", "", "domain.gov", "").Return(nil)
 	_, err := s.Broker.Update("", details, true)
-	s.NotNil(err)
-	s.Equal(err.Error(), "value for 'origin' 4 cannot be converted to a string")
+	s.Nil(err)
 }
 
-func (s *UpdateSuite) TestBadDomain() {
+func (s *UpdateSuite) TestUpdateSuccessOnlyOrigin() {
 	details := brokerapi.UpdateDetails{
 		Parameters: map[string]interface{}{
-			"domain": 3,
+			"origin": "origin.gov",
 		},
 	}
+	s.Manager.On("Update", "", "", "origin.gov").Return(nil)
 	_, err := s.Broker.Update("", details, true)
-	s.NotNil(err)
-	s.Equal(err.Error(), "value for 'domain' 3 cannot be converted to a string")
+	s.Nil(err)
 }
 
-func (s *UpdateSuite) TestValid() {
+func (s *UpdateSuite) TestUpdateSuccess() {
 	details := brokerapi.UpdateDetails{
 		Parameters: map[string]interface{}{
 			"domain": "domain.gov",

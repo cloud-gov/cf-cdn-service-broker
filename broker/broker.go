@@ -12,7 +12,7 @@ import (
 	"github.com/18F/cf-cdn-service-broker/models"
 )
 
-type ProvisionOptions struct {
+type Options struct {
 	Domain         string `json:"domain"`
 	Origin         string `json:"origin"`
 	Path           string `json:"path"`
@@ -37,13 +37,20 @@ func (*CdnServiceBroker) Services() []brokerapi.Service {
 	return []brokerapi.Service{service}
 }
 
-func parseProvisionOptions(details brokerapi.ProvisionDetails) (options ProvisionOptions, err error) {
-	if len(details.RawParameters) == 0 {
+func createBrokerOptions(details []byte) (options Options, err error) {
+	if len(details) == 0 {
 		err = errors.New("must be invoked with configuration parameters")
 		return
 	}
+	err = json.Unmarshal(details, &options)
+	if err != nil {
+		return
+	}
+	return
+}
 
-	err = json.Unmarshal(details.RawParameters, &options)
+func parseProvisionDetails(details brokerapi.ProvisionDetails) (options Options, err error) {
+	options, err = createBrokerOptions(details.RawParameters)
 	if err != nil {
 		return
 	}
@@ -53,6 +60,21 @@ func parseProvisionOptions(details brokerapi.ProvisionDetails) (options Provisio
 	}
 
 	return
+}
+
+func parseUpdateDetails(details map[string]interface{}) (Options, error) {
+	b, err := json.Marshal(details)
+	if err != nil {
+		return Options{}, err
+	}
+	options, err := createBrokerOptions(b)
+	if err != nil {
+		return Options{}, err
+	}
+	if options.Domain == "" && options.Origin == "" {
+		return Options{}, errors.New("must be invoked with `domain` or `origin` keys")
+	}
+	return options, nil
 }
 
 func (b *CdnServiceBroker) Provision(
@@ -66,7 +88,7 @@ func (b *CdnServiceBroker) Provision(
 		return spec, brokerapi.ErrAsyncRequired
 	}
 
-	options, err := parseProvisionOptions(details)
+	options, err := parseProvisionDetails(details)
 	if err != nil {
 		return spec, err
 	}
@@ -167,39 +189,15 @@ func (b *CdnServiceBroker) Update(instanceId string, details brokerapi.UpdateDet
 		return false, brokerapi.ErrAsyncRequired
 	}
 
-	// Get the origin and domain data.
-	originData, originExists := details.Parameters["origin"]
-	domainData, domainExists := details.Parameters["domain"]
-	if !(originExists || domainExists) {
-		return false, errors.New("must be invoked with `domain` or `origin` keys")
-	}
-	origin := ""
-	domain := ""
-	var ok bool
-	if originExists {
-		origin, ok = convertInterfaceToString(originData)
-		if !ok {
-			return false, fmt.Errorf("value for 'origin' %v cannot be converted to a string", originData)
-		}
-	}
-	if domainExists {
-		domain, ok = convertInterfaceToString(domainData)
-		if !ok {
-			return false, fmt.Errorf("value for 'domain' %v cannot be converted to a string", domainData)
-		}
+	options, err := parseUpdateDetails(details.Parameters)
+	if err != nil {
+		return false, err
 	}
 
-	err := b.Manager.Update(instanceId, domain, origin)
+	err = b.Manager.Update(instanceId, options.Domain, options.Origin)
 	if err != nil {
 		return false, err
 	}
 
 	return true, nil
-}
-
-func convertInterfaceToString(data interface{}) (string, bool) {
-	if str, ok := data.(string); ok {
-		return str, true
-	}
-	return "", false
 }
