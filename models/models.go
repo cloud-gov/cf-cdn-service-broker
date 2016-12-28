@@ -143,7 +143,7 @@ func (m *RouteManager) Update(instanceId, domain, origin string) error {
 	route.State = Provisioning
 
 	// Get the updated domain name and dist id.
-	route.DomainExternal = *dist.DomainName
+	route.DomainInternal = *dist.DomainName
 	route.DistId = *dist.Id
 
 	// Save the database.
