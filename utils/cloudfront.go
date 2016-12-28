@@ -224,7 +224,7 @@ func (d *Distribution) Update(distId string, domains []string, origin, path stri
 		return nil, err
 	}
 	d.fillDistributionConfig(dist.DistributionConfig, origin, path, insecureOrigin,
-		aws.String(d.getDistributionId(domains)), domains)
+		dist.DistributionConfig.CallerReference, domains)
 
 	// Call the UpdateDistribution function
 	resp, err := d.Service.UpdateDistribution(&cloudfront.UpdateDistributionInput{
