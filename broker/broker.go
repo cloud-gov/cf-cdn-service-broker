@@ -79,7 +79,8 @@ func parseUpdateDetails(details map[string]interface{}) (options Options, err er
 		return
 	}
 	if options.Domain == "" && options.Origin == "" {
-		return Options{}, errors.New("must be invoked with `domain` or `origin` keys")
+		err = errors.New("must be invoked with `domain` or `origin` keys")
+		return
 	}
 	return
 }
