@@ -37,6 +37,7 @@ func (*CdnServiceBroker) Services() []brokerapi.Service {
 	return []brokerapi.Service{service}
 }
 
+// createBrokerOptions will attempt to take raw json and convert it into the "Options" struct.
 func createBrokerOptions(details []byte) (options Options, err error) {
 	if len(details) == 0 {
 		err = errors.New("must be invoked with configuration parameters")
@@ -49,6 +50,8 @@ func createBrokerOptions(details []byte) (options Options, err error) {
 	return
 }
 
+// parseProvisionDetails will attempt to parse the update details and then verify that BOTH least "domain" and "origin"
+// are provided.
 func parseProvisionDetails(details brokerapi.ProvisionDetails) (options Options, err error) {
 	options, err = createBrokerOptions(details.RawParameters)
 	if err != nil {
@@ -62,19 +65,23 @@ func parseProvisionDetails(details brokerapi.ProvisionDetails) (options Options,
 	return
 }
 
-func parseUpdateDetails(details map[string]interface{}) (Options, error) {
-	b, err := json.Marshal(details)
+// parseUpdateDetails will attempt to parse the update details and then verify that at least "domain" or "origin"
+// are provided.
+func parseUpdateDetails(details map[string]interface{}) (options Options, err error) {
+	// need to convert the map into raw JSON.
+	var rawJSON []byte
+	rawJSON, err = json.Marshal(details)
 	if err != nil {
-		return Options{}, err
+		return
 	}
-	options, err := createBrokerOptions(b)
+	options, err = createBrokerOptions(rawJSON)
 	if err != nil {
-		return Options{}, err
+		return
 	}
 	if options.Domain == "" && options.Origin == "" {
 		return Options{}, errors.New("must be invoked with `domain` or `origin` keys")
 	}
-	return options, nil
+	return
 }
 
 func (b *CdnServiceBroker) Provision(
