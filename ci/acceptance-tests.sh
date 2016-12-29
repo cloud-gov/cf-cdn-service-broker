@@ -6,6 +6,10 @@ set -u
 # Set defaults
 TTL="${TTL:-60}"
 
+suffix="${RANDOM}"
+DOMAIN=$(printf "${DOMAIN}" "${suffix}")
+SERVICE_INSTANCE_NAME=$(printf "${SERVICE_INSTANCE_NAME}" "${suffix}")
+
 # Authenticate
 cf api "${CF_API_URL}"
 cf auth "${CF_USERNAME}" "${CF_PASSWORD}"
@@ -31,7 +35,6 @@ until [ "${elapsed}" -le 0 ]; do
   let elapsed-=5
   sleep 5
 done
-
 if [ -z "${internal}" ]; then
   echo "Failed to parse message: ${message}"
   exit 1
@@ -62,19 +65,18 @@ aws route53 change-resource-record-sets \
 # Wait for provision to complete
 elapsed=3600
 until [ "${elapsed}" -le 0 ]; do
-  status=$(cf service "${SERVICE_INSTANCE_NAME}")
-  if echo "${status}" | grep "Status: create succeeded"; then
+  status=$(cf service "${SERVICE_INSTANCE_NAME}" | grep "^Status: ")
+  if [[ "${status}" =~ "Status: create succeeded" ]]; then
     updated="true"
     break
-  elif echo "${status}" | grep "Status: create failed"; then
-    echo ""
+  elif [[ "${status}" =~ "Status: create failed" ]]; then
+    echo "Failed to create service"
     exit 1
   fi
   let elapsed-=30
   sleep 30
 done
-
-if [ "${updated}" -ne "true" ]; then
+if [ "${updated}" != "true" ]; then
   echo "Failed to update service ${SERVICE_NAME}"
   exit 1
 fi
@@ -94,7 +96,7 @@ fi
 
 # Assert same response from app and cdn
 app_resp=$(curl "https://${ORIGIN}")
-if [[ "${app_resp}" -ne "${cdn_resp}" ]]; then
+if [ "${app_resp}" != "${cdn_resp}" ]; then
   echo "Got different responses from app and cdn"
   exit 1
 fi
@@ -108,7 +110,7 @@ cat << EOF > ./delete-cname.json
       "ResourceRecordSet": {
         "Name": "${external}.",
         "Type": "CNAME",
-        "TTL": "${TTL}",
+        "TTL": ${TTL},
         "ResourceRecords": [
           {"Value": "${internal}"}
         ]

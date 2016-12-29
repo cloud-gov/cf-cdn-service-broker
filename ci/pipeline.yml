@@ -82,7 +82,7 @@ jobs:
       <<: *cf-creds-staging
       SERVICE_NAME: cdn-route
       PLAN_NAME: cdn-route
-      SERVICE_INSTANCE_NAME: cdn-acceptance-test
+      SERVICE_INSTANCE_NAME: cdn-acceptance-test-%s
       AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id-staging}}
       AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key-staging}}
       HOSTED_ZONE_ID: {{hosted-zone-id-staging}}
@@ -162,7 +162,7 @@ jobs:
       <<: *cf-creds-production
       SERVICE_NAME: cdn-route
       PLAN_NAME: cdn-route
-      SERVICE_INSTANCE_NAME: cdn-acceptance-test
+      SERVICE_INSTANCE_NAME: cdn-acceptance-test-%s
       AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id-production}}
       AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key-production}}
       HOSTED_ZONE_ID: {{hosted-zone-id-production}}
