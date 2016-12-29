@@ -3,31 +3,15 @@
 set -e
 set -u
 
+# Set defaults
 TTL="${TTL:-60}"
-TIMEOUT="${TIMEOUT:-3600}"
-INTERVAL="${INTERVAL:-30}"
-
-check_service() {
-  elapsed="${TIMEOUT}"
-  until [ "${elapsed}" -le 0 ]; do
-    status=$(cf service "${SERVICE_INSTANCE_NAME}")
-    if echo "${status}" | grep "Status: create succeeded"; then
-      return 0
-    elif echo "${status}" | grep "Status: create failed"; then
-      return 1
-    fi
-    let elapsed-="${INTERVAL}"
-    sleep "${INTERVAL}"
-  done
-  return 1
-}
 
 # Authenticate
 cf api "${CF_API_URL}"
 cf auth "${CF_USERNAME}" "${CF_PASSWORD}"
 
 # Target
-cf target -o ${CF_ORGANIZATION} -s ${CF_SPACE}
+cf target -o "${CF_ORGANIZATION}" -s "${CF_SPACE}"
 
 # Create service
 opts=$(jq -n --arg domain "${DOMAIN}" --arg origin "${ORIGIN}" '{domain: $domain, origin: $origin}')
@@ -35,11 +19,20 @@ cf create-service "${SERVICE_NAME}" "${PLAN_NAME}" "${SERVICE_INSTANCE_NAME}" -c
 
 # Get CNAME instructions
 regex="CNAME domain (.*) to (.*)\.$"
-message=$(cf service "${SERVICE_INSTANCE_NAME}" | grep "^Message: ")
-if [[ "${message}" =~ ${regex} ]]; then
-  external="${BASH_REMATCH[1]}"
-  internal="${BASH_REMATCH[2]}"
-else
+
+elapsed=60
+until [ "${elapsed}" -le 0 ]; do
+  message=$(cf service "${SERVICE_INSTANCE_NAME}" | grep "^Message: ")
+  if [[ "${message}" =~ ${regex} ]]; then
+    external="${BASH_REMATCH[1]}"
+    internal="${BASH_REMATCH[2]}"
+    break
+  fi
+  let elapsed-=5
+  sleep 5
+done
+
+if [ -z "${internal}" ]; then
   echo "Failed to parse message: ${message}"
   exit 1
 fi
@@ -53,7 +46,7 @@ cat << EOF > ./create-cname.json
       "ResourceRecordSet": {
         "Name": "${external}.",
         "Type": "CNAME",
-        "TTL": "${TTL}",
+        "TTL": ${TTL},
         "ResourceRecords": [
           {"Value": "${internal}"}
         ]
@@ -64,17 +57,43 @@ cat << EOF > ./create-cname.json
 EOF
 aws route53 change-resource-record-sets \
   --hosted-zone-id "${HOSTED_ZONE_ID}" \
-  --change-batch ./create-cname.json
+  --change-batch file://./create-cname.json
 
 # Wait for provision to complete
-if ! check_service; then
+elapsed=3600
+until [ "${elapsed}" -le 0 ]; do
+  status=$(cf service "${SERVICE_INSTANCE_NAME}")
+  if echo "${status}" | grep "Status: create succeeded"; then
+    updated="true"
+    break
+  elif echo "${status}" | grep "Status: create failed"; then
+    echo ""
+    exit 1
+  fi
+  let elapsed-=30
+  sleep 30
+done
+
+if [ "${updated}" -ne "true" ]; then
   echo "Failed to update service ${SERVICE_NAME}"
   exit 1
 fi
 
+elapsed=3600
+until [ "${elapsed}" -le 0 ]; do
+  if cdn_resp=$(curl "https://${DOMAIN}"); then
+    break
+  fi
+  let elapsed-=30
+  sleep 30
+done
+if [ -z "${elapsed}"} ]; then
+  echo "Failed to load ${DOMAIN}"
+  exit 1
+fi
+
 # Assert same response from app and cdn
-app_resp=$(curl "${origin}")
-cdn_resp=$(curl "${domain}")
+app_resp=$(curl "https://${ORIGIN}")
 if [[ "${app_resp}" -ne "${cdn_resp}" ]]; then
   echo "Got different responses from app and cdn"
   exit 1
@@ -100,7 +119,7 @@ cat << EOF > ./delete-cname.json
 EOF
 aws route53 change-resource-record-sets \
   --hosted-zone-id "${HOSTED_ZONE_ID}" \
-  --change-batch ./delete-cname.json
+  --change-batch file://./delete-cname.json
 
 # Delete service
 cf delete-service -f "${SERVICE_INSTANCE_NAME}"
