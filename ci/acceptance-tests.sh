@@ -5,6 +5,7 @@ set -u
 
 # Set defaults
 TTL="${TTL:-60}"
+CDN_TIMEOUT="${CDN_TIMEOUT:-7200}"
 
 suffix="${RANDOM}"
 DOMAIN=$(printf "${DOMAIN}" "${suffix}")
@@ -63,7 +64,7 @@ aws route53 change-resource-record-sets \
   --change-batch file://./create-cname.json
 
 # Wait for provision to complete
-elapsed=3600
+elapsed="${CDN_TIMEOUT}"
 until [ "${elapsed}" -le 0 ]; do
   status=$(cf service "${SERVICE_INSTANCE_NAME}" | grep "^Status: ")
   if [[ "${status}" =~ "succeeded" ]]; then
@@ -81,7 +82,7 @@ if [ "${updated}" != "true" ]; then
   exit 1
 fi
 
-elapsed=3600
+elapsed="${CDN_TIMEOUT}"
 until [ "${elapsed}" -le 0 ]; do
   if cdn_resp=$(curl "https://${DOMAIN}"); then
     break
@@ -127,7 +128,7 @@ aws route53 change-resource-record-sets \
 cf delete-service -f "${SERVICE_INSTANCE_NAME}"
 
 # Wait for deprovision to complete
-elapsed=3600
+elapsed="${CDN_TIMEOUT}"
 until [ "${elapsed}" -le 0 ]; do
   if cf service "${SERVICE_INSTANCE_NAME}" | grep "not found"; then
     deleted="true"
