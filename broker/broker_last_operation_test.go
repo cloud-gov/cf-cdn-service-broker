@@ -52,7 +52,7 @@ func (s *LastOperationSuite) TestLastOperationSucceeded() {
 		Origin:         "cdn.apps.cloud.gov",
 	}
 	manager.On("Get", "123").Return(route, nil)
-	manager.On("Update", route).Return(nil)
+	manager.On("Poll", route).Return(nil)
 	b := broker.CdnServiceBroker{
 		Manager: &manager,
 	}
@@ -71,7 +71,7 @@ func (s *LastOperationSuite) TestLastOperationProvisioning() {
 		Origin:         "cdn.apps.cloud.gov",
 	}
 	manager.On("Get", "123").Return(route, nil)
-	manager.On("Update", route).Return(nil)
+	manager.On("Poll", route).Return(nil)
 	b := broker.CdnServiceBroker{
 		Manager: &manager,
 	}
@@ -90,7 +90,7 @@ func (s *LastOperationSuite) TestLastOperationDeprovisioning() {
 		Origin:         "cdn.apps.cloud.gov",
 	}
 	manager.On("Get", "123").Return(route, nil)
-	manager.On("Update", route).Return(nil)
+	manager.On("Poll", route).Return(nil)
 	b := broker.CdnServiceBroker{
 		Manager: &manager,
 	}

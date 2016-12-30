@@ -12,7 +12,7 @@ import (
 	"github.com/18F/cf-cdn-service-broker/models"
 )
 
-type ProvisionOptions struct {
+type Options struct {
 	Domain         string `json:"domain"`
 	Origin         string `json:"origin"`
 	Path           string `json:"path"`
@@ -37,13 +37,23 @@ func (*CdnServiceBroker) Services() []brokerapi.Service {
 	return []brokerapi.Service{service}
 }
 
-func parseProvisionOptions(details brokerapi.ProvisionDetails) (options ProvisionOptions, err error) {
-	if len(details.RawParameters) == 0 {
+// createBrokerOptions will attempt to take raw json and convert it into the "Options" struct.
+func createBrokerOptions(details []byte) (options Options, err error) {
+	if len(details) == 0 {
 		err = errors.New("must be invoked with configuration parameters")
 		return
 	}
+	err = json.Unmarshal(details, &options)
+	if err != nil {
+		return
+	}
+	return
+}
 
-	err = json.Unmarshal(details.RawParameters, &options)
+// parseProvisionDetails will attempt to parse the update details and then verify that BOTH least "domain" and "origin"
+// are provided.
+func parseProvisionDetails(details brokerapi.ProvisionDetails) (options Options, err error) {
+	options, err = createBrokerOptions(details.RawParameters)
 	if err != nil {
 		return
 	}
@@ -52,6 +62,26 @@ func parseProvisionOptions(details brokerapi.ProvisionDetails) (options Provisio
 		return
 	}
 
+	return
+}
+
+// parseUpdateDetails will attempt to parse the update details and then verify that at least "domain" or "origin"
+// are provided.
+func parseUpdateDetails(details map[string]interface{}) (options Options, err error) {
+	// need to convert the map into raw JSON.
+	var rawJSON []byte
+	rawJSON, err = json.Marshal(details)
+	if err != nil {
+		return
+	}
+	options, err = createBrokerOptions(rawJSON)
+	if err != nil {
+		return
+	}
+	if options.Domain == "" && options.Origin == "" {
+		err = errors.New("must be invoked with `domain` or `origin` keys")
+		return
+	}
 	return
 }
 
@@ -66,7 +96,7 @@ func (b *CdnServiceBroker) Provision(
 		return spec, brokerapi.ErrAsyncRequired
 	}
 
-	options, err := parseProvisionOptions(details)
+	options, err := parseProvisionDetails(details)
 	if err != nil {
 		return spec, err
 	}
@@ -100,7 +130,7 @@ func (b *CdnServiceBroker) LastOperation(instanceId string) (brokerapi.LastOpera
 		}, nil
 	}
 
-	err = b.Manager.Update(route)
+	err = b.Manager.Poll(route)
 	if err != nil {
 		b.Logger.Error("Error during update", err, lager.Data{
 			"domain": route.DomainExternal,
@@ -165,6 +195,16 @@ func (b *CdnServiceBroker) Unbind(instanceId, bindingId string, details brokerap
 func (b *CdnServiceBroker) Update(instanceId string, details brokerapi.UpdateDetails, asyncAllowed bool) (brokerapi.IsAsync, error) {
 	if !asyncAllowed {
 		return false, brokerapi.ErrAsyncRequired
+	}
+
+	options, err := parseUpdateDetails(details.Parameters)
+	if err != nil {
+		return false, err
+	}
+
+	err = b.Manager.Update(instanceId, options.Domain, options.Origin, options.Path, options.InsecureOrigin)
+	if err != nil {
+		return false, err
 	}
 
 	return true, nil

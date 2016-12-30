@@ -68,6 +68,20 @@ func (_m *RouteManagerIface) Get(instanceId string) (*models.Route, error) {
 	return r0, r1
 }
 
+// Poll provides a mock function with given fields: route
+func (_m *RouteManagerIface) Poll(route *models.Route) error {
+	ret := _m.Called(route)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*models.Route) error); ok {
+		r0 = rf(route)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Renew provides a mock function with given fields: route
 func (_m *RouteManagerIface) Renew(route *models.Route) error {
 	ret := _m.Called(route)
@@ -87,13 +101,13 @@ func (_m *RouteManagerIface) RenewAll() {
 	_m.Called()
 }
 
-// Update provides a mock function with given fields: route
-func (_m *RouteManagerIface) Update(route *models.Route) error {
-	ret := _m.Called(route)
+// Update provides a mock function with given fields: instanceId, domain, origin, path, insecureOrigin
+func (_m *RouteManagerIface) Update(instanceId string, domain string, origin string, path string, insecureOrigin bool) error {
+	ret := _m.Called(instanceId, domain, origin, path, insecureOrigin)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*models.Route) error); ok {
-		r0 = rf(route)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, bool) error); ok {
+		r0 = rf(instanceId, domain, origin, path, insecureOrigin)
 	} else {
 		r0 = ret.Error(0)
 	}
