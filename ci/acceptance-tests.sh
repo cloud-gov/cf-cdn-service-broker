@@ -125,3 +125,18 @@ aws route53 change-resource-record-sets \
 
 # Delete service
 cf delete-service -f "${SERVICE_INSTANCE_NAME}"
+
+# Wait for deprovision to complete
+elapsed=3600
+until [ "${elapsed}" -le 0 ]; do
+  if cf service "${SERVICE_INSTANCE_NAME}" | grep "not found"; then
+    deleted="true"
+    break
+  fi
+  let elapsed-=30
+  sleep 30
+done
+if [ "${deleted}" != "true" ]; then
+  echo "Failed to delete service ${SERVICE_NAME}"
+  exit 1
+fi
