@@ -66,10 +66,10 @@ aws route53 change-resource-record-sets \
 elapsed=3600
 until [ "${elapsed}" -le 0 ]; do
   status=$(cf service "${SERVICE_INSTANCE_NAME}" | grep "^Status: ")
-  if [[ "${status}" =~ "Status: create succeeded" ]]; then
+  if [[ "${status}" =~ "succeeded" ]]; then
     updated="true"
     break
-  elif [[ "${status}" =~ "Status: create failed" ]]; then
+  elif [[ "${status}" =~ "failed" ]]; then
     echo "Failed to create service"
     exit 1
   fi
