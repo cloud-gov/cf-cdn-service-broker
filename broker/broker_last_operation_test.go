@@ -1,6 +1,7 @@
 package broker_test
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -38,7 +39,7 @@ func (s *LastOperationSuite) TestLastOperationMissing() {
 		Manager: &manager,
 	}
 
-	operation, err := b.LastOperation("")
+	operation, err := b.LastOperation(context.TODO(), "", "")
 	s.Equal(operation.State, brokerapi.Failed)
 	s.Equal(operation.Description, "Service instance not found")
 	s.Nil(err)
@@ -57,7 +58,7 @@ func (s *LastOperationSuite) TestLastOperationSucceeded() {
 		Manager: &manager,
 	}
 
-	operation, err := b.LastOperation("123")
+	operation, err := b.LastOperation(context.TODO(), "123", "")
 	s.Equal(operation.State, brokerapi.Succeeded)
 	s.Equal(operation.Description, "Service instance provisioned [cdn.cloud.gov => cdn.apps.cloud.gov]")
 	s.Nil(err)
@@ -76,7 +77,7 @@ func (s *LastOperationSuite) TestLastOperationProvisioning() {
 		Manager: &manager,
 	}
 
-	operation, err := b.LastOperation("123")
+	operation, err := b.LastOperation(context.TODO(), "123", "")
 	s.Equal(operation.State, brokerapi.InProgress)
 	s.True(strings.Contains(operation.Description, "Provisioning in progress [cdn.cloud.gov => cdn.apps.cloud.gov]"))
 	s.Nil(err)
@@ -95,7 +96,7 @@ func (s *LastOperationSuite) TestLastOperationDeprovisioning() {
 		Manager: &manager,
 	}
 
-	operation, err := b.LastOperation("123")
+	operation, err := b.LastOperation(context.TODO(), "123", "")
 	s.Equal(operation.State, brokerapi.InProgress)
 	s.Equal(operation.Description, "Deprovisioning in progress [cdn.cloud.gov => cdn.apps.cloud.gov]")
 	s.Nil(err)
