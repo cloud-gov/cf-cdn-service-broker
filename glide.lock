@@ -1,8 +1,10 @@
-hash: 3081c011a68e518db56fae114204e0691f3aba46b2a1066bb7cd29a037fc31a9
-updated: 2016-12-20T11:55:08.599745654-05:00
+hash: e20862563cfed9d2de0b4a76e93c67ced42dbb34b2163df7b963884b2bd35270
+updated: 2016-12-30T14:17:16.332496159-05:00
 imports:
+- name: code.cloudfoundry.org/lager
+  version: 6cfe365fb6bb84343f0034b4a53cd250d173b61f
 - name: github.com/aws/aws-sdk-go
-  version: 1a651d9028d1203f4a0ba9fee91b207536cd4ca2
+  version: 36670f6ab1769ad77fa5f7e2c194398733503635
   subpackages:
   - aws
   - aws/awserr
@@ -16,10 +18,10 @@ imports:
   - aws/credentials/stscreds
   - aws/defaults
   - aws/ec2metadata
+  - aws/endpoints
   - aws/request
   - aws/session
   - aws/signer/v4
-  - private/endpoints
   - private/protocol
   - private/protocol/query
   - private/protocol/query/queryutil
@@ -32,7 +34,7 @@ imports:
   - service/s3
   - service/sts
 - name: github.com/davecgh/go-spew
-  version: 5215b55f46b2b919f50a1df0eaa5886afe4e3b3d
+  version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9
   subpackages:
   - spew
 - name: github.com/go-ini/ini
@@ -40,9 +42,9 @@ imports:
 - name: github.com/gorilla/context
   version: a8d44e7d8e4d532b6a27a02dd82abb31cc1b01bd
 - name: github.com/gorilla/mux
-  version: 9c19ed558d5df4da88e2ade9c8940d742aef0e7e
+  version: cf79e51a62d8219d52060dfc1b4e810414ba2d15
 - name: github.com/jinzhu/gorm
-  version: 57c72125b3087e1ed02c16f23a1f381cde3aaf2c
+  version: 5174cc5c242a728b435ea2be8a2f7f998e15429b
   subpackages:
   - dialects/postgres
 - name: github.com/jinzhu/inflection
@@ -50,7 +52,7 @@ imports:
 - name: github.com/jmespath/go-jmespath
   version: 0b12d6b521d83fc7f755e7cfc1b1fbdd35a01a74
 - name: github.com/kelseyhightower/envconfig
-  version: 91921eb4cf999321cdbeebdba5a03555800d493b
+  version: 9aca109c9aec4633fced9717c4a09ecab3d33111
 - name: github.com/lib/pq
   version: ee1442bda7bd1b6a84e913bdb421cb1874ec629d
   subpackages:
@@ -59,28 +61,26 @@ imports:
 - name: github.com/miekg/dns
   version: 48ab6605c66ac797e07f615101c3e9e10e932b66
 - name: github.com/pivotal-cf/brokerapi
-  version: 3abc5864a39f7b204e1daaa0677433f8d4568f81
+  version: 3dcb3e88faf1f81359679aa1b931df45d30f01de
   subpackages:
   - auth
-- name: github.com/pivotal-golang/lager
-  version: 7639e31ce6622c55c15aa64144b85d5f4873d127
 - name: github.com/pmezard/go-difflib
-  version: 792786c7400a136282c1664665ae0a8db921c6c2
+  version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
   subpackages:
   - difflib
 - name: github.com/robfig/cron
-  version: 8dc4916d418b9d0b2e23c9c1e68351dc9a1d6573
+  version: b024fc5ea0e34bc3f83d9941c8d60b0622bfaca4
 - name: github.com/stretchr/objx
   version: cbeaeb16a013161a98496fad62933b1d21786672
 - name: github.com/stretchr/testify
-  version: 6cb3b85ef5a0efef77caef88363ec4d4b5c0976d
+  version: 69483b4bd14f5845b5a1e55bca19e954e827f1d0
   subpackages:
   - assert
   - mock
   - require
   - suite
 - name: github.com/xenolf/lego
-  version: b5d5eee2dd269f88f181d7a437be80194bfd0235
+  version: 96a24777ffb3c6a25f6bb0b3a7997969c1fcde4b
   subpackages:
   - acme
 - name: golang.org/x/crypto

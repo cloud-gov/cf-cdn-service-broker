@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strconv"
 
+	"code.cloudfoundry.org/lager"
 	"github.com/gorilla/mux"
 	"github.com/pivotal-cf/brokerapi/auth"
-	"github.com/pivotal-golang/lager"
 )
 
 const provisionLogKey = "provision"
@@ -33,6 +33,7 @@ const asyncRequiredKey = "async-required"
 const planChangeNotSupportedKey = "plan-change-not-supported"
 const unknownErrorKey = "unknown-error"
 const invalidRawParamsKey = "invalid-raw-params"
+const appGuidNotProvidedErrorKey = "app-guid-not-provided"
 
 const statusUnprocessableEntity = 422
 
@@ -67,7 +68,7 @@ type serviceBrokerHandler struct {
 
 func (h serviceBrokerHandler) catalog(w http.ResponseWriter, req *http.Request) {
 	catalog := CatalogResponse{
-		Services: h.serviceBroker.Services(),
+		Services: h.serviceBroker.Services(req.Context()),
 	}
 
 	h.respond(w, http.StatusOK, catalog)
@@ -96,7 +97,7 @@ func (h serviceBrokerHandler) provision(w http.ResponseWriter, req *http.Request
 		instanceDetailsLogKey: details,
 	})
 
-	provisionResponse, err := h.serviceBroker.Provision(instanceID, details, acceptsIncompleteFlag)
+	provisionResponse, err := h.serviceBroker.Provision(req.Context(), instanceID, details, acceptsIncompleteFlag)
 
 	if err != nil {
 		switch err {
@@ -130,7 +131,8 @@ func (h serviceBrokerHandler) provision(w http.ResponseWriter, req *http.Request
 
 	if provisionResponse.IsAsync {
 		h.respond(w, http.StatusAccepted, ProvisioningResponse{
-			DashboardURL: provisionResponse.DashboardURL,
+			DashboardURL:  provisionResponse.DashboardURL,
+			OperationData: provisionResponse.OperationData,
 		})
 	} else {
 		h.respond(w, http.StatusCreated, ProvisioningResponse{
@@ -154,7 +156,7 @@ func (h serviceBrokerHandler) update(w http.ResponseWriter, req *http.Request) {
 
 	acceptsIncompleteFlag, _ := strconv.ParseBool(req.URL.Query().Get("accepts_incomplete"))
 
-	isAsync, err := h.serviceBroker.Update(instanceID, details, acceptsIncompleteFlag)
+	updateServiceSpec, err := h.serviceBroker.Update(req.Context(), instanceID, details, acceptsIncompleteFlag)
 	if err != nil {
 		switch err {
 		case ErrAsyncRequired:
@@ -183,10 +185,10 @@ func (h serviceBrokerHandler) update(w http.ResponseWriter, req *http.Request) {
 	}
 
 	statusCode := http.StatusOK
-	if isAsync {
+	if updateServiceSpec.IsAsync {
 		statusCode = http.StatusAccepted
 	}
-	h.respond(w, statusCode, struct{}{})
+	h.respond(w, statusCode, UpdateResponse{OperationData: updateServiceSpec.OperationData})
 }
 
 func (h serviceBrokerHandler) deprovision(w http.ResponseWriter, req *http.Request) {
@@ -202,7 +204,7 @@ func (h serviceBrokerHandler) deprovision(w http.ResponseWriter, req *http.Reque
 	}
 	asyncAllowed := req.FormValue("accepts_incomplete") == "true"
 
-	isAsync, err := h.serviceBroker.Deprovision(instanceID, details, asyncAllowed)
+	deprovisionSpec, err := h.serviceBroker.Deprovision(req.Context(), instanceID, details, asyncAllowed)
 	if err != nil {
 		switch err {
 		case ErrInstanceDoesNotExist:
@@ -223,8 +225,8 @@ func (h serviceBrokerHandler) deprovision(w http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	if isAsync {
-		h.respond(w, http.StatusAccepted, EmptyResponse{})
+	if deprovisionSpec.IsAsync {
+		h.respond(w, http.StatusAccepted, DeprovisionResponse{OperationData: deprovisionSpec.OperationData})
 	} else {
 		h.respond(w, http.StatusOK, EmptyResponse{})
 	}
@@ -249,7 +251,7 @@ func (h serviceBrokerHandler) bind(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	binding, err := h.serviceBroker.Bind(instanceID, bindingID, details)
+	binding, err := h.serviceBroker.Bind(req.Context(), instanceID, bindingID, details)
 	if err != nil {
 		switch err {
 		case ErrInstanceDoesNotExist:
@@ -262,12 +264,50 @@ func (h serviceBrokerHandler) bind(w http.ResponseWriter, req *http.Request) {
 			h.respond(w, http.StatusConflict, ErrorResponse{
 				Description: err.Error(),
 			})
+		case ErrAppGuidNotProvided:
+			logger.Error(appGuidNotProvidedErrorKey, err)
+			h.respond(w, statusUnprocessableEntity, ErrorResponse{
+				Description: err.Error(),
+			})
 		default:
 			logger.Error(unknownErrorKey, err)
 			h.respond(w, http.StatusInternalServerError, ErrorResponse{
 				Description: err.Error(),
 			})
 		}
+		return
+	}
+
+	brokerAPIVersion := req.Header.Get("X-Broker-Api-Version")
+	if brokerAPIVersion == "2.8" || brokerAPIVersion == "2.9" {
+		experimentalVols := []ExperimentalVolumeMount{}
+
+		for _, vol := range binding.VolumeMounts {
+			experimentalConfig, err := json.Marshal(vol.Device.MountConfig)
+			if err != nil {
+				logger.Error(unknownErrorKey, err)
+				h.respond(w, http.StatusInternalServerError, ErrorResponse{Description: err.Error()})
+				return
+			}
+
+			experimentalVols = append(experimentalVols, ExperimentalVolumeMount{
+				ContainerPath: vol.ContainerDir,
+				Mode:          vol.Mode,
+				Private: ExperimentalVolumeMountPrivate{
+					Driver:  vol.Driver,
+					GroupID: vol.Device.VolumeId,
+					Config:  string(experimentalConfig),
+				},
+			})
+		}
+
+		experimentalBinding := ExperimentalVolumeMountBindingResponse{
+			Credentials:     binding.Credentials,
+			RouteServiceURL: binding.RouteServiceURL,
+			SyslogDrainURL:  binding.SyslogDrainURL,
+			VolumeMounts:    experimentalVols,
+		}
+		h.respond(w, http.StatusCreated, experimentalBinding)
 		return
 	}
 
@@ -289,7 +329,7 @@ func (h serviceBrokerHandler) unbind(w http.ResponseWriter, req *http.Request) {
 		ServiceID: req.FormValue("service_id"),
 	}
 
-	if err := h.serviceBroker.Unbind(instanceID, bindingID, details); err != nil {
+	if err := h.serviceBroker.Unbind(req.Context(), instanceID, bindingID, details); err != nil {
 		switch err {
 		case ErrInstanceDoesNotExist:
 			logger.Error(instanceMissingErrorKey, err)
@@ -312,6 +352,7 @@ func (h serviceBrokerHandler) unbind(w http.ResponseWriter, req *http.Request) {
 func (h serviceBrokerHandler) lastOperation(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	instanceID := vars["instance_id"]
+	operationData := req.FormValue("operation")
 
 	logger := h.logger.Session(lastOperationLogKey, lager.Data{
 		instanceIDLogKey: instanceID,
@@ -319,7 +360,7 @@ func (h serviceBrokerHandler) lastOperation(w http.ResponseWriter, req *http.Req
 
 	logger.Info("starting-check-for-operation")
 
-	lastOperation, err := h.serviceBroker.LastOperation(instanceID)
+	lastOperation, err := h.serviceBroker.LastOperation(req.Context(), instanceID, operationData)
 
 	if err != nil {
 		switch err {

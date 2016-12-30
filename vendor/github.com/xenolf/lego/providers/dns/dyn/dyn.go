@@ -172,17 +172,12 @@ func (d *DNSProvider) logout() error {
 
 // Present creates a TXT record using the specified parameters
 func (d *DNSProvider) Present(domain, token, keyAuth string) error {
+	err := d.login()
+	if err != nil {
+		return err
+	}
+
 	fqdn, value, ttl := acme.DNS01Record(domain, keyAuth)
-
-	authZone, err := acme.FindZoneByFqdn(fqdn, acme.RecursiveNameservers)
-	if err != nil {
-		return err
-	}
-
-	err = d.login()
-	if err != nil {
-		return err
-	}
 
 	data := map[string]interface{}{
 		"rdata": map[string]string{
@@ -191,13 +186,13 @@ func (d *DNSProvider) Present(domain, token, keyAuth string) error {
 		"ttl": strconv.Itoa(ttl),
 	}
 
-	resource := fmt.Sprintf("TXTRecord/%s/%s/", authZone, fqdn)
+	resource := fmt.Sprintf("TXTRecord/%s/%s/", domain, fqdn)
 	_, err = d.sendRequest("POST", resource, data)
 	if err != nil {
 		return err
 	}
 
-	err = d.publish(authZone, "Added TXT record for ACME dns-01 challenge using lego client")
+	err = d.publish(domain, "Added TXT record for ACME dns-01 challenge using lego client")
 	if err != nil {
 		return err
 	}
@@ -210,14 +205,14 @@ func (d *DNSProvider) Present(domain, token, keyAuth string) error {
 	return nil
 }
 
-func (d *DNSProvider) publish(zone, notes string) error {
+func (d *DNSProvider) publish(domain, notes string) error {
 	type publish struct {
 		Publish bool   `json:"publish"`
 		Notes   string `json:"notes"`
 	}
 
 	pub := &publish{Publish: true, Notes: notes}
-	resource := fmt.Sprintf("Zone/%s/", zone)
+	resource := fmt.Sprintf("Zone/%s/", domain)
 	_, err := d.sendRequest("PUT", resource, pub)
 	if err != nil {
 		return err
@@ -228,19 +223,14 @@ func (d *DNSProvider) publish(zone, notes string) error {
 
 // CleanUp removes the TXT record matching the specified parameters
 func (d *DNSProvider) CleanUp(domain, token, keyAuth string) error {
+	err := d.login()
+	if err != nil {
+		return err
+	}
+
 	fqdn, _, _ := acme.DNS01Record(domain, keyAuth)
 
-	authZone, err := acme.FindZoneByFqdn(fqdn, acme.RecursiveNameservers)
-	if err != nil {
-		return err
-	}
-
-	err = d.login()
-	if err != nil {
-		return err
-	}
-
-	resource := fmt.Sprintf("TXTRecord/%s/%s/", authZone, fqdn)
+	resource := fmt.Sprintf("TXTRecord/%s/%s/", domain, fqdn)
 	url := fmt.Sprintf("%s/%s", dynBaseURL, resource)
 	req, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
@@ -260,7 +250,7 @@ func (d *DNSProvider) CleanUp(domain, token, keyAuth string) error {
 		return fmt.Errorf("Dyn API request failed to delete TXT record HTTP status code %d", resp.StatusCode)
 	}
 
-	err = d.publish(authZone, "Removed TXT record for ACME dns-01 challenge using lego client")
+	err = d.publish(domain, "Removed TXT record for ACME dns-01 challenge using lego client")
 	if err != nil {
 		return err
 	}
