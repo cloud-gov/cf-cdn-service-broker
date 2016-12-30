@@ -88,6 +88,7 @@ jobs:
       HOSTED_ZONE_ID: {{hosted-zone-id-staging}}
       ORIGIN: {{origin-url-staging}}
       DOMAIN: {{domain-url-staging}}
+      CDN_TIMEOUT: {{cdn-timeout}}
 
 - name: push-cf-cdn-service-broker-production
   plan:
@@ -168,6 +169,7 @@ jobs:
       HOSTED_ZONE_ID: {{hosted-zone-id-production}}
       ORIGIN: {{origin-url-production}}
       DOMAIN: {{domain-url-production}}
+      CDN_TIMEOUT: {{cdn-timeout}}
 
 resources:
 - name: broker-src
