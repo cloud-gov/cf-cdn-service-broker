@@ -1,6 +1,7 @@
 package broker_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -19,6 +20,7 @@ type UpdateSuite struct {
 	suite.Suite
 	Manager mocks.RouteManagerIface
 	Broker  broker.CdnServiceBroker
+	ctx     context.Context
 }
 
 func (s *UpdateSuite) SetupTest() {
@@ -26,11 +28,12 @@ func (s *UpdateSuite) SetupTest() {
 	s.Broker = broker.CdnServiceBroker{
 		Manager: &s.Manager,
 	}
+	s.ctx = context.Background()
 }
 
 func (s *UpdateSuite) TestUpdateWithoutOptions() {
 	details := brokerapi.UpdateDetails{}
-	_, err := s.Broker.Update("", details, true)
+	_, err := s.Broker.Update(s.ctx, "", details, true)
 	s.NotNil(err)
 	s.Equal(err.Error(), "must be invoked with `domain` or `origin` keys")
 }
@@ -42,7 +45,7 @@ func (s *UpdateSuite) TestUpdateSuccessOnlyDomain() {
 		},
 	}
 	s.Manager.On("Update", "", "domain.gov", "", "", false).Return(nil)
-	_, err := s.Broker.Update("", details, true)
+	_, err := s.Broker.Update(s.ctx, "", details, true)
 	s.Nil(err)
 }
 
@@ -53,7 +56,7 @@ func (s *UpdateSuite) TestUpdateSuccessOnlyOrigin() {
 		},
 	}
 	s.Manager.On("Update", "", "", "origin.gov", "", false).Return(nil)
-	_, err := s.Broker.Update("", details, true)
+	_, err := s.Broker.Update(s.ctx, "", details, true)
 	s.Nil(err)
 }
 
@@ -67,6 +70,6 @@ func (s *UpdateSuite) TestUpdateSuccess() {
 		},
 	}
 	s.Manager.On("Update", "", "domain.gov", "origin.gov", ".", true).Return(nil)
-	_, err := s.Broker.Update("", details, true)
+	_, err := s.Broker.Update(s.ctx, "", details, true)
 	s.Nil(err)
 }

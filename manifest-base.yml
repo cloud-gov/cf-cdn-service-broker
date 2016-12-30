@@ -2,3 +2,5 @@
 buildpack: go_buildpack
 services:
 - rds-cdn-broker
+env:
+  GOVERSION: go1.7

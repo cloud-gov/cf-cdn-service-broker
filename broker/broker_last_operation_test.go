@@ -1,6 +1,7 @@
 package broker_test
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -22,6 +23,7 @@ type LastOperationSuite struct {
 	suite.Suite
 	Manager mocks.RouteManagerIface
 	Broker  broker.CdnServiceBroker
+	ctx     context.Context
 }
 
 func (s *LastOperationSuite) SetupTest() {
@@ -29,6 +31,7 @@ func (s *LastOperationSuite) SetupTest() {
 	s.Broker = broker.CdnServiceBroker{
 		Manager: &s.Manager,
 	}
+	s.ctx = context.Background()
 }
 
 func (s *LastOperationSuite) TestLastOperationMissing() {
@@ -38,7 +41,7 @@ func (s *LastOperationSuite) TestLastOperationMissing() {
 		Manager: &manager,
 	}
 
-	operation, err := b.LastOperation("")
+	operation, err := b.LastOperation(s.ctx, "", "")
 	s.Equal(operation.State, brokerapi.Failed)
 	s.Equal(operation.Description, "Service instance not found")
 	s.Nil(err)
@@ -57,7 +60,7 @@ func (s *LastOperationSuite) TestLastOperationSucceeded() {
 		Manager: &manager,
 	}
 
-	operation, err := b.LastOperation("123")
+	operation, err := b.LastOperation(s.ctx, "123", "")
 	s.Equal(operation.State, brokerapi.Succeeded)
 	s.Equal(operation.Description, "Service instance provisioned [cdn.cloud.gov => cdn.apps.cloud.gov]")
 	s.Nil(err)
@@ -76,7 +79,7 @@ func (s *LastOperationSuite) TestLastOperationProvisioning() {
 		Manager: &manager,
 	}
 
-	operation, err := b.LastOperation("123")
+	operation, err := b.LastOperation(s.ctx, "123", "")
 	s.Equal(operation.State, brokerapi.InProgress)
 	s.True(strings.Contains(operation.Description, "Provisioning in progress [cdn.cloud.gov => cdn.apps.cloud.gov]"))
 	s.Nil(err)
@@ -95,7 +98,7 @@ func (s *LastOperationSuite) TestLastOperationDeprovisioning() {
 		Manager: &manager,
 	}
 
-	operation, err := b.LastOperation("123")
+	operation, err := b.LastOperation(s.ctx, "123", "")
 	s.Equal(operation.State, brokerapi.InProgress)
 	s.Equal(operation.Description, "Deprovisioning in progress [cdn.cloud.gov => cdn.apps.cloud.gov]")
 	s.Nil(err)

@@ -84,7 +84,7 @@ func (r *DNSProvider) CleanUp(domain, token, keyAuth string) error {
 func (r *DNSProvider) changeRecord(action, fqdn, value string, ttl int) error {
 	hostedZoneID, err := r.getHostedZoneID(fqdn)
 	if err != nil {
-		return fmt.Errorf("Failed to determine Route 53 hosted zone ID: %v", err)
+		return err
 	}
 
 	recordSet := newTXTRecordSet(fqdn, value, ttl)
@@ -103,7 +103,7 @@ func (r *DNSProvider) changeRecord(action, fqdn, value string, ttl int) error {
 
 	resp, err := r.client.ChangeResourceRecordSets(reqParams)
 	if err != nil {
-		return fmt.Errorf("Failed to change Route 53 record set: %v", err)
+		return err
 	}
 
 	statusID := resp.ChangeInfo.Id
@@ -114,7 +114,7 @@ func (r *DNSProvider) changeRecord(action, fqdn, value string, ttl int) error {
 		}
 		resp, err := r.client.GetChange(reqParams)
 		if err != nil {
-			return false, fmt.Errorf("Failed to query Route 53 change status: %v", err)
+			return false, err
 		}
 		if *resp.ChangeInfo.Status == route53.ChangeStatusInsync {
 			return true, nil
@@ -131,31 +131,25 @@ func (r *DNSProvider) getHostedZoneID(fqdn string) (string, error) {
 
 	// .DNSName should not have a trailing dot
 	reqParams := &route53.ListHostedZonesByNameInput{
-		DNSName: aws.String(acme.UnFqdn(authZone)),
+		DNSName:  aws.String(acme.UnFqdn(authZone)),
+		MaxItems: aws.String("1"),
 	}
 	resp, err := r.client.ListHostedZonesByName(reqParams)
 	if err != nil {
 		return "", err
 	}
 
-	var hostedZoneID string
-	for _, hostedZone := range resp.HostedZones {
-		// .Name has a trailing dot
-		if !*hostedZone.Config.PrivateZone && *hostedZone.Name == authZone {
-			hostedZoneID = *hostedZone.Id
-			break
-		}
+	// .Name has a trailing dot
+	if len(resp.HostedZones) == 0 || *resp.HostedZones[0].Name != authZone {
+		return "", fmt.Errorf("Zone %s not found in Route53 for domain %s", authZone, fqdn)
 	}
 
-	if len(hostedZoneID) == 0 {
-		return "", fmt.Errorf("Zone %s not found in Route 53 for domain %s", authZone, fqdn)
+	zoneID := *resp.HostedZones[0].Id
+	if strings.HasPrefix(zoneID, "/hostedzone/") {
+		zoneID = strings.TrimPrefix(zoneID, "/hostedzone/")
 	}
 
-	if strings.HasPrefix(hostedZoneID, "/hostedzone/") {
-		hostedZoneID = strings.TrimPrefix(hostedZoneID, "/hostedzone/")
-	}
-
-	return hostedZoneID, nil
+	return zoneID, nil
 }
 
 func newTXTRecordSet(fqdn, value string, ttl int) *route53.ResourceRecordSet {

@@ -4,7 +4,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/pivotal-golang/lager"
+	"code.cloudfoundry.org/lager"
 	"github.com/robfig/cron"
 
 	"github.com/aws/aws-sdk-go/aws"

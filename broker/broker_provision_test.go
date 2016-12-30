@@ -1,6 +1,7 @@
 package broker_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -21,6 +22,7 @@ type ProvisionSuite struct {
 	suite.Suite
 	Manager mocks.RouteManagerIface
 	Broker  broker.CdnServiceBroker
+	ctx     context.Context
 }
 
 func (s *ProvisionSuite) SetupTest() {
@@ -28,15 +30,16 @@ func (s *ProvisionSuite) SetupTest() {
 	s.Broker = broker.CdnServiceBroker{
 		Manager: &s.Manager,
 	}
+	s.ctx = context.Background()
 }
 
 func (s *ProvisionSuite) TestSync() {
-	_, err := s.Broker.Provision("", brokerapi.ProvisionDetails{}, false)
+	_, err := s.Broker.Provision(s.ctx, "", brokerapi.ProvisionDetails{}, false)
 	s.Equal(err, brokerapi.ErrAsyncRequired)
 }
 
 func (s *ProvisionSuite) TestWithoutDetails() {
-	_, err := s.Broker.Provision("", brokerapi.ProvisionDetails{}, true)
+	_, err := s.Broker.Provision(s.ctx, "", brokerapi.ProvisionDetails{}, true)
 	s.NotNil(err)
 	s.Equal(err.Error(), "must be invoked with configuration parameters")
 }
@@ -45,7 +48,7 @@ func (s *ProvisionSuite) TestWithoutOptions() {
 	details := brokerapi.ProvisionDetails{
 		RawParameters: []byte(`{}`),
 	}
-	_, err := s.Broker.Provision("", details, true)
+	_, err := s.Broker.Provision(s.ctx, "", details, true)
 	s.NotNil(err)
 	s.Equal(err.Error(), "must be invoked with `domain` and `origin` keys")
 }
@@ -59,7 +62,7 @@ func (s *ProvisionSuite) TestInstanceExists() {
 	details := brokerapi.ProvisionDetails{
 		RawParameters: []byte(`{"domain": "domain.gov", "origin": "origin.gov"}`),
 	}
-	_, err := s.Broker.Provision("123", details, true)
+	_, err := s.Broker.Provision(s.ctx, "123", details, true)
 	s.Equal(err, brokerapi.ErrInstanceAlreadyExists)
 }
 
@@ -72,6 +75,6 @@ func (s *ProvisionSuite) TestSuccess() {
 	details := brokerapi.ProvisionDetails{
 		RawParameters: []byte(`{"domain": "domain.gov", "origin": "origin.gov"}`),
 	}
-	_, err := s.Broker.Provision("123", details, true)
+	_, err := s.Broker.Provision(s.ctx, "123", details, true)
 	s.Nil(err)
 }

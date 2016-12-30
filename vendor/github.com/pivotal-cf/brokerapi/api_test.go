@@ -2,21 +2,23 @@ package brokerapi_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 
 	"github.com/pivotal-cf/brokerapi"
 	"github.com/pivotal-cf/brokerapi/fakes"
 
+	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/lager/lagertest"
 	"github.com/drewolson/testflight"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/pivotal-golang/lager"
-	"github.com/pivotal-golang/lager/lagertest"
 )
 
 var _ = Describe("Service Broker API", func() {
@@ -91,6 +93,60 @@ var _ = Describe("Service Broker API", func() {
 
 			header := response.Header().Get("Content-Type")
 			Ω(header).Should(Equal("application/json"))
+		})
+	})
+
+	Describe("request context", func() {
+		var (
+			ctx context.Context
+		)
+
+		makeRequest := func(method, path, body string) *httptest.ResponseRecorder {
+			recorder := httptest.NewRecorder()
+			request, _ := http.NewRequest(method, path, strings.NewReader(body))
+			request.SetBasicAuth(credentials.Username, credentials.Password)
+			request = request.WithContext(ctx)
+			brokerAPI.ServeHTTP(recorder, request)
+			return recorder
+		}
+
+		BeforeEach(func() {
+			ctx = context.WithValue(context.Background(), "test_context", true)
+		})
+
+		It("catalog endpoint passes the request context to the broker", func() {
+			makeRequest("GET", "/v2/catalog", "")
+			Expect(fakeServiceBroker.ReceivedContext).To(BeTrue())
+		})
+
+		It("provision endpoint passes the request context to the broker", func() {
+			makeRequest("PUT", "/v2/service_instances/instance-id", "{}")
+			Expect(fakeServiceBroker.ReceivedContext).To(BeTrue())
+		})
+
+		It("deprovision endpoint passes the request context to the broker", func() {
+			makeRequest("DELETE", "/v2/service_instances/instance-id", "")
+			Expect(fakeServiceBroker.ReceivedContext).To(BeTrue())
+		})
+
+		It("bind endpoint passes the request context to the broker", func() {
+			makeRequest("PUT", "/v2/service_instances/instance-id/service_bindings/binding-id", "{}")
+			Expect(fakeServiceBroker.ReceivedContext).To(BeTrue())
+		})
+
+		It("unbind endpoint passes the request context to the broker", func() {
+			makeRequest("DELETE", "/v2/service_instances/instance-id/service_bindings/binding-id", "")
+			Expect(fakeServiceBroker.ReceivedContext).To(BeTrue())
+		})
+
+		It("update endpoint passes the request context to the broker", func() {
+			makeRequest("PATCH", "/v2/service_instances/instance-id", "{}")
+			Expect(fakeServiceBroker.ReceivedContext).To(BeTrue())
+		})
+
+		It("last operation endpoint passes the request context to the broker", func() {
+			makeRequest("GET", "/v2/service_instances/instance-id/last_operation", "{}")
+			Expect(fakeServiceBroker.ReceivedContext).To(BeTrue())
 		})
 	})
 
@@ -225,6 +281,25 @@ var _ = Describe("Service Broker API", func() {
 			It("calls Provision on the service broker with the instance id", func() {
 				makeInstanceProvisioningRequest(instanceID, provisionDetails, "")
 				Expect(fakeServiceBroker.ProvisionedInstanceIDs).To(ContainElement(instanceID))
+			})
+
+			Context("when the broker returns some operation data", func() {
+				BeforeEach(func() {
+					fakeServiceBroker = &fakes.FakeServiceBroker{
+						InstanceLimit:         3,
+						OperationDataToReturn: "some-operation-data",
+					}
+					fakeAsyncServiceBroker := &fakes.FakeAsyncServiceBroker{
+						FakeServiceBroker:    *fakeServiceBroker,
+						ShouldProvisionAsync: true,
+					}
+					brokerAPI = brokerapi.New(fakeAsyncServiceBroker, brokerLogger, credentials)
+				})
+
+				It("returns the operation data to the cloud controller", func() {
+					resp := makeInstanceProvisioningRequest(instanceID, provisionDetails, "")
+					Expect(resp.Body).To(MatchJSON(fixture("operation_data_response.json")))
+				})
 			})
 
 			Context("when there are arbitrary params", func() {
@@ -594,6 +669,16 @@ var _ = Describe("Service Broker API", func() {
 					It("returns HTTP 202", func() {
 						Expect(response.StatusCode).To(Equal(http.StatusAccepted))
 					})
+
+					Context("when the broker responds with operation data", func() {
+						BeforeEach(func() {
+							fakeServiceBroker.OperationDataToReturn = "some-operation-data"
+						})
+
+						It("returns the operation data to the cloud controller", func() {
+							Expect(response.Body).To(MatchJSON(fixture("operation_data_response.json")))
+						})
+					})
 				})
 			})
 
@@ -720,6 +805,23 @@ var _ = Describe("Service Broker API", func() {
 						itReturnsStatus(202, "accepts_incomplete=true")
 						itReturnsEmptyJsonObject("accepts_incomplete=true")
 					})
+
+					Context("when the broker returns operation data", func() {
+						BeforeEach(func() {
+							fakeServiceBroker.OperationDataToReturn = "some-operation-data"
+							fakeAsyncServiceBroker := &fakes.FakeAsyncOnlyServiceBroker{
+								FakeServiceBroker: *fakeServiceBroker,
+							}
+							brokerAPI = brokerapi.New(fakeAsyncServiceBroker, brokerLogger, credentials)
+						})
+
+						itReturnsStatus(202, "accepts_incomplete=true")
+
+						It("returns the operation data to the cloud controller", func() {
+							response := makeInstanceDeprovisioningRequest(instanceID, "accepts_incomplete=true")
+							Expect(response.Body).To(MatchJSON(fixture("operation_data_response.json")))
+						})
+					})
 				})
 
 				Context("when the broker can operate both synchronously and asynchronously", func() {
@@ -811,7 +913,7 @@ var _ = Describe("Service Broker API", func() {
 	})
 
 	Describe("binding lifecycle endpoint", func() {
-		makeBindingRequest := func(instanceID, bindingID string, details *brokerapi.BindDetails) *testflight.Response {
+		makeBindingRequestWithSpecificAPIVersion := func(instanceID, bindingID string, details *brokerapi.BindDetails, apiVersion string) *testflight.Response {
 			response := &testflight.Response{}
 			testflight.WithServer(brokerAPI, func(r *testflight.Requester) {
 				path := fmt.Sprintf("/v2/service_instances/%s/service_bindings/%s",
@@ -828,11 +930,16 @@ var _ = Describe("Service Broker API", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				request.Header.Add("Content-Type", "application/json")
+				request.Header.Add("X-Broker-Api-Version", apiVersion)
 				request.SetBasicAuth("username", "password")
 
 				response = r.Do(request)
 			})
 			return response
+		}
+
+		makeBindingRequest := func(instanceID, bindingID string, details *brokerapi.BindDetails) *testflight.Response {
+			return makeBindingRequestWithSpecificAPIVersion(instanceID, bindingID, details, "2.10")
 		}
 
 		Describe("binding", func() {
@@ -889,6 +996,42 @@ var _ = Describe("Service Broker API", func() {
 					It("responds with the route service url", func() {
 						response := makeBindingRequest(uniqueInstanceID(), uniqueBindingID(), details)
 						Expect(response.Body).To(MatchJSON(fixture("binding_with_route_service.json")))
+					})
+				})
+
+				Context("when a volume mount is being passed", func() {
+					BeforeEach(func() {
+						fakeServiceBroker.VolumeMounts = []brokerapi.VolumeMount{{
+							Driver:       "driver",
+							ContainerDir: "/dev/null",
+							Mode:         "rw",
+							DeviceType:   "shared",
+							Device: brokerapi.SharedDevice{
+								VolumeId:    "some-guid",
+								MountConfig: map[string]interface{}{"key": "value"},
+							},
+						}}
+					})
+
+					Context("when the broker API version is greater than 2.9", func() {
+						It("responds with a volume mount", func() {
+							response := makeBindingRequest(uniqueInstanceID(), uniqueBindingID(), details)
+							Expect(response.Body).To(MatchJSON(fixture("binding_with_volume_mounts.json")))
+						})
+					})
+
+					Context("when the broker API version is 2.9", func() {
+						It("responds with an experimental volume mount", func() {
+							response := makeBindingRequestWithSpecificAPIVersion(uniqueInstanceID(), uniqueBindingID(), details, "2.9")
+							Expect(response.Body).To(MatchJSON(fixture("binding_with_experimental_volume_mounts.json")))
+						})
+					})
+
+					Context("when the broker API version is 2.8", func() {
+						It("responds with an experimental volume mount", func() {
+							response := makeBindingRequestWithSpecificAPIVersion(uniqueInstanceID(), uniqueBindingID(), details, "2.8")
+							Expect(response.Body).To(MatchJSON(fixture("binding_with_experimental_volume_mounts.json")))
+						})
 					})
 				})
 
@@ -1115,10 +1258,14 @@ var _ = Describe("Service Broker API", func() {
 		})
 
 		Describe("last_operation", func() {
-			makeLastOperationRequest := func(instanceID string) *testflight.Response {
+			makeLastOperationRequest := func(instanceID, operationData string) *testflight.Response {
 				response := &testflight.Response{}
 				testflight.WithServer(brokerAPI, func(r *testflight.Requester) {
 					path := fmt.Sprintf("/v2/service_instances/%s/last_operation", instanceID)
+					if operationData != "" {
+						path = fmt.Sprintf("%s?operation=%s", path, url.QueryEscape(operationData))
+					}
+
 					request, _ := http.NewRequest("GET", path, strings.NewReader(""))
 					request.Header.Add("Content-Type", "application/json")
 					request.SetBasicAuth("username", "password")
@@ -1128,12 +1275,25 @@ var _ = Describe("Service Broker API", func() {
 				return response
 			}
 
+			It("calls the broker with the relevant instance ID", func() {
+				instanceID := "instanceID"
+				makeLastOperationRequest(instanceID, "")
+				Expect(fakeServiceBroker.LastOperationInstanceID).To(Equal(instanceID))
+			})
+
+			It("calls the broker with the URL decoded operation data", func() {
+				instanceID := "an-instance"
+				operationData := `{"foo":"bar"}`
+				makeLastOperationRequest(instanceID, operationData)
+				Expect(fakeServiceBroker.LastOperationData).To(Equal(operationData))
+			})
+
 			It("should return succeeded if the operation completed successfully", func() {
 				fakeServiceBroker.LastOperationState = "succeeded"
 				fakeServiceBroker.LastOperationDescription = "some description"
 
 				instanceID := "instanceID"
-				response := makeLastOperationRequest(instanceID)
+				response := makeLastOperationRequest(instanceID, "")
 
 				logs := brokerLogger.Logs()
 
@@ -1151,7 +1311,7 @@ var _ = Describe("Service Broker API", func() {
 			It("should return a 404 and log in case the instance id is not found", func() {
 				fakeServiceBroker.LastOperationError = brokerapi.ErrInstanceDoesNotExist
 				instanceID := "non-existing"
-				response := makeLastOperationRequest(instanceID)
+				response := makeLastOperationRequest(instanceID, "")
 
 				Expect(lastLogLine().Message).To(ContainSubstring("lastOperation.instance-missing"))
 				Expect(lastLogLine().Data["error"]).To(ContainSubstring("instance does not exist"))
@@ -1162,7 +1322,7 @@ var _ = Describe("Service Broker API", func() {
 
 			It("should return an internal sever error for all other errors", func() {
 				fakeServiceBroker.LastOperationError = errors.New("Blah")
-				response := makeLastOperationRequest("instanceID")
+				response := makeLastOperationRequest("instanceID", "")
 
 				Expect(lastLogLine().Message).To(ContainSubstring("lastOperation.unknown-error"))
 				Expect(lastLogLine().Data["error"]).To(ContainSubstring("Blah"))

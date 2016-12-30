@@ -1,13 +1,14 @@
 package broker
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 
+	"code.cloudfoundry.org/lager"
 	"github.com/pivotal-cf/brokerapi"
-	"github.com/pivotal-golang/lager"
 
 	"github.com/18F/cf-cdn-service-broker/models"
 )
@@ -24,7 +25,7 @@ type CdnServiceBroker struct {
 	Logger  lager.Logger
 }
 
-func (*CdnServiceBroker) Services() []brokerapi.Service {
+func (*CdnServiceBroker) Services(context context.Context) []brokerapi.Service {
 	var service brokerapi.Service
 	buf, err := ioutil.ReadFile("./catalog.json")
 	if err != nil {
@@ -69,8 +70,7 @@ func parseProvisionDetails(details brokerapi.ProvisionDetails) (options Options,
 // are provided.
 func parseUpdateDetails(details map[string]interface{}) (options Options, err error) {
 	// need to convert the map into raw JSON.
-	var rawJSON []byte
-	rawJSON, err = json.Marshal(details)
+	rawJSON, err := json.Marshal(details)
 	if err != nil {
 		return
 	}
@@ -86,7 +86,8 @@ func parseUpdateDetails(details map[string]interface{}) (options Options, err er
 }
 
 func (b *CdnServiceBroker) Provision(
-	instanceId string,
+	context context.Context,
+	instanceID string,
 	details brokerapi.ProvisionDetails,
 	asyncAllowed bool,
 ) (brokerapi.ProvisionedServiceSpec, error) {
@@ -101,7 +102,7 @@ func (b *CdnServiceBroker) Provision(
 		return spec, err
 	}
 
-	_, err = b.Manager.Get(instanceId)
+	_, err = b.Manager.Get(instanceID)
 	if err == nil {
 		return spec, brokerapi.ErrInstanceAlreadyExists
 	}
@@ -113,7 +114,7 @@ func (b *CdnServiceBroker) Provision(
 		"Plan":         details.PlanID,
 	}
 
-	_, err = b.Manager.Create(instanceId, options.Domain, options.Origin, options.Path, options.InsecureOrigin, tags)
+	_, err = b.Manager.Create(instanceID, options.Domain, options.Origin, options.Path, options.InsecureOrigin, tags)
 	if err != nil {
 		return spec, err
 	}
@@ -121,8 +122,11 @@ func (b *CdnServiceBroker) Provision(
 	return brokerapi.ProvisionedServiceSpec{IsAsync: true}, nil
 }
 
-func (b *CdnServiceBroker) LastOperation(instanceId string) (brokerapi.LastOperation, error) {
-	route, err := b.Manager.Get(instanceId)
+func (b *CdnServiceBroker) LastOperation(
+	context context.Context,
+	instanceID, operationData string,
+) (brokerapi.LastOperation, error) {
+	route, err := b.Manager.Get(instanceID)
 	if err != nil {
 		return brokerapi.LastOperation{
 			State:       brokerapi.Failed,
@@ -166,46 +170,64 @@ func (b *CdnServiceBroker) LastOperation(instanceId string) (brokerapi.LastOpera
 	}
 }
 
-func (b *CdnServiceBroker) Deprovision(instanceId string, details brokerapi.DeprovisionDetails, asyncAllowed bool) (brokerapi.IsAsync, error) {
+func (b *CdnServiceBroker) Deprovision(
+	context context.Context,
+	instanceID string,
+	details brokerapi.DeprovisionDetails,
+	asyncAllowed bool,
+) (brokerapi.DeprovisionServiceSpec, error) {
 	if !asyncAllowed {
-		return false, brokerapi.ErrAsyncRequired
+		return brokerapi.DeprovisionServiceSpec{}, brokerapi.ErrAsyncRequired
 	}
 
-	route, err := b.Manager.Get(instanceId)
+	route, err := b.Manager.Get(instanceID)
 	if err != nil {
-		return false, err
+		return brokerapi.DeprovisionServiceSpec{}, err
 	}
 
 	err = b.Manager.Disable(route)
 	if err != nil {
-		return false, nil
+		return brokerapi.DeprovisionServiceSpec{}, nil
 	}
 
-	return true, nil
+	return brokerapi.DeprovisionServiceSpec{IsAsync: true}, nil
 }
 
-func (b *CdnServiceBroker) Bind(instanceId, bindingId string, details brokerapi.BindDetails) (brokerapi.Binding, error) {
+func (b *CdnServiceBroker) Bind(
+	context context.Context,
+	instanceID, bindingID string,
+	details brokerapi.BindDetails,
+) (brokerapi.Binding, error) {
 	return brokerapi.Binding{}, errors.New("service does not support bind")
 }
 
-func (b *CdnServiceBroker) Unbind(instanceId, bindingId string, details brokerapi.UnbindDetails) error {
+func (b *CdnServiceBroker) Unbind(
+	context context.Context,
+	instanceID, bindingID string,
+	details brokerapi.UnbindDetails,
+) error {
 	return errors.New("service does not support bind")
 }
 
-func (b *CdnServiceBroker) Update(instanceId string, details brokerapi.UpdateDetails, asyncAllowed bool) (brokerapi.IsAsync, error) {
+func (b *CdnServiceBroker) Update(
+	context context.Context,
+	instanceID string,
+	details brokerapi.UpdateDetails,
+	asyncAllowed bool,
+) (brokerapi.UpdateServiceSpec, error) {
 	if !asyncAllowed {
-		return false, brokerapi.ErrAsyncRequired
+		return brokerapi.UpdateServiceSpec{}, brokerapi.ErrAsyncRequired
 	}
 
 	options, err := parseUpdateDetails(details.Parameters)
 	if err != nil {
-		return false, err
+		return brokerapi.UpdateServiceSpec{}, err
 	}
 
-	err = b.Manager.Update(instanceId, options.Domain, options.Origin, options.Path, options.InsecureOrigin)
+	err = b.Manager.Update(instanceID, options.Domain, options.Origin, options.Path, options.InsecureOrigin)
 	if err != nil {
-		return false, err
+		return brokerapi.UpdateServiceSpec{}, err
 	}
 
-	return true, nil
+	return brokerapi.UpdateServiceSpec{IsAsync: true}, nil
 }
