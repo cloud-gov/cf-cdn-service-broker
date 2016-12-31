@@ -1,35 +1,39 @@
 {
-  "id": "8478b533-2b59-4007-8494-2feec5970f94",
-  "name": "cdn-route",
-  "description": "CDN Route Service",
-  "bindable": true,
-  "metadata": {
-    "displayName": "cdn-route"
-  },
-  "plan_updateable": true,
-  "plans": [
+  "services": [
     {
-      "id": "fc055c72-1075-44c9-9aee-bddd52e1b053",
+      "id": "8478b533-2b59-4007-8494-2feec5970f94",
       "name": "cdn-route",
-      "description": "CDN Route Plan",
-      "free": true,
+      "description": "CDN Route Service",
+      "bindable": true,
       "metadata": {
         "displayName": "cdn-route"
       },
-      "properties": {
-        "iam_policy": {
-          "Version": "2012-10-17",
-          "Statement": [
-            {
-              "Action": [
-                "cloudfront:GetDistributionConfig"
-              ],
-              "Effect": "Allow",
-              "Resource": "{{.Resource}}"
+      "plan_updateable": true,
+      "plans": [
+        {
+          "id": "fc055c72-1075-44c9-9aee-bddd52e1b053",
+          "name": "cdn-route",
+          "description": "CDN Route Plan",
+          "free": true,
+          "metadata": {
+            "displayName": "cdn-route"
+          },
+          "properties": {
+            "iam_policy": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Action": [
+                    "cloudfront:GetDistributionConfig"
+                  ],
+                  "Effect": "Allow",
+                  "Resource": "{{.Resource}}"
+                }
+              ]
             }
-          ]
+          }
         }
-      }
+      ]
     }
   ]
 }
