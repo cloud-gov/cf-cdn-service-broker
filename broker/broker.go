@@ -46,7 +46,7 @@ func NewCdnServiceBroker(
 		distribution: distribution,
 		user:         user,
 		catalog:      catalog,
-		iamPath:      settings.IamPathPrefix,
+		iamPath:      settings.IamUserPath,
 		userPrefix:   settings.IamUserPrefix,
 		policyPrefix: settings.IamPolicyPrefix,
 		logger:       logger,

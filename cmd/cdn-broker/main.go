@@ -31,7 +31,7 @@ func main() {
 		logger.Fatal("new-settings", err)
 	}
 
-	catalog, err := broker.LoadCatalog("./config.json")
+	catalog, err := broker.LoadCatalog("./catalog.json")
 	if err != nil {
 		logger.Fatal("load-catalog", err)
 	}

@@ -34,6 +34,9 @@ jobs:
           ACME_URL: {{cdn-broker-acme-url-staging}}
           BUCKET: {{cdn-broker-bucket-staging}}
           IAM_PATH_PREFIX: {{cdn-broker-iam-path-prefix-staging}}
+          IAM_USER_PATH: {{cdn-broker-iam-user-path-staging}}
+          IAM_USER_PREFIX: {{cdn-broker-iam-user-prefix-staging}}
+          IAM_POLICY_PREFIX: {{cdn-broker-iam-policy-prefix-staging}}
           AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id-staging}}
           AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key-staging}}
           AWS_DEFAULT_REGION: {{cdn-broker-region-staging}}
@@ -117,6 +120,9 @@ jobs:
           ACME_URL: {{cdn-broker-acme-url-production}}
           BUCKET: {{cdn-broker-bucket-production}}
           IAM_PATH_PREFIX: {{cdn-broker-iam-path-prefix-production}}
+          IAM_USER_PATH: {{cdn-broker-iam-user-path-production}}
+          IAM_USER_PREFIX: {{cdn-broker-iam-user-prefix-production}}
+          IAM_POLICY_PREFIX: {{cdn-broker-iam-policy-prefix-production}}
           AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id-production}}
           AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key-production}}
           AWS_DEFAULT_REGION: {{cdn-broker-region-production}}

@@ -17,6 +17,7 @@ type Settings struct {
 	AcmeUrl              string `envconfig:"acme_url" required:"true"`
 	Bucket               string `envconfig:"bucket" required:"true"`
 	IamPathPrefix        string `envconfig:"iam_path_prefix" default:"letsencrypt"`
+	IamUserPath          string `envconfig:"iam_user_path" required="true"`
 	IamUserPrefix        string `envconfig:"iam_user_prefix required:"true"`
 	IamPolicyPrefix      string `envconfig:"iam_policy_prefix required:"true"`
 	CloudFrontPrefix     string `envconfig:"cloudfront_prefix" default:""`
