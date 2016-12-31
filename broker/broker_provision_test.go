@@ -7,11 +7,15 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"code.cloudfoundry.org/lager"
 	"github.com/pivotal-cf/brokerapi"
 
 	"github.com/18F/cf-cdn-service-broker/broker"
+	"github.com/18F/cf-cdn-service-broker/config"
+	"github.com/18F/cf-cdn-service-broker/iamuser"
 	"github.com/18F/cf-cdn-service-broker/models"
 	"github.com/18F/cf-cdn-service-broker/models/mocks"
+	"github.com/18F/cf-cdn-service-broker/utils"
 )
 
 func TestProvisioning(t *testing.T) {
@@ -20,16 +24,22 @@ func TestProvisioning(t *testing.T) {
 
 type ProvisionSuite struct {
 	suite.Suite
-	Manager mocks.RouteManagerIface
-	Broker  broker.CdnServiceBroker
+	Logger  lager.Logger
+	Manager *mocks.RouteManagerIface
+	Broker  *broker.CdnServiceBroker
 	ctx     context.Context
 }
 
 func (s *ProvisionSuite) SetupTest() {
-	s.Manager = mocks.RouteManagerIface{}
-	s.Broker = broker.CdnServiceBroker{
-		Manager: &s.Manager,
-	}
+	s.Manager = &mocks.RouteManagerIface{}
+	s.Broker = broker.NewCdnServiceBroker(
+		s.Manager,
+		&utils.Distribution{},
+		&iamuser.IAMUser{},
+		broker.Catalog{},
+		config.Settings{},
+		s.Logger,
+	)
 	s.ctx = context.Background()
 }
 

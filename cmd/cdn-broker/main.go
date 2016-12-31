@@ -16,6 +16,8 @@ import (
 
 	"github.com/18F/cf-cdn-service-broker/broker"
 	"github.com/18F/cf-cdn-service-broker/config"
+	"github.com/18F/cf-cdn-service-broker/iamcerts"
+	"github.com/18F/cf-cdn-service-broker/iamuser"
 	"github.com/18F/cf-cdn-service-broker/models"
 	"github.com/18F/cf-cdn-service-broker/utils"
 )
@@ -29,6 +31,11 @@ func main() {
 		logger.Fatal("new-settings", err)
 	}
 
+	catalog, err := broker.LoadCatalog("./config.json")
+	if err != nil {
+		logger.Fatal("load-catalog", err)
+	}
+
 	db, err := config.Connect(settings)
 	if err != nil {
 		logger.Fatal("connect", err)
@@ -36,24 +43,31 @@ func main() {
 
 	db.AutoMigrate(&models.Route{}, &models.Certificate{})
 
-	session := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
-	manager := models.RouteManager{
+	sess := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
+	distribution := &utils.Distribution{settings, cloudfront.New(sess)}
+	user := iamuser.NewIAMUser(iam.New(sess), logger)
+
+	manager := &models.RouteManager{
 		Logger:     logger,
-		Iam:        &utils.Iam{settings, iam.New(session)},
-		CloudFront: &utils.Distribution{settings, cloudfront.New(session)},
-		Acme:       &utils.Acme{settings, s3.New(session)},
+		Certs:      iamcerts.NewIAMCerts(settings, iam.New(sess), logger),
+		CloudFront: &utils.Distribution{settings, cloudfront.New(sess)},
+		Acme:       &utils.Acme{settings, s3.New(sess)},
 		DB:         db,
 	}
-	broker := broker.CdnServiceBroker{
-		Manager: &manager,
-		Logger:  logger,
-	}
+	broker := broker.NewCdnServiceBroker(
+		manager,
+		distribution,
+		user,
+		catalog,
+		settings,
+		logger,
+	)
 	credentials := brokerapi.BrokerCredentials{
 		Username: settings.BrokerUsername,
 		Password: settings.BrokerPassword,
 	}
 
-	brokerAPI := brokerapi.New(&broker, logger, credentials)
+	brokerAPI := brokerapi.New(broker, logger, credentials)
 	http.Handle("/", brokerAPI)
 	http.ListenAndServe(fmt.Sprintf(":%s", settings.Port), nil)
 }

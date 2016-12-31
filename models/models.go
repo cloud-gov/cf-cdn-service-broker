@@ -14,6 +14,7 @@ import (
 	"github.com/pivotal-cf/brokerapi"
 	"github.com/xenolf/lego/acme"
 
+	"github.com/18F/cf-cdn-service-broker/iamcerts"
 	"github.com/18F/cf-cdn-service-broker/utils"
 )
 
@@ -79,7 +80,7 @@ type RouteManagerIface interface {
 
 type RouteManager struct {
 	Logger     lager.Logger
-	Iam        utils.IamIface
+	Certs      iamcerts.Certs
 	CloudFront utils.DistributionIface
 	Acme       utils.AcmeIface
 	DB         *gorm.DB
@@ -263,7 +264,7 @@ func (m *RouteManager) updateDeprovisioning(r *Route) error {
 	}
 
 	if deleted {
-		err = m.Iam.DeleteCertificate(fmt.Sprintf("cdn-route-%s", r.DomainExternal), false)
+		err = m.Certs.DeleteCertificate(fmt.Sprintf("cdn-route-%s", r.DomainExternal), false)
 		if err != nil {
 			return err
 		}
@@ -350,7 +351,7 @@ func (m *RouteManager) deployCertificate(domain, distId string, cert acme.Certif
 	prev := fmt.Sprintf("cdn-route-%s-new", domain)
 	next := fmt.Sprintf("cdn-route-%s", domain)
 
-	certId, err := m.Iam.UploadCertificate(prev, cert)
+	certId, err := m.Certs.UploadCertificate(prev, cert)
 	if err != nil {
 		return err
 	}
@@ -360,5 +361,5 @@ func (m *RouteManager) deployCertificate(domain, distId string, cert acme.Certif
 		return err
 	}
 
-	return m.Iam.RenameCertificate(prev, next)
+	return m.Certs.RenameCertificate(prev, next)
 }

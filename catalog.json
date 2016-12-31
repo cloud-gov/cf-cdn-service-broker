@@ -15,6 +15,20 @@
       "free": true,
       "metadata": {
         "displayName": "cdn-route"
+      },
+      "properties": {
+        "iam_policy": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Action": [
+                "cloudfront:GetDistributionConfig"
+              ],
+              "Effect": "Allow",
+              "Resource": "{{.Resource}}"
+            }
+          ]
+        }
       }
     }
   ]

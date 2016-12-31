@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 
 	"github.com/18F/cf-cdn-service-broker/config"
+	"github.com/18F/cf-cdn-service-broker/iamcerts"
 	"github.com/18F/cf-cdn-service-broker/models"
 	"github.com/18F/cf-cdn-service-broker/utils"
 )
@@ -32,12 +33,12 @@ func main() {
 		logger.Fatal("connect", err)
 	}
 
-	session := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
+	sess := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
 	manager := models.RouteManager{
 		Logger:     logger,
-		Iam:        &utils.Iam{settings, iam.New(session)},
-		CloudFront: &utils.Distribution{settings, cloudfront.New(session)},
-		Acme:       &utils.Acme{settings, s3.New(session)},
+		Certs:      iamcerts.NewIAMCerts(settings, iam.New(sess), logger),
+		CloudFront: &utils.Distribution{settings, cloudfront.New(sess)},
+		Acme:       &utils.Acme{settings, s3.New(sess)},
 		DB:         db,
 	}
 
