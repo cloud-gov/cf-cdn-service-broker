@@ -1,18 +1,18 @@
 {
   "id": "8478b533-2b59-4007-8494-2feec5970f94",
   "name": "cdn-route",
-  "description": "Custom URL, CDN, and free TLS certificates",
+  "description": "Custom domains, CDN caching, and TLS certificates",
   "bindable": true,
   "metadata": {
-    "displayName": "Content Distribution Network",
-    "documentationUrl": "https://cloud.gov/docs/services/cdn-route"
+    "displayName": "CDN Route",
+    "documentationUrl": "https://cloud.gov/docs/services/cdn-route/"
   },
   "plan_updateable": true,
   "plans": [
     {
       "id": "fc055c72-1075-44c9-9aee-bddd52e1b053",
       "name": "cdn-route",
-      "description": "A CDN distribution with custom URL and free TLS certificate with auto renewal",
+      "description": "A service providing custom domains, CDN caching, and TLS certificates with auto renewal",
       "free": true,
       "metadata": {
         "displayName": "Content Distribution Network Route"
