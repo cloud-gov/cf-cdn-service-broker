@@ -1,10 +1,10 @@
 hash: e20862563cfed9d2de0b4a76e93c67ced42dbb34b2163df7b963884b2bd35270
-updated: 2016-12-30T14:17:16.332496159-05:00
+updated: 2017-01-26T11:26:13.217819451-05:00
 imports:
 - name: code.cloudfoundry.org/lager
   version: 6cfe365fb6bb84343f0034b4a53cd250d173b61f
 - name: github.com/aws/aws-sdk-go
-  version: 36670f6ab1769ad77fa5f7e2c194398733503635
+  version: aa8704199ea17856a3f37852f16a6008aea97e81
   subpackages:
   - aws
   - aws/awserr
@@ -54,7 +54,7 @@ imports:
 - name: github.com/kelseyhightower/envconfig
   version: 9aca109c9aec4633fced9717c4a09ecab3d33111
 - name: github.com/lib/pq
-  version: ee1442bda7bd1b6a84e913bdb421cb1874ec629d
+  version: dd3290b2f71a8b30bee8e4e75a337a825263d26f
   subpackages:
   - hstore
   - oid

@@ -1940,7 +1940,9 @@
         "StorageType":{"shape":"String"},
         "CopyTagsToSnapshot":{"shape":"BooleanOptional"},
         "MonitoringInterval":{"shape":"IntegerOptional"},
-        "MonitoringRoleArn":{"shape":"String"}
+        "MonitoringRoleArn":{"shape":"String"},
+        "KmsKeyId":{"shape":"String"},
+        "PreSignedUrl":{"shape":"String"}
       }
     },
     "CreateDBInstanceReadReplicaResult":{
@@ -2424,6 +2426,7 @@
         "AutoMinorVersionUpgrade":{"shape":"Boolean"},
         "ReadReplicaSourceDBInstanceIdentifier":{"shape":"String"},
         "ReadReplicaDBInstanceIdentifiers":{"shape":"ReadReplicaDBInstanceIdentifierList"},
+        "ReadReplicaDBClusterIdentifiers":{"shape":"ReadReplicaDBClusterIdentifierList"},
         "LicenseModel":{"shape":"String"},
         "Iops":{"shape":"IntegerOptional"},
         "OptionGroupMemberships":{"shape":"OptionGroupMembershipList"},
@@ -4356,6 +4359,13 @@
       "type":"structure",
       "members":{
         "ReservedDBInstance":{"shape":"ReservedDBInstance"}
+      }
+    },
+    "ReadReplicaDBClusterIdentifierList":{
+      "type":"list",
+      "member":{
+        "shape":"String",
+        "locationName":"ReadReplicaDBClusterIdentifier"
       }
     },
     "ReadReplicaDBInstanceIdentifierList":{
