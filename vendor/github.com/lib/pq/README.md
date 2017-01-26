@@ -20,11 +20,11 @@ variables.
 
 Example:
 
-	PGHOST=/run/postgresql go test github.com/lib/pq
+	PGHOST=/var/run/postgresql go test github.com/lib/pq
 
 Optionally, a benchmark suite can be run as part of the tests:
 
-	PGHOST=/run/postgresql go test -bench .
+	PGHOST=/var/run/postgresql go test -bench .
 
 ## Features
 

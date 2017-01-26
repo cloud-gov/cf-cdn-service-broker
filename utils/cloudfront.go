@@ -85,6 +85,9 @@ func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionCon
 		DefaultTTL:      aws.Int64(86400),
 		MinTTL:          aws.Int64(0),
 		MaxTTL:          aws.Int64(31536000),
+		LambdaFunctionAssociations: &cloudfront.LambdaFunctionAssociations{
+			Quantity: aws.Int64(0),
+		},
 		TrustedSigners: &cloudfront.TrustedSigners{
 			Enabled:  aws.Bool(false),
 			Quantity: aws.Int64(0),
@@ -185,6 +188,9 @@ func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionCon
 				DefaultTTL:      aws.Int64(86400),
 				MinTTL:          aws.Int64(0),
 				MaxTTL:          aws.Int64(31536000),
+				LambdaFunctionAssociations: &cloudfront.LambdaFunctionAssociations{
+					Quantity: aws.Int64(0),
+				},
 				TrustedSigners: &cloudfront.TrustedSigners{
 					Enabled:  aws.Bool(false),
 					Quantity: aws.Int64(0),
