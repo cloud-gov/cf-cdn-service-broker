@@ -8,9 +8,11 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"code.cloudfoundry.org/lager"
 	"github.com/pivotal-cf/brokerapi"
 
 	"github.com/18F/cf-cdn-service-broker/broker"
+	"github.com/18F/cf-cdn-service-broker/config"
 	"github.com/18F/cf-cdn-service-broker/models"
 	"github.com/18F/cf-cdn-service-broker/models/mocks"
 )
@@ -21,25 +23,31 @@ func TestLastOperation(t *testing.T) {
 
 type LastOperationSuite struct {
 	suite.Suite
-	Manager mocks.RouteManagerIface
-	Broker  broker.CdnServiceBroker
-	ctx     context.Context
+	Manager  mocks.RouteManagerIface
+	Broker   *broker.CdnServiceBroker
+	settings config.Settings
+	logger   lager.Logger
+	ctx      context.Context
 }
 
 func (s *LastOperationSuite) SetupTest() {
 	s.Manager = mocks.RouteManagerIface{}
-	s.Broker = broker.CdnServiceBroker{
-		Manager: &s.Manager,
-	}
+	s.Broker = broker.New(
+		&s.Manager,
+		s.settings,
+		s.logger,
+	)
 	s.ctx = context.Background()
 }
 
 func (s *LastOperationSuite) TestLastOperationMissing() {
 	manager := mocks.RouteManagerIface{}
 	manager.On("Get", "").Return(&models.Route{}, errors.New("not found"))
-	b := broker.CdnServiceBroker{
-		Manager: &manager,
-	}
+	b := broker.New(
+		&manager,
+		s.settings,
+		s.logger,
+	)
 
 	operation, err := b.LastOperation(s.ctx, "", "")
 	s.Equal(operation.State, brokerapi.Failed)
@@ -56,9 +64,11 @@ func (s *LastOperationSuite) TestLastOperationSucceeded() {
 	}
 	manager.On("Get", "123").Return(route, nil)
 	manager.On("Poll", route).Return(nil)
-	b := broker.CdnServiceBroker{
-		Manager: &manager,
-	}
+	b := broker.New(
+		&manager,
+		s.settings,
+		s.logger,
+	)
 
 	operation, err := b.LastOperation(s.ctx, "123", "")
 	s.Equal(operation.State, brokerapi.Succeeded)
@@ -75,9 +85,11 @@ func (s *LastOperationSuite) TestLastOperationProvisioning() {
 	}
 	manager.On("Get", "123").Return(route, nil)
 	manager.On("Poll", route).Return(nil)
-	b := broker.CdnServiceBroker{
-		Manager: &manager,
-	}
+	b := broker.New(
+		&manager,
+		s.settings,
+		s.logger,
+	)
 
 	operation, err := b.LastOperation(s.ctx, "123", "")
 	s.Equal(operation.State, brokerapi.InProgress)
@@ -94,9 +106,11 @@ func (s *LastOperationSuite) TestLastOperationDeprovisioning() {
 	}
 	manager.On("Get", "123").Return(route, nil)
 	manager.On("Poll", route).Return(nil)
-	b := broker.CdnServiceBroker{
-		Manager: &manager,
-	}
+	b := broker.New(
+		&manager,
+		s.settings,
+		s.logger,
+	)
 
 	operation, err := b.LastOperation(s.ctx, "123", "")
 	s.Equal(operation.State, brokerapi.InProgress)

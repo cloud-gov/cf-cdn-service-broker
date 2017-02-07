@@ -44,16 +44,17 @@ func main() {
 		Acme:       &utils.Acme{settings, s3.New(session)},
 		DB:         db,
 	}
-	broker := broker.CdnServiceBroker{
-		Manager: &manager,
-		Logger:  logger,
-	}
+	broker := broker.New(
+		&manager,
+		settings,
+		logger,
+	)
 	credentials := brokerapi.BrokerCredentials{
 		Username: settings.BrokerUsername,
 		Password: settings.BrokerPassword,
 	}
 
-	brokerAPI := brokerapi.New(&broker, logger, credentials)
+	brokerAPI := brokerapi.New(broker, logger, credentials)
 	http.Handle("/", brokerAPI)
 	http.ListenAndServe(fmt.Sprintf(":%s", settings.Port), nil)
 }

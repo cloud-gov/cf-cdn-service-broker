@@ -7,9 +7,11 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"code.cloudfoundry.org/lager"
 	"github.com/pivotal-cf/brokerapi"
 
 	"github.com/18F/cf-cdn-service-broker/broker"
+	"github.com/18F/cf-cdn-service-broker/config"
 	"github.com/18F/cf-cdn-service-broker/models"
 	"github.com/18F/cf-cdn-service-broker/models/mocks"
 )
@@ -20,16 +22,20 @@ func TestProvisioning(t *testing.T) {
 
 type ProvisionSuite struct {
 	suite.Suite
-	Manager mocks.RouteManagerIface
-	Broker  broker.CdnServiceBroker
-	ctx     context.Context
+	Manager  mocks.RouteManagerIface
+	Broker   *broker.CdnServiceBroker
+	settings config.Settings
+	logger   lager.Logger
+	ctx      context.Context
 }
 
 func (s *ProvisionSuite) SetupTest() {
 	s.Manager = mocks.RouteManagerIface{}
-	s.Broker = broker.CdnServiceBroker{
-		Manager: &s.Manager,
-	}
+	s.Broker = broker.New(
+		&s.Manager,
+		s.settings,
+		s.logger,
+	)
 	s.ctx = context.Background()
 }
 
@@ -50,7 +56,7 @@ func (s *ProvisionSuite) TestWithoutOptions() {
 	}
 	_, err := s.Broker.Provision(s.ctx, "", details, true)
 	s.NotNil(err)
-	s.Equal(err.Error(), "must be invoked with `domain` and `origin` keys")
+	s.Equal(err.Error(), "must be invoked with `domain` key")
 }
 
 func (s *ProvisionSuite) TestInstanceExists() {
@@ -69,7 +75,7 @@ func (s *ProvisionSuite) TestInstanceExists() {
 func (s *ProvisionSuite) TestSuccess() {
 	s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
 	route := &models.Route{State: models.Provisioning}
-	s.Manager.On("Create", "123", "domain.gov", "origin.gov", "", false,
+	s.Manager.On("Create", "123", "domain.gov", "origin.gov", "", false, []string{"Host"},
 		map[string]string{"Organization": "", "Space": "", "Service": "", "Plan": ""}).Return(route, nil)
 
 	details := brokerapi.ProvisionDetails{

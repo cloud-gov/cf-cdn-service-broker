@@ -68,8 +68,8 @@ type Certificate struct {
 }
 
 type RouteManagerIface interface {
-	Create(instanceId, domain, origin, path string, insecureOrigin bool, tags map[string]string) (*Route, error)
-	Update(instanceId string, domain, origin string, path string, insecureOrigin bool) error
+	Create(instanceId, domain, origin, path string, insecureOrigin bool, forwardedHeaders []string, tags map[string]string) (*Route, error)
+	Update(instanceId string, domain, origin string, path string, insecureOrigin bool, forwardedHeaders []string) error
 	Get(instanceId string) (*Route, error)
 	Poll(route *Route) error
 	Disable(route *Route) error
@@ -85,7 +85,7 @@ type RouteManager struct {
 	DB         *gorm.DB
 }
 
-func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureOrigin bool, tags map[string]string) (*Route, error) {
+func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureOrigin bool, forwardedHeaders []string, tags map[string]string) (*Route, error) {
 	route := &Route{
 		InstanceId:     instanceId,
 		State:          Provisioning,
@@ -95,7 +95,7 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 		InsecureOrigin: insecureOrigin,
 	}
 
-	dist, err := m.CloudFront.Create(route.GetDomains(), origin, path, insecureOrigin, tags)
+	dist, err := m.CloudFront.Create(route.GetDomains(), origin, path, insecureOrigin, forwardedHeaders, tags)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func (m *RouteManager) Get(instanceId string) (*Route, error) {
 	}
 }
 
-func (m *RouteManager) Update(instanceId, domain, origin string, path string, insecureOrigin bool) error {
+func (m *RouteManager) Update(instanceId, domain, origin string, path string, insecureOrigin bool, forwardedHeaders []string) error {
 	// Get current route
 	route, err := m.Get(instanceId)
 	if err != nil {
@@ -142,7 +142,7 @@ func (m *RouteManager) Update(instanceId, domain, origin string, path string, in
 
 	// Update the distribution
 	dist, err := m.CloudFront.Update(route.DistId, route.GetDomains(),
-		route.Origin, route.Path, route.InsecureOrigin)
+		route.Origin, route.Path, route.InsecureOrigin, forwardedHeaders)
 	if err != nil {
 		return err
 	}

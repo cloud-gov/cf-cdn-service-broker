@@ -6,9 +6,11 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"code.cloudfoundry.org/lager"
 	"github.com/pivotal-cf/brokerapi"
 
 	"github.com/18F/cf-cdn-service-broker/broker"
+	"github.com/18F/cf-cdn-service-broker/config"
 	"github.com/18F/cf-cdn-service-broker/models/mocks"
 )
 
@@ -18,16 +20,20 @@ func TestUpdating(t *testing.T) {
 
 type UpdateSuite struct {
 	suite.Suite
-	Manager mocks.RouteManagerIface
-	Broker  broker.CdnServiceBroker
-	ctx     context.Context
+	Manager  mocks.RouteManagerIface
+	Broker   *broker.CdnServiceBroker
+	settings config.Settings
+	logger   lager.Logger
+	ctx      context.Context
 }
 
 func (s *UpdateSuite) SetupTest() {
 	s.Manager = mocks.RouteManagerIface{}
-	s.Broker = broker.CdnServiceBroker{
-		Manager: &s.Manager,
-	}
+	s.Broker = broker.New(
+		&s.Manager,
+		s.settings,
+		s.logger,
+	)
 	s.ctx = context.Background()
 }
 
@@ -44,7 +50,7 @@ func (s *UpdateSuite) TestUpdateSuccessOnlyDomain() {
 			"domain": "domain.gov",
 		},
 	}
-	s.Manager.On("Update", "", "domain.gov", "", "", false).Return(nil)
+	s.Manager.On("Update", "", "domain.gov", "", "", false, []string{}).Return(nil)
 	_, err := s.Broker.Update(s.ctx, "", details, true)
 	s.Nil(err)
 }
@@ -55,7 +61,7 @@ func (s *UpdateSuite) TestUpdateSuccessOnlyOrigin() {
 			"origin": "origin.gov",
 		},
 	}
-	s.Manager.On("Update", "", "", "origin.gov", "", false).Return(nil)
+	s.Manager.On("Update", "", "", "origin.gov", "", false, []string{"Host"}).Return(nil)
 	_, err := s.Broker.Update(s.ctx, "", details, true)
 	s.Nil(err)
 }
@@ -69,7 +75,7 @@ func (s *UpdateSuite) TestUpdateSuccess() {
 			"insecure_origin": true,
 		},
 	}
-	s.Manager.On("Update", "", "domain.gov", "origin.gov", ".", true).Return(nil)
+	s.Manager.On("Update", "", "domain.gov", "origin.gov", ".", true, []string{"Host"}).Return(nil)
 	_, err := s.Broker.Update(s.ctx, "", details, true)
 	s.Nil(err)
 }
