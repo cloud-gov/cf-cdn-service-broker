@@ -227,7 +227,7 @@ func (b *CdnServiceBroker) parseProvisionDetails(details brokerapi.ProvisionDeta
 		return
 	}
 	if options.Domain == "" {
-		err = errors.New("must be invoked with `domain` key")
+		err = errors.New("must pass non-empty `domain`")
 		return
 	}
 
@@ -247,7 +247,7 @@ func (b *CdnServiceBroker) parseUpdateDetails(details map[string]interface{}) (o
 		return
 	}
 	if options.Domain == "" && options.Origin == "" {
-		err = errors.New("must be invoked with `domain` or `origin` keys")
+		err = errors.New("must pass non-empty `domain` or `origin`")
 		return
 	}
 	return
@@ -255,7 +255,7 @@ func (b *CdnServiceBroker) parseUpdateDetails(details map[string]interface{}) (o
 
 func (b *CdnServiceBroker) getHeaders(options Options) []string {
 	if options.Origin == b.settings.DefaultOrigin {
-		return []string{}
+		return []string{"Host"}
 	}
-	return []string{"Host"}
+	return []string{}
 }

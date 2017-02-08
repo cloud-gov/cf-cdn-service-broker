@@ -114,7 +114,7 @@ if [ -z "${elapsed}" ]; then
 fi
 
 # Delete private domain
-cf delete-domain -f "${CF_ORGANIZATION}" "${DOMAIN}"
+cf delete-domain -f "${DOMAIN}"
 
 # Delete CNAME record
 cat << EOF > ./delete-cname.json
