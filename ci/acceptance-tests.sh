@@ -20,6 +20,9 @@ cf auth "${CF_USERNAME}" "${CF_PASSWORD}"
 # Target
 cf target -o "${CF_ORGANIZATION}" -s "${CF_SPACE}"
 
+# Create private domain
+cf create-domain "${CF_ORGANIZATION}" "${DOMAIN}"
+
 # Create service
 opts=$(jq -n --arg domain "${DOMAIN}" '{domain: $domain}')
 cf create-service "${SERVICE_NAME}" "${PLAN_NAME}" "${SERVICE_INSTANCE_NAME}" -c "${opts}"
@@ -83,9 +86,6 @@ if [ "${updated}" != "true" ]; then
   echo "Failed to update service ${SERVICE_NAME}"
   exit 1
 fi
-
-# Create private domain
-cf create-domain "${CF_ORGANIZATION}" "${DOMAIN}"
 
 # Push test app
 cat << EOF > "${path}/app/manifest.yml"

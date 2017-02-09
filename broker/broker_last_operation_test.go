@@ -12,6 +12,7 @@ import (
 	"github.com/pivotal-cf/brokerapi"
 
 	"github.com/18F/cf-cdn-service-broker/broker"
+	cfmock "github.com/18F/cf-cdn-service-broker/cf/mocks"
 	"github.com/18F/cf-cdn-service-broker/config"
 	"github.com/18F/cf-cdn-service-broker/models"
 	"github.com/18F/cf-cdn-service-broker/models/mocks"
@@ -25,6 +26,7 @@ type LastOperationSuite struct {
 	suite.Suite
 	Manager  mocks.RouteManagerIface
 	Broker   *broker.CdnServiceBroker
+	cfclient cfmock.Client
 	settings config.Settings
 	logger   lager.Logger
 	ctx      context.Context
@@ -32,8 +34,10 @@ type LastOperationSuite struct {
 
 func (s *LastOperationSuite) SetupTest() {
 	s.Manager = mocks.RouteManagerIface{}
+	s.cfclient = cfmock.Client{}
 	s.Broker = broker.New(
 		&s.Manager,
+		&s.cfclient,
 		s.settings,
 		s.logger,
 	)
@@ -45,6 +49,7 @@ func (s *LastOperationSuite) TestLastOperationMissing() {
 	manager.On("Get", "").Return(&models.Route{}, errors.New("not found"))
 	b := broker.New(
 		&manager,
+		&s.cfclient,
 		s.settings,
 		s.logger,
 	)
@@ -66,6 +71,7 @@ func (s *LastOperationSuite) TestLastOperationSucceeded() {
 	manager.On("Poll", route).Return(nil)
 	b := broker.New(
 		&manager,
+		&s.cfclient,
 		s.settings,
 		s.logger,
 	)
@@ -87,6 +93,7 @@ func (s *LastOperationSuite) TestLastOperationProvisioning() {
 	manager.On("Poll", route).Return(nil)
 	b := broker.New(
 		&manager,
+		&s.cfclient,
 		s.settings,
 		s.logger,
 	)
@@ -108,6 +115,7 @@ func (s *LastOperationSuite) TestLastOperationDeprovisioning() {
 	manager.On("Poll", route).Return(nil)
 	b := broker.New(
 		&manager,
+		&s.cfclient,
 		s.settings,
 		s.logger,
 	)

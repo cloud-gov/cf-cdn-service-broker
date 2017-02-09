@@ -45,6 +45,12 @@ The easiest/recommended way to deploy the broker is via the [Concourse](http://c
     $ cf target -o <org> -s <space>
     ```
 
+1. Add your domain to your Cloud Foundry organization:
+
+    ````bash
+    $ cf create-domain <org> my.domain.gov
+    ```
+
 1. Create a service instance.
 
     ```bash
@@ -76,12 +82,6 @@ The easiest/recommended way to deploy the broker is via the [Concourse](http://c
 1. Wait up to 30 minutes for the CloudFront distribution to be provisioned and the DNS changes to propagate.
 
 1. Visit `my.domain.gov`, and see that you have a valid certificate (i.e. that visiting your site in a modern browser doesn't give you a certificate warning).
-
-1. Add your domain to your Cloud Foundry organization:
-
-    ````bash
-    $ cf create-domain <org> my.domain.gov
-    ```
 
 1. Add your domain to a Cloud Foundry application:
 

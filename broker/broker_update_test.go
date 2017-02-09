@@ -2,14 +2,17 @@ package broker_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
 	"code.cloudfoundry.org/lager"
+	"github.com/cloudfoundry-community/go-cfclient"
 	"github.com/pivotal-cf/brokerapi"
 
 	"github.com/18F/cf-cdn-service-broker/broker"
+	cfmock "github.com/18F/cf-cdn-service-broker/cf/mocks"
 	"github.com/18F/cf-cdn-service-broker/config"
 	"github.com/18F/cf-cdn-service-broker/models/mocks"
 )
@@ -22,6 +25,7 @@ type UpdateSuite struct {
 	suite.Suite
 	Manager  mocks.RouteManagerIface
 	Broker   *broker.CdnServiceBroker
+	cfclient cfmock.Client
 	settings config.Settings
 	logger   lager.Logger
 	ctx      context.Context
@@ -29,11 +33,13 @@ type UpdateSuite struct {
 
 func (s *UpdateSuite) SetupTest() {
 	s.Manager = mocks.RouteManagerIface{}
+	s.cfclient = cfmock.Client{}
 	s.settings = config.Settings{
 		DefaultOrigin: "origin.cloud.gov",
 	}
 	s.Broker = broker.New(
 		&s.Manager,
+		&s.cfclient,
 		s.settings,
 		s.logger,
 	)
@@ -58,6 +64,7 @@ func (s *UpdateSuite) TestUpdateSuccessOnlyDomain() {
 		},
 	}
 	s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", "", false, []string{"Host"}).Return(nil)
+	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 	_, err := s.Broker.Update(s.ctx, "", details, true)
 	s.Nil(err)
 }
@@ -69,6 +76,7 @@ func (s *UpdateSuite) TestUpdateSuccessOnlyOrigin() {
 		},
 	}
 	s.Manager.On("Update", "", "", "origin.gov", "", false, []string{}).Return(nil)
+	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 	_, err := s.Broker.Update(s.ctx, "", details, true)
 	s.Nil(err)
 }
@@ -82,6 +90,20 @@ func (s *UpdateSuite) TestUpdateSuccess() {
 		},
 	}
 	s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", ".", true, []string{"Host"}).Return(nil)
+	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 	_, err := s.Broker.Update(s.ctx, "", details, true)
 	s.Nil(err)
+}
+
+func (s *UpdateSuite) TestDomainNotExists() {
+	details := brokerapi.UpdateDetails{
+		Parameters: map[string]interface{}{
+			"domain": "domain.gov",
+		},
+	}
+	s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", ".", true, []string{"Host"}).Return(nil)
+	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, errors.New("bad"))
+	_, err := s.Broker.Update(s.ctx, "", details, true)
+	s.NotNil(err)
+	s.Contains(err.Error(), "cf create-domain")
 }

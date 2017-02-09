@@ -10,6 +10,7 @@ import (
 	"code.cloudfoundry.org/lager"
 	"github.com/pivotal-cf/brokerapi"
 
+	"github.com/18F/cf-cdn-service-broker/cf"
 	"github.com/18F/cf-cdn-service-broker/config"
 	"github.com/18F/cf-cdn-service-broker/models"
 )
@@ -23,17 +24,20 @@ type Options struct {
 
 type CdnServiceBroker struct {
 	manager  models.RouteManagerIface
+	cfclient cf.Client
 	settings config.Settings
 	logger   lager.Logger
 }
 
 func New(
 	manager models.RouteManagerIface,
+	cfclient cf.Client,
 	settings config.Settings,
 	logger lager.Logger,
 ) *CdnServiceBroker {
 	return &CdnServiceBroker{
 		manager:  manager,
+		cfclient: cfclient,
 		settings: settings,
 		logger:   logger,
 	}
@@ -230,7 +234,11 @@ func (b *CdnServiceBroker) parseProvisionDetails(details brokerapi.ProvisionDeta
 		err = errors.New("must pass non-empty `domain`")
 		return
 	}
-
+	if options.Origin == b.settings.DefaultOrigin {
+		if _, err = b.cfclient.GetDomainByName(options.Domain); err != nil {
+			err = fmt.Errorf("Domain %s does not exist; create it with `cf create-domain <my-organization> %s`", options.Domain, options.Domain)
+		}
+	}
 	return
 }
 
@@ -249,6 +257,11 @@ func (b *CdnServiceBroker) parseUpdateDetails(details map[string]interface{}) (o
 	if options.Domain == "" && options.Origin == "" {
 		err = errors.New("must pass non-empty `domain` or `origin`")
 		return
+	}
+	if options.Domain != "" && options.Origin == b.settings.DefaultOrigin {
+		if _, err = b.cfclient.GetDomainByName(options.Domain); err != nil {
+			err = fmt.Errorf("Domain %s does not exist; create it with `cf create-domain <my-organization> %s`", options.Domain, options.Domain)
+		}
 	}
 	return
 }

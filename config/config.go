@@ -22,6 +22,9 @@ type Settings struct {
 	AwsSecretAccessKey   string `envconfig:"aws_secret_access_key" required:"true"`
 	AwsDefaultRegion     string `envconfig:"aws_default_region" required:"true"`
 	ServerSideEncryption string `envconfig:"server_side_encryption"`
+	APIAddress           string `envconfig:"api_address" required:"true"`
+	ClientID             string `envconfig:"client_id" required:"true"`
+	ClientSecret         string `envconfig:"client_secret" required:"true"`
 	DefaultOrigin        string `envconfig:"default_origin" required:"true"`
 	Schedule             string `envconfig:"schedule" default:"0 0 * * * *"`
 }

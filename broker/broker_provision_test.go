@@ -8,9 +8,11 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"code.cloudfoundry.org/lager"
+	"github.com/cloudfoundry-community/go-cfclient"
 	"github.com/pivotal-cf/brokerapi"
 
 	"github.com/18F/cf-cdn-service-broker/broker"
+	cfmock "github.com/18F/cf-cdn-service-broker/cf/mocks"
 	"github.com/18F/cf-cdn-service-broker/config"
 	"github.com/18F/cf-cdn-service-broker/models"
 	"github.com/18F/cf-cdn-service-broker/models/mocks"
@@ -24,6 +26,7 @@ type ProvisionSuite struct {
 	suite.Suite
 	Manager  mocks.RouteManagerIface
 	Broker   *broker.CdnServiceBroker
+	cfclient cfmock.Client
 	settings config.Settings
 	logger   lager.Logger
 	ctx      context.Context
@@ -31,11 +34,13 @@ type ProvisionSuite struct {
 
 func (s *ProvisionSuite) SetupTest() {
 	s.Manager = mocks.RouteManagerIface{}
+	s.cfclient = cfmock.Client{}
 	s.settings = config.Settings{
 		DefaultOrigin: "origin.cloud.gov",
 	}
 	s.Broker = broker.New(
 		&s.Manager,
+		&s.cfclient,
 		s.settings,
 		s.logger,
 	)
@@ -66,6 +71,7 @@ func (s *ProvisionSuite) TestInstanceExists() {
 	route := &models.Route{
 		State: models.Provisioned,
 	}
+	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 	s.Manager.On("Get", "123").Return(route, nil)
 
 	details := brokerapi.ProvisionDetails{
@@ -78,6 +84,7 @@ func (s *ProvisionSuite) TestInstanceExists() {
 func (s *ProvisionSuite) TestSuccess() {
 	s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
 	route := &models.Route{State: models.Provisioning}
+	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 	s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", "", false, []string{"Host"},
 		map[string]string{"Organization": "", "Space": "", "Service": "", "Plan": ""}).Return(route, nil)
 
@@ -99,4 +106,14 @@ func (s *ProvisionSuite) TestSuccessCustomOrigin() {
 	}
 	_, err := s.Broker.Provision(s.ctx, "123", details, true)
 	s.Nil(err)
+}
+
+func (s *ProvisionSuite) TestDomainNotExists() {
+	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, errors.New("fail"))
+	details := brokerapi.ProvisionDetails{
+		RawParameters: []byte(`{"domain": "domain.gov"}`),
+	}
+	_, err := s.Broker.Provision(s.ctx, "123", details, true)
+	s.NotNil(err)
+	s.Contains(err.Error(), "cf create-domain")
 }

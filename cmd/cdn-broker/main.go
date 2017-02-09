@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/cloudfoundry-community/go-cfclient"
 
 	"github.com/18F/cf-cdn-service-broker/broker"
 	"github.com/18F/cf-cdn-service-broker/config"
@@ -34,6 +35,15 @@ func main() {
 		logger.Fatal("connect", err)
 	}
 
+	client, err := cfclient.NewClient(&cfclient.Config{
+		ApiAddress:   settings.APIAddress,
+		ClientID:     settings.ClientID,
+		ClientSecret: settings.ClientSecret,
+	})
+	if err != nil {
+		logger.Fatal("client", err)
+	}
+
 	db.AutoMigrate(&models.Route{}, &models.Certificate{})
 
 	session := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
@@ -46,6 +56,7 @@ func main() {
 	}
 	broker := broker.New(
 		&manager,
+		client,
 		settings,
 		logger,
 	)
