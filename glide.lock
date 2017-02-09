@@ -1,5 +1,5 @@
 hash: ba8a210ca030cee047b36cba02a52b4ba402b51b735bc286c58f54664d38ecb5
-updated: 2017-02-09T14:36:44.317479604-05:00
+updated: 2017-02-09T17:06:08.79114682-05:00
 imports:
 - name: code.cloudfoundry.org/lager
   version: 6cfe365fb6bb84343f0034b4a53cd250d173b61f
@@ -34,7 +34,7 @@ imports:
   - service/s3
   - service/sts
 - name: github.com/cloudfoundry-community/go-cfclient
-  version: 3f50c38f9f3a7607a06a66aa0edfd8c678701f26
+  version: 80c3c517232069b3f63c056750bf9b0098376cfe
 - name: github.com/davecgh/go-spew
   version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9
   subpackages:
