@@ -30,4 +30,25 @@ func (_m *Client) GetDomainByName(name string) (cfclient.Domain, error) {
 	return r0, r1
 }
 
+// GetOrgByGuid provides a mock function with given fields: guid
+func (_m *Client) GetOrgByGuid(guid string) (cfclient.Org, error) {
+	ret := _m.Called(guid)
+
+	var r0 cfclient.Org
+	if rf, ok := ret.Get(0).(func(string) cfclient.Org); ok {
+		r0 = rf(guid)
+	} else {
+		r0 = ret.Get(0).(cfclient.Org)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(guid)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 var _ cf.Client = (*Client)(nil)

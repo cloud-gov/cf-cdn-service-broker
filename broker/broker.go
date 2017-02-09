@@ -192,7 +192,7 @@ func (b *CdnServiceBroker) Update(
 		return brokerapi.UpdateServiceSpec{}, brokerapi.ErrAsyncRequired
 	}
 
-	options, err := b.parseUpdateDetails(details.Parameters)
+	options, err := b.parseUpdateDetails(details)
 	if err != nil {
 		return brokerapi.UpdateServiceSpec{}, err
 	}
@@ -235,8 +235,9 @@ func (b *CdnServiceBroker) parseProvisionDetails(details brokerapi.ProvisionDeta
 		return
 	}
 	if options.Origin == b.settings.DefaultOrigin {
-		if _, err = b.cfclient.GetDomainByName(options.Domain); err != nil {
-			err = fmt.Errorf("Domain %s does not exist; create it with `cf create-domain <my-organization> %s`", options.Domain, options.Domain)
+		err = b.checkDomain(options.Domain, details.OrganizationGUID)
+		if err != nil {
+			return
 		}
 	}
 	return
@@ -244,9 +245,8 @@ func (b *CdnServiceBroker) parseProvisionDetails(details brokerapi.ProvisionDeta
 
 // parseUpdateDetails will attempt to parse the update details and then verify that at least "domain" or "origin"
 // are provided.
-func (b *CdnServiceBroker) parseUpdateDetails(details map[string]interface{}) (options Options, err error) {
-	// need to convert the map into raw JSON.
-	rawJSON, err := json.Marshal(details)
+func (b *CdnServiceBroker) parseUpdateDetails(details brokerapi.UpdateDetails) (options Options, err error) {
+	rawJSON, err := json.Marshal(details.Parameters)
 	if err != nil {
 		return
 	}
@@ -259,11 +259,24 @@ func (b *CdnServiceBroker) parseUpdateDetails(details map[string]interface{}) (o
 		return
 	}
 	if options.Domain != "" && options.Origin == b.settings.DefaultOrigin {
-		if _, err = b.cfclient.GetDomainByName(options.Domain); err != nil {
-			err = fmt.Errorf("Domain %s does not exist; create it with `cf create-domain <my-organization> %s`", options.Domain, options.Domain)
+		err = b.checkDomain(options.Domain, details.PreviousValues.OrgID)
+		if err != nil {
+			return
 		}
 	}
 	return
+}
+
+func (b *CdnServiceBroker) checkDomain(domain, orgGUID string) error {
+	if _, err := b.cfclient.GetDomainByName(domain); err != nil {
+		org, err := b.cfclient.GetOrgByGuid(orgGUID)
+		orgName := "<organization>"
+		if err == nil {
+			orgName = org.Name
+		}
+		return fmt.Errorf("Domain %s does not exist; create it with `cf create-domain %s %s`", domain, orgName, domain)
+	}
+	return nil
 }
 
 func (b *CdnServiceBroker) getHeaders(options Options) []string {

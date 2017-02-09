@@ -109,9 +109,11 @@ func (s *ProvisionSuite) TestSuccessCustomOrigin() {
 }
 
 func (s *ProvisionSuite) TestDomainNotExists() {
+	s.cfclient.On("GetOrgByGuid", "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5").Return(cfclient.Org{Name: "my-org"}, nil)
 	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, errors.New("fail"))
 	details := brokerapi.ProvisionDetails{
-		RawParameters: []byte(`{"domain": "domain.gov"}`),
+		OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+		RawParameters:    []byte(`{"domain": "domain.gov"}`),
 	}
 	_, err := s.Broker.Provision(s.ctx, "123", details, true)
 	s.NotNil(err)

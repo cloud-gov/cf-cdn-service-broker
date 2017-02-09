@@ -97,11 +97,15 @@ func (s *UpdateSuite) TestUpdateSuccess() {
 
 func (s *UpdateSuite) TestDomainNotExists() {
 	details := brokerapi.UpdateDetails{
+		PreviousValues: brokerapi.PreviousValues{
+			OrgID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+		},
 		Parameters: map[string]interface{}{
 			"domain": "domain.gov",
 		},
 	}
 	s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", ".", true, []string{"Host"}).Return(nil)
+	s.cfclient.On("GetOrgByGuid", "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5").Return(cfclient.Org{Name: "my-org"}, nil)
 	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, errors.New("bad"))
 	_, err := s.Broker.Update(s.ctx, "", details, true)
 	s.NotNil(err)
