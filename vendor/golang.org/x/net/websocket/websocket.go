@@ -144,8 +144,6 @@ type frameHandler interface {
 }
 
 // Conn represents a WebSocket connection.
-//
-// Multiple goroutines may invoke methods on a Conn simultaneously.
 type Conn struct {
 	config  *Config
 	request *http.Request
@@ -209,17 +207,19 @@ func (ws *Conn) Write(msg []byte) (n int, err error) {
 	}
 	n, err = w.Write(msg)
 	w.Close()
+	if err != nil {
+		return n, err
+	}
 	return n, err
 }
 
 // Close implements the io.Closer interface.
 func (ws *Conn) Close() error {
 	err := ws.frameHandler.WriteClose(ws.defaultCloseStatus)
-	err1 := ws.rwc.Close()
 	if err != nil {
 		return err
 	}
-	return err1
+	return ws.rwc.Close()
 }
 
 func (ws *Conn) IsClientConn() bool { return ws.request == nil }

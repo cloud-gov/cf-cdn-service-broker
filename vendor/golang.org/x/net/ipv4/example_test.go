@@ -13,11 +13,12 @@ import (
 	"time"
 
 	"golang.org/x/net/icmp"
+	"golang.org/x/net/internal/iana"
 	"golang.org/x/net/ipv4"
 )
 
 func ExampleConn_markingTCP() {
-	ln, err := net.Listen("tcp", "0.0.0.0:1024")
+	ln, err := net.Listen("tcp4", "0.0.0.0:1024")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -30,14 +31,12 @@ func ExampleConn_markingTCP() {
 		}
 		go func(c net.Conn) {
 			defer c.Close()
-			if c.RemoteAddr().(*net.TCPAddr).IP.To4() != nil {
-				p := ipv4.NewConn(c)
-				if err := p.SetTOS(0x28); err != nil { // DSCP AF11
-					log.Fatal(err)
-				}
-				if err := p.SetTTL(128); err != nil {
-					log.Fatal(err)
-				}
+			p := ipv4.NewConn(c)
+			if err := p.SetTOS(iana.DiffServAF11); err != nil {
+				log.Fatal(err)
+			}
+			if err := p.SetTTL(128); err != nil {
+				log.Fatal(err)
 			}
 			if _, err := c.Write([]byte("HELLO-R-U-THERE-ACK")); err != nil {
 				log.Fatal(err)
@@ -103,7 +102,7 @@ func ExamplePacketConn_tracingIPPacketRoute() {
 		log.Fatal("no A record found")
 	}
 
-	c, err := net.ListenPacket("ip4:1", "0.0.0.0") // ICMP for IPv4
+	c, err := net.ListenPacket(fmt.Sprintf("ip4:%d", iana.ProtocolICMP), "0.0.0.0") // ICMP for IPv4
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -150,7 +149,7 @@ func ExamplePacketConn_tracingIPPacketRoute() {
 			}
 			log.Fatal(err)
 		}
-		rm, err := icmp.ParseMessage(1, rb[:n])
+		rm, err := icmp.ParseMessage(iana.ProtocolICMP, rb[:n])
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -174,7 +173,7 @@ func ExamplePacketConn_tracingIPPacketRoute() {
 }
 
 func ExampleRawConn_advertisingOSPFHello() {
-	c, err := net.ListenPacket("ip4:89", "0.0.0.0") // OSPF for IPv4
+	c, err := net.ListenPacket(fmt.Sprintf("ip4:%d", iana.ProtocolOSPFIGP), "0.0.0.0") // OSPF for IPv4
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -202,10 +201,10 @@ func ExampleRawConn_advertisingOSPFHello() {
 	iph := &ipv4.Header{
 		Version:  ipv4.Version,
 		Len:      ipv4.HeaderLen,
-		TOS:      0xc0, // DSCP CS6
+		TOS:      iana.DiffServCS6,
 		TotalLen: ipv4.HeaderLen + len(ospf),
 		TTL:      1,
-		Protocol: 89,
+		Protocol: iana.ProtocolOSPFIGP,
 		Dst:      allSPFRouters.IP.To4(),
 	}
 

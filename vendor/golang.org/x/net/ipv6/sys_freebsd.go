@@ -6,13 +6,13 @@ package ipv6
 
 import (
 	"net"
-	"runtime"
-	"strings"
 	"syscall"
 	"unsafe"
 
 	"golang.org/x/net/internal/iana"
 )
+
+type sysSockoptLen int32
 
 var (
 	ctlOpts = [ctlMax]ctlOpt{
@@ -44,18 +44,6 @@ var (
 		ssoUnblockSourceGroup:  {iana.ProtocolIPv6, sysMCAST_UNBLOCK_SOURCE, ssoTypeGroupSourceReq},
 	}
 )
-
-func init() {
-	if runtime.GOOS == "freebsd" && runtime.GOARCH == "386" {
-		archs, _ := syscall.Sysctl("kern.supported_archs")
-		for _, s := range strings.Fields(archs) {
-			if s == "amd64" {
-				freebsd32o64 = true
-				break
-			}
-		}
-	}
-}
 
 func (sa *sysSockaddrInet6) setSockaddr(ip net.IP, i int) {
 	sa.Len = sysSizeofSockaddrInet6
