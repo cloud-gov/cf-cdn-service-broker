@@ -8,7 +8,6 @@ import (
 	"encoding/xml"
 	"fmt"
 	"net/http"
-	"os"
 	"reflect"
 	"sort"
 	"testing"
@@ -17,7 +16,7 @@ import (
 func TestMemPS(t *testing.T) {
 	// calcProps calculates the getlastmodified and getetag DAV: property
 	// values in pstats for resource name in file-system fs.
-	calcProps := func(name string, fs FileSystem, ls LockSystem, pstats []Propstat) error {
+	calcProps := func(name string, fs FileSystem, pstats []Propstat) error {
 		fi, err := fs.Stat(name)
 		if err != nil {
 			return err
@@ -29,85 +28,68 @@ func TestMemPS(t *testing.T) {
 					p.InnerXML = []byte(fi.ModTime().Format(http.TimeFormat))
 					pst.Props[i] = p
 				case xml.Name{Space: "DAV:", Local: "getetag"}:
-					if fi.IsDir() {
-						continue
-					}
-					etag, err := findETag(fs, ls, name, fi)
-					if err != nil {
-						return err
-					}
-					p.InnerXML = []byte(etag)
-					pst.Props[i] = p
+					// TODO(rost) ETag will be defined in the next CL.
+					panic("Not implemented")
 				}
 			}
 		}
 		return nil
 	}
 
-	const (
-		lockEntry = `` +
-			`<D:lockentry xmlns:D="DAV:">` +
-			`<D:lockscope><D:exclusive/></D:lockscope>` +
-			`<D:locktype><D:write/></D:locktype>` +
-			`</D:lockentry>`
-		statForbiddenError = `<D:cannot-modify-protected-property xmlns:D="DAV:"/>`
-	)
-
 	type propOp struct {
 		op            string
 		name          string
-		pnames        []xml.Name
-		patches       []Proppatch
-		wantPnames    []xml.Name
+		propnames     []xml.Name
+		wantNames     []xml.Name
 		wantPropstats []Propstat
 	}
 
 	testCases := []struct {
-		desc        string
-		noDeadProps bool
-		buildfs     []string
-		propOp      []propOp
+		desc    string
+		buildfs []string
+		propOp  []propOp
 	}{{
-		desc:    "propname",
-		buildfs: []string{"mkdir /dir", "touch /file"},
-		propOp: []propOp{{
+		"propname",
+		[]string{"mkdir /dir", "touch /file"},
+		[]propOp{{
 			op:   "propname",
 			name: "/dir",
-			wantPnames: []xml.Name{
-				{Space: "DAV:", Local: "resourcetype"},
-				{Space: "DAV:", Local: "displayname"},
-				{Space: "DAV:", Local: "supportedlock"},
+			wantNames: []xml.Name{
+				xml.Name{Space: "DAV:", Local: "resourcetype"},
+				xml.Name{Space: "DAV:", Local: "displayname"},
+				xml.Name{Space: "DAV:", Local: "getcontentlength"},
+				xml.Name{Space: "DAV:", Local: "getlastmodified"},
 			},
 		}, {
 			op:   "propname",
 			name: "/file",
-			wantPnames: []xml.Name{
-				{Space: "DAV:", Local: "resourcetype"},
-				{Space: "DAV:", Local: "displayname"},
-				{Space: "DAV:", Local: "getcontentlength"},
-				{Space: "DAV:", Local: "getlastmodified"},
-				{Space: "DAV:", Local: "getcontenttype"},
-				{Space: "DAV:", Local: "getetag"},
-				{Space: "DAV:", Local: "supportedlock"},
+			wantNames: []xml.Name{
+				xml.Name{Space: "DAV:", Local: "resourcetype"},
+				xml.Name{Space: "DAV:", Local: "displayname"},
+				xml.Name{Space: "DAV:", Local: "getcontentlength"},
+				xml.Name{Space: "DAV:", Local: "getlastmodified"},
 			},
 		}},
 	}, {
-		desc:    "allprop dir and file",
-		buildfs: []string{"mkdir /dir", "write /file foobarbaz"},
-		propOp: []propOp{{
+		"allprop dir and file",
+		[]string{"mkdir /dir", "write /file foobarbaz"},
+		[]propOp{{
 			op:   "allprop",
 			name: "/dir",
 			wantPropstats: []Propstat{{
 				Status: http.StatusOK,
 				Props: []Property{{
 					XMLName:  xml.Name{Space: "DAV:", Local: "resourcetype"},
-					InnerXML: []byte(`<D:collection xmlns:D="DAV:"/>`),
+					InnerXML: []byte(`<collection xmlns="DAV:"/>`),
 				}, {
 					XMLName:  xml.Name{Space: "DAV:", Local: "displayname"},
 					InnerXML: []byte("dir"),
 				}, {
-					XMLName:  xml.Name{Space: "DAV:", Local: "supportedlock"},
-					InnerXML: []byte(lockEntry),
+					XMLName:  xml.Name{Space: "DAV:", Local: "getcontentlength"},
+					InnerXML: []byte("0"),
+				}, {
+					XMLName:  xml.Name{Space: "DAV:", Local: "getlastmodified"},
+					InnerXML: nil, // Calculated during test.
 				}},
 			}},
 		}, {
@@ -127,21 +109,12 @@ func TestMemPS(t *testing.T) {
 				}, {
 					XMLName:  xml.Name{Space: "DAV:", Local: "getlastmodified"},
 					InnerXML: nil, // Calculated during test.
-				}, {
-					XMLName:  xml.Name{Space: "DAV:", Local: "getcontenttype"},
-					InnerXML: []byte("text/plain; charset=utf-8"),
-				}, {
-					XMLName:  xml.Name{Space: "DAV:", Local: "getetag"},
-					InnerXML: nil, // Calculated during test.
-				}, {
-					XMLName:  xml.Name{Space: "DAV:", Local: "supportedlock"},
-					InnerXML: []byte(lockEntry),
 				}},
 			}},
 		}, {
 			op:   "allprop",
 			name: "/file",
-			pnames: []xml.Name{
+			propnames: []xml.Name{
 				{"DAV:", "resourcetype"},
 				{"foo", "bar"},
 			},
@@ -159,15 +132,6 @@ func TestMemPS(t *testing.T) {
 				}, {
 					XMLName:  xml.Name{Space: "DAV:", Local: "getlastmodified"},
 					InnerXML: nil, // Calculated during test.
-				}, {
-					XMLName:  xml.Name{Space: "DAV:", Local: "getcontenttype"},
-					InnerXML: []byte("text/plain; charset=utf-8"),
-				}, {
-					XMLName:  xml.Name{Space: "DAV:", Local: "getetag"},
-					InnerXML: nil, // Calculated during test.
-				}, {
-					XMLName:  xml.Name{Space: "DAV:", Local: "supportedlock"},
-					InnerXML: []byte(lockEntry),
 				}}}, {
 				Status: http.StatusNotFound,
 				Props: []Property{{
@@ -176,23 +140,23 @@ func TestMemPS(t *testing.T) {
 			},
 		}},
 	}, {
-		desc:    "propfind DAV:resourcetype",
-		buildfs: []string{"mkdir /dir", "touch /file"},
-		propOp: []propOp{{
-			op:     "propfind",
-			name:   "/dir",
-			pnames: []xml.Name{{"DAV:", "resourcetype"}},
+		"propfind DAV:resourcetype",
+		[]string{"mkdir /dir", "touch /file"},
+		[]propOp{{
+			op:        "propfind",
+			name:      "/dir",
+			propnames: []xml.Name{{"DAV:", "resourcetype"}},
 			wantPropstats: []Propstat{{
 				Status: http.StatusOK,
 				Props: []Property{{
 					XMLName:  xml.Name{Space: "DAV:", Local: "resourcetype"},
-					InnerXML: []byte(`<D:collection xmlns:D="DAV:"/>`),
+					InnerXML: []byte(`<collection xmlns="DAV:"/>`),
 				}},
 			}},
 		}, {
-			op:     "propfind",
-			name:   "/file",
-			pnames: []xml.Name{{"DAV:", "resourcetype"}},
+			op:        "propfind",
+			name:      "/file",
+			propnames: []xml.Name{{"DAV:", "resourcetype"}},
 			wantPropstats: []Propstat{{
 				Status: http.StatusOK,
 				Props: []Property{{
@@ -202,12 +166,12 @@ func TestMemPS(t *testing.T) {
 			}},
 		}},
 	}, {
-		desc:    "propfind unsupported DAV properties",
-		buildfs: []string{"mkdir /dir"},
-		propOp: []propOp{{
-			op:     "propfind",
-			name:   "/dir",
-			pnames: []xml.Name{{"DAV:", "getcontentlanguage"}},
+		"propfind unsupported DAV properties",
+		[]string{"mkdir /dir"},
+		[]propOp{{
+			op:        "propfind",
+			name:      "/dir",
+			propnames: []xml.Name{{"DAV:", "getcontentlanguage"}},
 			wantPropstats: []Propstat{{
 				Status: http.StatusNotFound,
 				Props: []Property{{
@@ -215,9 +179,9 @@ func TestMemPS(t *testing.T) {
 				}},
 			}},
 		}, {
-			op:     "propfind",
-			name:   "/dir",
-			pnames: []xml.Name{{"DAV:", "creationdate"}},
+			op:        "propfind",
+			name:      "/dir",
+			propnames: []xml.Name{{"DAV:", "creationdate"}},
 			wantPropstats: []Propstat{{
 				Status: http.StatusNotFound,
 				Props: []Property{{
@@ -226,267 +190,12 @@ func TestMemPS(t *testing.T) {
 			}},
 		}},
 	}, {
-		desc:    "propfind getetag for files but not for directories",
-		buildfs: []string{"mkdir /dir", "touch /file"},
-		propOp: []propOp{{
-			op:     "propfind",
-			name:   "/dir",
-			pnames: []xml.Name{{"DAV:", "getetag"}},
-			wantPropstats: []Propstat{{
-				Status: http.StatusNotFound,
-				Props: []Property{{
-					XMLName: xml.Name{Space: "DAV:", Local: "getetag"},
-				}},
-			}},
-		}, {
-			op:     "propfind",
-			name:   "/file",
-			pnames: []xml.Name{{"DAV:", "getetag"}},
-			wantPropstats: []Propstat{{
-				Status: http.StatusOK,
-				Props: []Property{{
-					XMLName:  xml.Name{Space: "DAV:", Local: "getetag"},
-					InnerXML: nil, // Calculated during test.
-				}},
-			}},
-		}},
-	}, {
-		desc:        "proppatch property on no-dead-properties file system",
-		buildfs:     []string{"mkdir /dir"},
-		noDeadProps: true,
-		propOp: []propOp{{
-			op:   "proppatch",
-			name: "/dir",
-			patches: []Proppatch{{
-				Props: []Property{{
-					XMLName: xml.Name{Space: "foo", Local: "bar"},
-				}},
-			}},
-			wantPropstats: []Propstat{{
-				Status: http.StatusForbidden,
-				Props: []Property{{
-					XMLName: xml.Name{Space: "foo", Local: "bar"},
-				}},
-			}},
-		}, {
-			op:   "proppatch",
-			name: "/dir",
-			patches: []Proppatch{{
-				Props: []Property{{
-					XMLName: xml.Name{Space: "DAV:", Local: "getetag"},
-				}},
-			}},
-			wantPropstats: []Propstat{{
-				Status:   http.StatusForbidden,
-				XMLError: statForbiddenError,
-				Props: []Property{{
-					XMLName: xml.Name{Space: "DAV:", Local: "getetag"},
-				}},
-			}},
-		}},
-	}, {
-		desc:    "proppatch dead property",
-		buildfs: []string{"mkdir /dir"},
-		propOp: []propOp{{
-			op:   "proppatch",
-			name: "/dir",
-			patches: []Proppatch{{
-				Props: []Property{{
-					XMLName:  xml.Name{Space: "foo", Local: "bar"},
-					InnerXML: []byte("baz"),
-				}},
-			}},
-			wantPropstats: []Propstat{{
-				Status: http.StatusOK,
-				Props: []Property{{
-					XMLName: xml.Name{Space: "foo", Local: "bar"},
-				}},
-			}},
-		}, {
-			op:     "propfind",
-			name:   "/dir",
-			pnames: []xml.Name{{Space: "foo", Local: "bar"}},
-			wantPropstats: []Propstat{{
-				Status: http.StatusOK,
-				Props: []Property{{
-					XMLName:  xml.Name{Space: "foo", Local: "bar"},
-					InnerXML: []byte("baz"),
-				}},
-			}},
-		}},
-	}, {
-		desc:    "proppatch dead property with failed dependency",
-		buildfs: []string{"mkdir /dir"},
-		propOp: []propOp{{
-			op:   "proppatch",
-			name: "/dir",
-			patches: []Proppatch{{
-				Props: []Property{{
-					XMLName:  xml.Name{Space: "foo", Local: "bar"},
-					InnerXML: []byte("baz"),
-				}},
-			}, {
-				Props: []Property{{
-					XMLName:  xml.Name{Space: "DAV:", Local: "displayname"},
-					InnerXML: []byte("xxx"),
-				}},
-			}},
-			wantPropstats: []Propstat{{
-				Status:   http.StatusForbidden,
-				XMLError: statForbiddenError,
-				Props: []Property{{
-					XMLName: xml.Name{Space: "DAV:", Local: "displayname"},
-				}},
-			}, {
-				Status: StatusFailedDependency,
-				Props: []Property{{
-					XMLName: xml.Name{Space: "foo", Local: "bar"},
-				}},
-			}},
-		}, {
-			op:     "propfind",
-			name:   "/dir",
-			pnames: []xml.Name{{Space: "foo", Local: "bar"}},
-			wantPropstats: []Propstat{{
-				Status: http.StatusNotFound,
-				Props: []Property{{
-					XMLName: xml.Name{Space: "foo", Local: "bar"},
-				}},
-			}},
-		}},
-	}, {
-		desc:    "proppatch remove dead property",
-		buildfs: []string{"mkdir /dir"},
-		propOp: []propOp{{
-			op:   "proppatch",
-			name: "/dir",
-			patches: []Proppatch{{
-				Props: []Property{{
-					XMLName:  xml.Name{Space: "foo", Local: "bar"},
-					InnerXML: []byte("baz"),
-				}, {
-					XMLName:  xml.Name{Space: "spam", Local: "ham"},
-					InnerXML: []byte("eggs"),
-				}},
-			}},
-			wantPropstats: []Propstat{{
-				Status: http.StatusOK,
-				Props: []Property{{
-					XMLName: xml.Name{Space: "foo", Local: "bar"},
-				}, {
-					XMLName: xml.Name{Space: "spam", Local: "ham"},
-				}},
-			}},
-		}, {
-			op:   "propfind",
-			name: "/dir",
-			pnames: []xml.Name{
-				{Space: "foo", Local: "bar"},
-				{Space: "spam", Local: "ham"},
-			},
-			wantPropstats: []Propstat{{
-				Status: http.StatusOK,
-				Props: []Property{{
-					XMLName:  xml.Name{Space: "foo", Local: "bar"},
-					InnerXML: []byte("baz"),
-				}, {
-					XMLName:  xml.Name{Space: "spam", Local: "ham"},
-					InnerXML: []byte("eggs"),
-				}},
-			}},
-		}, {
-			op:   "proppatch",
-			name: "/dir",
-			patches: []Proppatch{{
-				Remove: true,
-				Props: []Property{{
-					XMLName: xml.Name{Space: "foo", Local: "bar"},
-				}},
-			}},
-			wantPropstats: []Propstat{{
-				Status: http.StatusOK,
-				Props: []Property{{
-					XMLName: xml.Name{Space: "foo", Local: "bar"},
-				}},
-			}},
-		}, {
-			op:   "propfind",
-			name: "/dir",
-			pnames: []xml.Name{
-				{Space: "foo", Local: "bar"},
-				{Space: "spam", Local: "ham"},
-			},
-			wantPropstats: []Propstat{{
-				Status: http.StatusNotFound,
-				Props: []Property{{
-					XMLName: xml.Name{Space: "foo", Local: "bar"},
-				}},
-			}, {
-				Status: http.StatusOK,
-				Props: []Property{{
-					XMLName:  xml.Name{Space: "spam", Local: "ham"},
-					InnerXML: []byte("eggs"),
-				}},
-			}},
-		}},
-	}, {
-		desc:    "propname with dead property",
-		buildfs: []string{"touch /file"},
-		propOp: []propOp{{
-			op:   "proppatch",
-			name: "/file",
-			patches: []Proppatch{{
-				Props: []Property{{
-					XMLName:  xml.Name{Space: "foo", Local: "bar"},
-					InnerXML: []byte("baz"),
-				}},
-			}},
-			wantPropstats: []Propstat{{
-				Status: http.StatusOK,
-				Props: []Property{{
-					XMLName: xml.Name{Space: "foo", Local: "bar"},
-				}},
-			}},
-		}, {
-			op:   "propname",
-			name: "/file",
-			wantPnames: []xml.Name{
-				{Space: "DAV:", Local: "resourcetype"},
-				{Space: "DAV:", Local: "displayname"},
-				{Space: "DAV:", Local: "getcontentlength"},
-				{Space: "DAV:", Local: "getlastmodified"},
-				{Space: "DAV:", Local: "getcontenttype"},
-				{Space: "DAV:", Local: "getetag"},
-				{Space: "DAV:", Local: "supportedlock"},
-				{Space: "foo", Local: "bar"},
-			},
-		}},
-	}, {
-		desc:    "proppatch remove unknown dead property",
-		buildfs: []string{"mkdir /dir"},
-		propOp: []propOp{{
-			op:   "proppatch",
-			name: "/dir",
-			patches: []Proppatch{{
-				Remove: true,
-				Props: []Property{{
-					XMLName: xml.Name{Space: "foo", Local: "bar"},
-				}},
-			}},
-			wantPropstats: []Propstat{{
-				Status: http.StatusOK,
-				Props: []Property{{
-					XMLName: xml.Name{Space: "foo", Local: "bar"},
-				}},
-			}},
-		}},
-	}, {
-		desc:    "bad: propfind unknown property",
-		buildfs: []string{"mkdir /dir"},
-		propOp: []propOp{{
-			op:     "propfind",
-			name:   "/dir",
-			pnames: []xml.Name{{"foo:", "bar"}},
+		"bad: propfind unknown property",
+		[]string{"mkdir /dir"},
+		[]propOp{{
+			op:        "propfind",
+			name:      "/dir",
+			propnames: []xml.Name{{"foo:", "bar"}},
 			wantPropstats: []Propstat{{
 				Status: http.StatusNotFound,
 				Props: []Property{{
@@ -501,13 +210,11 @@ func TestMemPS(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: cannot create test filesystem: %v", tc.desc, err)
 		}
-		if tc.noDeadProps {
-			fs = noDeadPropsFS{fs}
-		}
 		ls := NewMemLS()
+		ps := NewMemPS(fs, ls)
 		for _, op := range tc.propOp {
 			desc := fmt.Sprintf("%s: %s %s", tc.desc, op.op, op.name)
-			if err = calcProps(op.name, fs, ls, op.wantPropstats); err != nil {
+			if err = calcProps(op.name, fs, op.wantPropstats); err != nil {
 				t.Fatalf("%s: calcProps: %v", desc, err)
 			}
 
@@ -515,23 +222,21 @@ func TestMemPS(t *testing.T) {
 			var propstats []Propstat
 			switch op.op {
 			case "propname":
-				pnames, err := propnames(fs, ls, op.name)
+				names, err := ps.Propnames(op.name)
 				if err != nil {
 					t.Errorf("%s: got error %v, want nil", desc, err)
 					continue
 				}
-				sort.Sort(byXMLName(pnames))
-				sort.Sort(byXMLName(op.wantPnames))
-				if !reflect.DeepEqual(pnames, op.wantPnames) {
-					t.Errorf("%s: pnames\ngot  %q\nwant %q", desc, pnames, op.wantPnames)
+				sort.Sort(byXMLName(names))
+				sort.Sort(byXMLName(op.wantNames))
+				if !reflect.DeepEqual(names, op.wantNames) {
+					t.Errorf("%s: names\ngot  %q\nwant %q", desc, names, op.wantNames)
 				}
 				continue
 			case "allprop":
-				propstats, err = allprop(fs, ls, op.name, op.pnames)
+				propstats, err = ps.Allprop(op.name, op.propnames)
 			case "propfind":
-				propstats, err = props(fs, ls, op.name, op.pnames)
-			case "proppatch":
-				propstats, err = patch(fs, ls, op.name, op.patches)
+				propstats, err = ps.Find(op.name, op.propnames)
 			default:
 				t.Fatalf("%s: %s not implemented", desc, op.op)
 			}
@@ -539,7 +244,7 @@ func TestMemPS(t *testing.T) {
 				t.Errorf("%s: got error %v, want nil", desc, err)
 				continue
 			}
-			// Compare return values from allprop, propfind or proppatch.
+			// Compare return values from allprop or propfind.
 			for _, pst := range propstats {
 				sort.Sort(byPropname(pst.Props))
 			}
@@ -564,43 +269,36 @@ func cmpXMLName(a, b xml.Name) bool {
 
 type byXMLName []xml.Name
 
-func (b byXMLName) Len() int           { return len(b) }
-func (b byXMLName) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
-func (b byXMLName) Less(i, j int) bool { return cmpXMLName(b[i], b[j]) }
+func (b byXMLName) Len() int {
+	return len(b)
+}
+func (b byXMLName) Swap(i, j int) {
+	b[i], b[j] = b[j], b[i]
+}
+func (b byXMLName) Less(i, j int) bool {
+	return cmpXMLName(b[i], b[j])
+}
 
 type byPropname []Property
 
-func (b byPropname) Len() int           { return len(b) }
-func (b byPropname) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
-func (b byPropname) Less(i, j int) bool { return cmpXMLName(b[i].XMLName, b[j].XMLName) }
+func (b byPropname) Len() int {
+	return len(b)
+}
+func (b byPropname) Swap(i, j int) {
+	b[i], b[j] = b[j], b[i]
+}
+func (b byPropname) Less(i, j int) bool {
+	return cmpXMLName(b[i].XMLName, b[j].XMLName)
+}
 
 type byStatus []Propstat
 
-func (b byStatus) Len() int           { return len(b) }
-func (b byStatus) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
-func (b byStatus) Less(i, j int) bool { return b[i].Status < b[j].Status }
-
-type noDeadPropsFS struct {
-	FileSystem
+func (b byStatus) Len() int {
+	return len(b)
 }
-
-func (fs noDeadPropsFS) OpenFile(name string, flag int, perm os.FileMode) (File, error) {
-	f, err := fs.FileSystem.OpenFile(name, flag, perm)
-	if err != nil {
-		return nil, err
-	}
-	return noDeadPropsFile{f}, nil
+func (b byStatus) Swap(i, j int) {
+	b[i], b[j] = b[j], b[i]
 }
-
-// noDeadPropsFile wraps a File but strips any optional DeadPropsHolder methods
-// provided by the underlying File implementation.
-type noDeadPropsFile struct {
-	f File
+func (b byStatus) Less(i, j int) bool {
+	return b[i].Status < b[j].Status
 }
-
-func (f noDeadPropsFile) Close() error                              { return f.f.Close() }
-func (f noDeadPropsFile) Read(p []byte) (int, error)                { return f.f.Read(p) }
-func (f noDeadPropsFile) Readdir(count int) ([]os.FileInfo, error)  { return f.f.Readdir(count) }
-func (f noDeadPropsFile) Seek(off int64, whence int) (int64, error) { return f.f.Seek(off, whence) }
-func (f noDeadPropsFile) Stat() (os.FileInfo, error)                { return f.f.Stat() }
-func (f noDeadPropsFile) Write(p []byte) (int, error)               { return f.f.Write(p) }

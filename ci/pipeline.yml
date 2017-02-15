@@ -38,6 +38,10 @@ jobs:
           AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key-staging}}
           AWS_DEFAULT_REGION: {{cdn-broker-region-staging}}
           SERVER_SIDE_ENCRYPTION: AES256
+          API_ADDRESS: {{cf-api-url-staging}}
+          CLIENT_ID: {{cdn-broker-client-id-staging}}
+          CLIENT_SECRET: {{cdn-broker-client-secret-staging}}
+          DEFAULT_ORIGIN: {{cdn-broker-default-origin-staging}}
     - put: broker-deploy-staging
       params:
         path: broker-src
@@ -86,7 +90,6 @@ jobs:
       AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id-staging}}
       AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key-staging}}
       HOSTED_ZONE_ID: {{hosted-zone-id-staging}}
-      ORIGIN: {{origin-url-staging}}
       DOMAIN: {{domain-url-staging}}
       CDN_TIMEOUT: {{cdn-timeout}}
 
@@ -121,6 +124,10 @@ jobs:
           AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key-production}}
           AWS_DEFAULT_REGION: {{cdn-broker-region-production}}
           SERVER_SIDE_ENCRYPTION: AES256
+          API_ADDRESS: {{cf-api-url-production}}
+          CLIENT_ID: {{cdn-broker-client-id-production}}
+          CLIENT_SECRET: {{cdn-broker-client-secret-production}}
+          DEFAULT_ORIGIN: {{cdn-broker-default-origin-production}}
     - put: broker-deploy-production
       params:
         path: broker-src
@@ -169,7 +176,6 @@ jobs:
       AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id-production}}
       AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key-production}}
       HOSTED_ZONE_ID: {{hosted-zone-id-production}}
-      ORIGIN: {{origin-url-production}}
       DOMAIN: {{domain-url-production}}
       CDN_TIMEOUT: {{cdn-timeout}}
 

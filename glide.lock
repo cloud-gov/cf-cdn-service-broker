@@ -1,10 +1,10 @@
-hash: e20862563cfed9d2de0b4a76e93c67ced42dbb34b2163df7b963884b2bd35270
-updated: 2017-01-26T11:26:13.217819451-05:00
+hash: ba8a210ca030cee047b36cba02a52b4ba402b51b735bc286c58f54664d38ecb5
+updated: 2017-02-09T17:06:08.79114682-05:00
 imports:
 - name: code.cloudfoundry.org/lager
   version: 6cfe365fb6bb84343f0034b4a53cd250d173b61f
 - name: github.com/aws/aws-sdk-go
-  version: aa8704199ea17856a3f37852f16a6008aea97e81
+  version: db14171eb3a0a13125d9cc2d9ebc7cbdb4e737b6
   subpackages:
   - aws
   - aws/awserr
@@ -33,12 +33,18 @@ imports:
   - service/iam
   - service/s3
   - service/sts
+- name: github.com/cloudfoundry-community/go-cfclient
+  version: 80c3c517232069b3f63c056750bf9b0098376cfe
 - name: github.com/davecgh/go-spew
   version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9
   subpackages:
   - spew
 - name: github.com/go-ini/ini
   version: 12f418cc7edc5a618a51407b7ac1f1f512139df3
+- name: github.com/golang/protobuf
+  version: 874264fbbb43f4d91e999fecb4b40143ed611400
+  subpackages:
+  - proto
 - name: github.com/gorilla/context
   version: a8d44e7d8e4d532b6a27a02dd82abb31cc1b01bd
 - name: github.com/gorilla/mux
@@ -88,9 +94,25 @@ imports:
   subpackages:
   - ocsp
 - name: golang.org/x/net
-  version: 96dbb961a39ddccf16860cdd355bfa639c497f23
+  version: 7dbad50ab5b31073856416cdcfeb2796d682f844
   subpackages:
+  - context
   - publicsuffix
+- name: golang.org/x/oauth2
+  version: 2baa8a1b9338cf13d9eeb27696d761155fa480be
+  subpackages:
+  - clientcredentials
+  - internal
+- name: google.golang.org/appengine
+  version: e234e71924d4aa52444bc76f2f831f13fa1eca60
+  subpackages:
+  - internal
+  - internal/base
+  - internal/datastore
+  - internal/log
+  - internal/remote_api
+  - internal/urlfetch
+  - urlfetch
 - name: gopkg.in/square/go-jose.v1
   version: e3f973b66b91445ec816dd7411ad1b6495a5a2fc
   subpackages:

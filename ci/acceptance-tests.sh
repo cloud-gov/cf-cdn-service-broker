@@ -11,6 +11,8 @@ suffix="${RANDOM}"
 DOMAIN=$(printf "${DOMAIN}" "${suffix}")
 SERVICE_INSTANCE_NAME=$(printf "${SERVICE_INSTANCE_NAME}" "${suffix}")
 
+path="$(dirname $0)"
+
 # Authenticate
 cf api "${CF_API_URL}"
 cf auth "${CF_USERNAME}" "${CF_PASSWORD}"
@@ -18,8 +20,11 @@ cf auth "${CF_USERNAME}" "${CF_PASSWORD}"
 # Target
 cf target -o "${CF_ORGANIZATION}" -s "${CF_SPACE}"
 
+# Create private domain
+cf create-domain "${CF_ORGANIZATION}" "${DOMAIN}"
+
 # Create service
-opts=$(jq -n --arg domain "${DOMAIN}" --arg origin "${ORIGIN}" '{domain: $domain, origin: $origin}')
+opts=$(jq -n --arg domain "${DOMAIN}" '{domain: $domain}')
 cf create-service "${SERVICE_NAME}" "${PLAN_NAME}" "${SERVICE_INSTANCE_NAME}" -c "${opts}"
 
 # Get CNAME instructions
@@ -82,25 +87,34 @@ if [ "${updated}" != "true" ]; then
   exit 1
 fi
 
+# Push test app
+cat << EOF > "${path}/app/manifest.yml"
+---
+applications:
+- name: cdn-broker-test
+  buildpack: staticfile_buildpack
+  domain: ${DOMAIN}
+  no-hostname: true
+EOF
+
+cf push -f "${path}/app/manifest.yml" -p "${path}/app"
+
+# Assert expected response from cdn
 elapsed="${CDN_TIMEOUT}"
 until [ "${elapsed}" -le 0 ]; do
-  if cdn_resp=$(curl "https://${DOMAIN}"); then
+  if curl "https://${DOMAIN}" | grep "CDN Broker Test"; then
     break
   fi
   let elapsed-=30
   sleep 30
 done
-if [ -z "${elapsed}"} ]; then
+if [ -z "${elapsed}" ]; then
   echo "Failed to load ${DOMAIN}"
   exit 1
 fi
 
-# Assert same response from app and cdn
-app_resp=$(curl "https://${ORIGIN}")
-if [ "${app_resp}" != "${cdn_resp}" ]; then
-  echo "Got different responses from app and cdn"
-  exit 1
-fi
+# Delete private domain
+cf delete-domain -f "${DOMAIN}"
 
 # Delete CNAME record
 cat << EOF > ./delete-cname.json

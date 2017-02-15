@@ -7,9 +7,13 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"code.cloudfoundry.org/lager"
+	"github.com/cloudfoundry-community/go-cfclient"
 	"github.com/pivotal-cf/brokerapi"
 
 	"github.com/18F/cf-cdn-service-broker/broker"
+	cfmock "github.com/18F/cf-cdn-service-broker/cf/mocks"
+	"github.com/18F/cf-cdn-service-broker/config"
 	"github.com/18F/cf-cdn-service-broker/models"
 	"github.com/18F/cf-cdn-service-broker/models/mocks"
 )
@@ -20,16 +24,26 @@ func TestProvisioning(t *testing.T) {
 
 type ProvisionSuite struct {
 	suite.Suite
-	Manager mocks.RouteManagerIface
-	Broker  broker.CdnServiceBroker
-	ctx     context.Context
+	Manager  mocks.RouteManagerIface
+	Broker   *broker.CdnServiceBroker
+	cfclient cfmock.Client
+	settings config.Settings
+	logger   lager.Logger
+	ctx      context.Context
 }
 
 func (s *ProvisionSuite) SetupTest() {
 	s.Manager = mocks.RouteManagerIface{}
-	s.Broker = broker.CdnServiceBroker{
-		Manager: &s.Manager,
+	s.cfclient = cfmock.Client{}
+	s.settings = config.Settings{
+		DefaultOrigin: "origin.cloud.gov",
 	}
+	s.Broker = broker.New(
+		&s.Manager,
+		&s.cfclient,
+		s.settings,
+		s.logger,
+	)
 	s.ctx = context.Background()
 }
 
@@ -50,17 +64,18 @@ func (s *ProvisionSuite) TestWithoutOptions() {
 	}
 	_, err := s.Broker.Provision(s.ctx, "", details, true)
 	s.NotNil(err)
-	s.Equal(err.Error(), "must be invoked with `domain` and `origin` keys")
+	s.Equal(err.Error(), "must pass non-empty `domain`")
 }
 
 func (s *ProvisionSuite) TestInstanceExists() {
 	route := &models.Route{
 		State: models.Provisioned,
 	}
+	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 	s.Manager.On("Get", "123").Return(route, nil)
 
 	details := brokerapi.ProvisionDetails{
-		RawParameters: []byte(`{"domain": "domain.gov", "origin": "origin.gov"}`),
+		RawParameters: []byte(`{"domain": "domain.gov"}`),
 	}
 	_, err := s.Broker.Provision(s.ctx, "123", details, true)
 	s.Equal(err, brokerapi.ErrInstanceAlreadyExists)
@@ -69,12 +84,38 @@ func (s *ProvisionSuite) TestInstanceExists() {
 func (s *ProvisionSuite) TestSuccess() {
 	s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
 	route := &models.Route{State: models.Provisioning}
-	s.Manager.On("Create", "123", "domain.gov", "origin.gov", "", false,
+	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
+	s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", "", false, []string{"Host"},
 		map[string]string{"Organization": "", "Space": "", "Service": "", "Plan": ""}).Return(route, nil)
 
 	details := brokerapi.ProvisionDetails{
-		RawParameters: []byte(`{"domain": "domain.gov", "origin": "origin.gov"}`),
+		RawParameters: []byte(`{"domain": "domain.gov"}`),
 	}
 	_, err := s.Broker.Provision(s.ctx, "123", details, true)
 	s.Nil(err)
+}
+
+func (s *ProvisionSuite) TestSuccessCustomOrigin() {
+	s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
+	route := &models.Route{State: models.Provisioning}
+	s.Manager.On("Create", "123", "domain.gov", "custom.cloud.gov", "", false, []string{},
+		map[string]string{"Organization": "", "Space": "", "Service": "", "Plan": ""}).Return(route, nil)
+
+	details := brokerapi.ProvisionDetails{
+		RawParameters: []byte(`{"domain": "domain.gov", "origin": "custom.cloud.gov"}`),
+	}
+	_, err := s.Broker.Provision(s.ctx, "123", details, true)
+	s.Nil(err)
+}
+
+func (s *ProvisionSuite) TestDomainNotExists() {
+	s.cfclient.On("GetOrgByGuid", "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5").Return(cfclient.Org{Name: "my-org"}, nil)
+	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, errors.New("fail"))
+	details := brokerapi.ProvisionDetails{
+		OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+		RawParameters:    []byte(`{"domain": "domain.gov"}`),
+	}
+	_, err := s.Broker.Provision(s.ctx, "123", details, true)
+	s.NotNil(err)
+	s.Contains(err.Error(), "cf create-domain")
 }

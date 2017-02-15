@@ -28,3 +28,4 @@ import:
   version: ~0.3.1
   subpackages:
   - acme
+- package: github.com/cloudfoundry-community/go-cfclient

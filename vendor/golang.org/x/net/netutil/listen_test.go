@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// +build go1.3
+
+// (We only run this test on Go 1.3 because the HTTP client timeout behavior
+// was bad in previous releases, causing occasional deadlocks.)
+
 package netutil
 
 import (
@@ -15,20 +20,17 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"golang.org/x/net/internal/nettest"
 )
 
 func TestLimitListener(t *testing.T) {
-	const max = 5
-	attempts := (nettest.MaxOpenFiles() - max) / 2
-	if attempts > 256 { // maximum length of accept queue is 128 by default
-		attempts = 256
-	}
+	const (
+		max = 5
+		num = 200
+	)
 
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Listen: %v", err)
 	}
 	defer l.Close()
 	l = LimitListener(l, max)
@@ -45,14 +47,14 @@ func TestLimitListener(t *testing.T) {
 
 	var wg sync.WaitGroup
 	var failed int32
-	for i := 0; i < attempts; i++ {
+	for i := 0; i < num; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			c := http.Client{Timeout: 3 * time.Second}
 			r, err := c.Get("http://" + l.Addr().String())
 			if err != nil {
-				t.Log(err)
+				t.Logf("Get: %v", err)
 				atomic.AddInt32(&failed, 1)
 				return
 			}
@@ -64,8 +66,8 @@ func TestLimitListener(t *testing.T) {
 
 	// We expect some Gets to fail as the kernel's accept queue is filled,
 	// but most should succeed.
-	if int(failed) >= attempts/2 {
-		t.Errorf("%d requests failed within %d attempts", failed, attempts)
+	if failed >= num/2 {
+		t.Errorf("too many Gets failed: %v", failed)
 	}
 }
 

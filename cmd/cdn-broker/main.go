@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/cloudfoundry-community/go-cfclient"
 
 	"github.com/18F/cf-cdn-service-broker/broker"
 	"github.com/18F/cf-cdn-service-broker/config"
@@ -34,6 +35,15 @@ func main() {
 		logger.Fatal("connect", err)
 	}
 
+	client, err := cfclient.NewClient(&cfclient.Config{
+		ApiAddress:   settings.APIAddress,
+		ClientID:     settings.ClientID,
+		ClientSecret: settings.ClientSecret,
+	})
+	if err != nil {
+		logger.Fatal("client", err)
+	}
+
 	db.AutoMigrate(&models.Route{}, &models.Certificate{})
 
 	session := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
@@ -44,16 +54,18 @@ func main() {
 		Acme:       &utils.Acme{settings, s3.New(session)},
 		DB:         db,
 	}
-	broker := broker.CdnServiceBroker{
-		Manager: &manager,
-		Logger:  logger,
-	}
+	broker := broker.New(
+		&manager,
+		client,
+		settings,
+		logger,
+	)
 	credentials := brokerapi.BrokerCredentials{
 		Username: settings.BrokerUsername,
 		Password: settings.BrokerPassword,
 	}
 
-	brokerAPI := brokerapi.New(&broker, logger, credentials)
+	brokerAPI := brokerapi.New(broker, logger, credentials)
 	http.Handle("/", brokerAPI)
 	http.ListenAndServe(fmt.Sprintf(":%s", settings.Port), nil)
 }
