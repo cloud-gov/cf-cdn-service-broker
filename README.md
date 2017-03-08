@@ -91,36 +91,36 @@ The easiest/recommended way to deploy the broker is via the [Concourse](http://c
 
 ## Custom origins
 
-If you are pointing your domain a non-Cloud Foundry application, such as a public S3 bucket, you can pass a custom origin to the broker:
+If you are pointing your domain to a non-Cloud Foundry application, such as a public S3 bucket, you can pass a custom origin to the broker:
 
-    ```bash
-    $ cf create-service cdn-route cdn-route my-cdn-route \
-        -c '{"domain": "my.domain.gov", "origin": "my-app.apps.cloud.gov"}'
+```bash
+$ cf create-service cdn-route cdn-route my-cdn-route \
+    -c '{"domain": "my.domain.gov", "origin": "my-app.apps.cloud.gov"}'
 
-    Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
-    ```
+Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
+```
 
 If you need to add a path to your origin, you can pass it in as a parameter:
 
-    ```bash
-    $ cf create-service cdn-route cdn-route my-cdn-route \
-        -c '{"domain": "my.domain.gov", "origin": "my-app.apps.cloud.gov", "path": "/myfolder"}'
+```bash
+$ cf create-service cdn-route cdn-route my-cdn-route \
+    -c '{"domain": "my.domain.gov", "origin": "my-app.apps.cloud.gov", "path": "/myfolder"}'
 
-    Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
-    ```
+Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
+```
     
-    If your origin is non-HTTPS, you'll need to add another parameter:
-    
-    ```bash
-    $ cf create-service cdn-route cdn-route my-cdn-route \
-        -c '{"domain": "my.domain.gov", "origin": "my-app.apps.cloud.gov", "insecure_origin": true}'
+If your origin is non-HTTPS, you'll need to add another parameter:
 
-    Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
-    ```
+```bash
+$ cf create-service cdn-route cdn-route my-cdn-route \
+    -c '{"domain": "my.domain.gov", "origin": "my-app.apps.cloud.gov", "insecure_origin": true}'
+
+Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
+```
 
 ## Debugging
 
-By default, Cloud Controller will expire asynchronous services instances that have been pending for over one week. If your instance expires, run a dummy update
+By default, Cloud Controller will expire asynchronous service instances that have been pending for over one week. If your instance expires, run a dummy update
 to restore it to the pending state so that Cloud Controller will continue to check for updates:
 
 ```bash
