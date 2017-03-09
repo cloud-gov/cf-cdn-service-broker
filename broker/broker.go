@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"strings"
 
 	"code.cloudfoundry.org/lager"
 	"github.com/pivotal-cf/brokerapi"
@@ -268,13 +269,17 @@ func (b *CdnServiceBroker) parseUpdateDetails(details brokerapi.UpdateDetails) (
 }
 
 func (b *CdnServiceBroker) checkDomain(domain, orgGUID string) error {
-	if _, err := b.cfclient.GetDomainByName(domain); err != nil {
-		org, err := b.cfclient.GetOrgByGuid(orgGUID)
-		orgName := "<organization>"
-		if err == nil {
-			orgName = org.Name
+	// domain can be a comma separated list so we need to check each one invidually
+	domains := strings.Split(domain, ",")
+	for i := range domains {
+		if _, err := b.cfclient.GetDomainByName(domains[i]); err != nil {
+			org, err := b.cfclient.GetOrgByGuid(orgGUID)
+			orgName := "<organization>"
+			if err == nil {
+				orgName = org.Name
+			}
+			return fmt.Errorf("Domain %s does not exist; create it with `cf create-domain %s %s`", domains[i], orgName, domains[i])
 		}
-		return fmt.Errorf("Domain %s does not exist; create it with `cf create-domain %s %s`", domain, orgName, domain)
 	}
 	return nil
 }
