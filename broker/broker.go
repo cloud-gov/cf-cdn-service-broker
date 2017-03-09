@@ -269,18 +269,34 @@ func (b *CdnServiceBroker) parseUpdateDetails(details brokerapi.UpdateDetails) (
 }
 
 func (b *CdnServiceBroker) checkDomain(domain, orgGUID string) error {
-	// domain can be a comma separated list so we need to check each one invidually
+	// domain can be a comma separated list so we need to check each one individually
 	domains := strings.Split(domain, ",")
+	var errorlist []string
+
+	var orgName string = "<organization>"
+
 	for i := range domains {
 		if _, err := b.cfclient.GetDomainByName(domains[i]); err != nil {
-			org, err := b.cfclient.GetOrgByGuid(orgGUID)
-			orgName := "<organization>"
-			if err == nil {
-				orgName = org.Name
+
+			if orgName == "<organization>" {
+				org, err := b.cfclient.GetOrgByGuid(orgGUID)
+				if err == nil {
+					orgName = org.Name
+				}
 			}
-			return fmt.Errorf("Domain %s does not exist; create it with `cf create-domain %s %s`", domains[i], orgName, domains[i])
+
+			errorlist = append(errorlist, fmt.Sprintf("`cf create-domain %s %s`", orgName, domains[i]))
 		}
 	}
+
+	if len(errorlist) > 0 {
+		if len(errorlist) > 1 {
+			return fmt.Errorf("Multiple domains do not exist; create them with:\n%s", strings.Join(errorlist, "\n"))
+		} else {
+			return fmt.Errorf("Domain does not exist; create it with %s", errorlist[0])
+		}
+	}
+
 	return nil
 }
 
