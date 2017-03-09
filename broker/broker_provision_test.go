@@ -45,6 +45,9 @@ func (s *ProvisionSuite) SetupTest() {
 		s.logger,
 	)
 	s.ctx = context.Background()
+
+	s.cfclient.On("GetOrgByGuid", "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5").Return(cfclient.Org{Name: "my-org"}, nil)
+
 }
 
 func (s *ProvisionSuite) TestSync() {
@@ -109,7 +112,6 @@ func (s *ProvisionSuite) TestSuccessCustomOrigin() {
 }
 
 func (s *ProvisionSuite) TestDomainNotExists() {
-	s.cfclient.On("GetOrgByGuid", "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5").Return(cfclient.Org{Name: "my-org"}, nil)
 	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, errors.New("fail"))
 	details := brokerapi.ProvisionDetails{
 		OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
@@ -118,4 +120,35 @@ func (s *ProvisionSuite) TestDomainNotExists() {
 	_, err := s.Broker.Provision(s.ctx, "123", details, true)
 	s.NotNil(err)
 	s.Contains(err.Error(), "cf create-domain")
+}
+
+func (s *ProvisionSuite) TestMultipleDomainsOneNotExists() {
+	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
+	s.cfclient.On("GetDomainByName", "domain2.gov").Return(cfclient.Domain{}, errors.New("fail"))
+	details := brokerapi.ProvisionDetails{
+		OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+		RawParameters:    []byte(`{"domain": "domain.gov,domain2.gov"}`),
+	}
+	_, err := s.Broker.Provision(s.ctx, "123", details, true)
+	s.NotNil(err)
+	s.Contains(err.Error(), "Domain does not exist")
+	s.NotContains(err.Error(), "domain.gov")
+	s.Contains(err.Error(), "domain2.gov")
+}
+
+func (s *ProvisionSuite) TestMultipleDomainsMoreThanOneNotExists() {
+	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
+	s.cfclient.On("GetDomainByName", "domain2.gov").Return(cfclient.Domain{}, errors.New("fail"))
+	s.cfclient.On("GetDomainByName", "domain3.gov").Return(cfclient.Domain{}, errors.New("fail"))
+	details := brokerapi.ProvisionDetails{
+		OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+		RawParameters:    []byte(`{"domain": "domain.gov,domain2.gov,domain3.gov"}`),
+	}
+	_, err := s.Broker.Provision(s.ctx, "123", details, true)
+	s.NotNil(err)
+	s.Contains(err.Error(), "Multiple domains do not exist")
+	s.NotContains(err.Error(), "domain.gov")
+	s.Contains(err.Error(), "domain2.gov")
+	s.Contains(err.Error(), "domain3.gov")
+
 }
