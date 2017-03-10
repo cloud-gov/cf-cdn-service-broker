@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
@@ -22,10 +21,6 @@ type DistributionIface interface {
 type Distribution struct {
 	Settings config.Settings
 	Service  *cloudfront.CloudFront
-}
-
-func (d *Distribution) getOriginId(domains []string) string {
-	return fmt.Sprintf("cdn-route-%s", strings.Join(domains, ":"))
 }
 
 func (d *Distribution) getAliases(domains []string) *cloudfront.Aliases {
@@ -75,7 +70,7 @@ func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionCon
 	config.Enabled = aws.Bool(true)
 	config.IsIPV6Enabled = aws.Bool(true)
 	config.DefaultCacheBehavior = &cloudfront.DefaultCacheBehavior{
-		TargetOriginId: aws.String(d.getOriginId(domains)),
+		TargetOriginId: aws.String(*callerReference),
 		ForwardedValues: &cloudfront.ForwardedValues{
 			Headers: d.getHeaders(forwardedHeaders),
 			Cookies: &cloudfront.CookiePreference{
@@ -124,7 +119,7 @@ func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionCon
 		Items: []*cloudfront.Origin{
 			{
 				DomainName: aws.String(origin),
-				Id:         aws.String(d.getOriginId(domains)),
+				Id:         aws.String(*callerReference),
 				OriginPath: aws.String(path),
 				CustomHeaders: &cloudfront.CustomHeaders{
 					Quantity: aws.Int64(0),
@@ -145,7 +140,7 @@ func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionCon
 			},
 			{
 				DomainName: aws.String(fmt.Sprintf("%s.s3.amazonaws.com", d.Settings.Bucket)),
-				Id:         aws.String(fmt.Sprintf("s3-%s-%s", d.Settings.Bucket, domains)),
+				Id:         aws.String(fmt.Sprintf("s3-%s-%s", d.Settings.Bucket, *callerReference)),
 				OriginPath: aws.String(""),
 				CustomHeaders: &cloudfront.CustomHeaders{
 					Quantity: aws.Int64(0),
