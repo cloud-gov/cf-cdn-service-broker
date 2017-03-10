@@ -171,7 +171,7 @@ func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionCon
 				},
 				Compress:       aws.Bool(false),
 				PathPattern:    aws.String("/.well-known/acme-challenge/*"),
-				TargetOriginId: aws.String(fmt.Sprintf("s3-%s-%s", d.Settings.Bucket, domains)),
+				TargetOriginId: aws.String(fmt.Sprintf("s3-%s-%s", d.Settings.Bucket, *callerReference)),
 				ForwardedValues: &cloudfront.ForwardedValues{
 					Headers: &cloudfront.Headers{
 						Quantity: aws.Int64(0),
