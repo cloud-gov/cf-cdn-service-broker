@@ -95,7 +95,7 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 		InsecureOrigin: insecureOrigin,
 	}
 
-	dist, err := m.CloudFront.Create(route.GetDomains(), origin, path, insecureOrigin, forwardedHeaders, tags)
+	dist, err := m.CloudFront.Create(instanceId, route.GetDomains(), origin, path, insecureOrigin, forwardedHeaders, tags)
 	if err != nil {
 		return nil, err
 	}
