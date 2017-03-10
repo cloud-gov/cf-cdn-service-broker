@@ -11,7 +11,7 @@ import (
 )
 
 type DistributionIface interface {
-	Create(domains []string, origin, path string, insecureOrigin bool, forwardedHeaders []string, tags map[string]string) (*cloudfront.Distribution, error)
+	Create(callerReference string, domains []string, origin, path string, insecureOrigin bool, forwardedHeaders []string, tags map[string]string) (*cloudfront.Distribution, error)
 	Update(distId string, domains []string, origin, path string, insecureOrigin bool, forwardedHeaders []string) (*cloudfront.Distribution, error)
 	Get(distId string) (*cloudfront.Distribution, error)
 	SetCertificate(distId, certId string) error
@@ -22,10 +22,6 @@ type DistributionIface interface {
 type Distribution struct {
 	Settings config.Settings
 	Service  *cloudfront.CloudFront
-}
-
-func (d *Distribution) getDistributionId(domains []string) string {
-	return fmt.Sprintf("%scdn-route-%s", d.Settings.CloudFrontPrefix, strings.Join(domains, ":"))
 }
 
 func (d *Distribution) getOriginId(domains []string) string {
@@ -212,10 +208,10 @@ func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionCon
 	config.PriceClass = aws.String("PriceClass_100")
 }
 
-func (d *Distribution) Create(domains []string, origin, path string, insecureOrigin bool, forwardedHeaders []string, tags map[string]string) (*cloudfront.Distribution, error) {
+func (d *Distribution) Create(callerReference string, domains []string, origin, path string, insecureOrigin bool, forwardedHeaders []string, tags map[string]string) (*cloudfront.Distribution, error) {
 	distConfig := new(cloudfront.DistributionConfig)
 	d.fillDistributionConfig(distConfig, origin, path, insecureOrigin,
-		aws.String(d.getDistributionId(domains)), domains, forwardedHeaders)
+		aws.String(callerReference), domains, forwardedHeaders)
 	resp, err := d.Service.CreateDistributionWithTags(&cloudfront.CreateDistributionWithTagsInput{
 		DistributionConfigWithTags: &cloudfront.DistributionConfigWithTags{
 			DistributionConfig: distConfig,
