@@ -71,7 +71,7 @@ func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionCon
 	config.IsIPV6Enabled = aws.Bool(true)
 
 	cookies := aws.String("all")
-	if forwardCookies == false {
+	if ! forwardCookies == false {
 		cookies = aws.String("none")
 	}
 
@@ -209,7 +209,7 @@ func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionCon
 	config.PriceClass = aws.String("PriceClass_100")
 }
 
-func (d *Distribution) Create(callerReference string, domains []string, origin, path string, insecureOrigin bool, forwardedHeaders []string, forwardCookies string, tags map[string]string) (*cloudfront.Distribution, error) {
+func (d *Distribution) Create(callerReference string, domains []string, origin, path string, insecureOrigin bool, forwardedHeaders []string, forwardCookies bool, tags map[string]string) (*cloudfront.Distribution, error) {
 	distConfig := new(cloudfront.DistributionConfig)
 	d.fillDistributionConfig(distConfig, origin, path, insecureOrigin,
 		aws.String(callerReference), domains, forwardedHeaders, forwardCookies)
@@ -227,7 +227,7 @@ func (d *Distribution) Create(callerReference string, domains []string, origin, 
 	return resp.Distribution, nil
 }
 
-func (d *Distribution) Update(distId string, domains []string, origin, path string, insecureOrigin bool, forwardedHeaders []string, forwardCookies string) (*cloudfront.Distribution, error) {
+func (d *Distribution) Update(distId string, domains []string, origin, path string, insecureOrigin bool, forwardedHeaders []string, forwardCookies bool) (*cloudfront.Distribution, error) {
 	// Get the current distribution
 	dist, err := d.Service.GetDistributionConfig(&cloudfront.GetDistributionConfigInput{
 		Id: aws.String(distId),
