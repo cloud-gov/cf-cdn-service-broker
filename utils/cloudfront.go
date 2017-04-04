@@ -64,17 +64,23 @@ func (d *Distribution) getHeaders(headers []string) *cloudfront.Headers {
 // it can't be changed like the domains and instead the callerReference which was composed of the original domains must
 // be passed in.
 func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionConfig, origin, path string,
-	insecureOrigin bool, callerReference *string, domains []string, forwardedHeaders []string) {
+	insecureOrigin bool, callerReference *string, domains []string, forwardedHeaders []string, forwardCookies bool) {
 	config.CallerReference = callerReference
 	config.Comment = aws.String("cdn route service")
 	config.Enabled = aws.Bool(true)
 	config.IsIPV6Enabled = aws.Bool(true)
+
+	cookies := aws.String("all")
+	if forwardCookies == false {
+		cookies = aws.String("none")
+	}
+
 	config.DefaultCacheBehavior = &cloudfront.DefaultCacheBehavior{
 		TargetOriginId: aws.String(*callerReference),
 		ForwardedValues: &cloudfront.ForwardedValues{
 			Headers: d.getHeaders(forwardedHeaders),
 			Cookies: &cloudfront.CookiePreference{
-				Forward: aws.String("all"),
+				Forward: cookies,
 			},
 			QueryString: aws.Bool(true),
 			QueryStringCacheKeys: &cloudfront.QueryStringCacheKeys{
@@ -203,10 +209,10 @@ func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionCon
 	config.PriceClass = aws.String("PriceClass_100")
 }
 
-func (d *Distribution) Create(callerReference string, domains []string, origin, path string, insecureOrigin bool, forwardedHeaders []string, tags map[string]string) (*cloudfront.Distribution, error) {
+func (d *Distribution) Create(callerReference string, domains []string, origin, path string, insecureOrigin bool, forwardedHeaders []string, forwardCookies string, tags map[string]string) (*cloudfront.Distribution, error) {
 	distConfig := new(cloudfront.DistributionConfig)
 	d.fillDistributionConfig(distConfig, origin, path, insecureOrigin,
-		aws.String(callerReference), domains, forwardedHeaders)
+		aws.String(callerReference), domains, forwardedHeaders, forwardCookies)
 	resp, err := d.Service.CreateDistributionWithTags(&cloudfront.CreateDistributionWithTagsInput{
 		DistributionConfigWithTags: &cloudfront.DistributionConfigWithTags{
 			DistributionConfig: distConfig,
@@ -221,7 +227,7 @@ func (d *Distribution) Create(callerReference string, domains []string, origin, 
 	return resp.Distribution, nil
 }
 
-func (d *Distribution) Update(distId string, domains []string, origin, path string, insecureOrigin bool, forwardedHeaders []string) (*cloudfront.Distribution, error) {
+func (d *Distribution) Update(distId string, domains []string, origin, path string, insecureOrigin bool, forwardedHeaders []string, forwardCookies string) (*cloudfront.Distribution, error) {
 	// Get the current distribution
 	dist, err := d.Service.GetDistributionConfig(&cloudfront.GetDistributionConfigInput{
 		Id: aws.String(distId),
@@ -230,7 +236,7 @@ func (d *Distribution) Update(distId string, domains []string, origin, path stri
 		return nil, err
 	}
 	d.fillDistributionConfig(dist.DistributionConfig, origin, path, insecureOrigin,
-		dist.DistributionConfig.CallerReference, domains, forwardedHeaders)
+		dist.DistributionConfig.CallerReference, domains, forwardedHeaders, forwardCookies)
 
 	// Call the UpdateDistribution function
 	resp, err := d.Service.UpdateDistribution(&cloudfront.UpdateDistributionInput{
