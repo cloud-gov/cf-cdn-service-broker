@@ -10,8 +10,8 @@ import (
 )
 
 type DistributionIface interface {
-	Create(callerReference string, domains []string, origin, path string, insecureOrigin bool, forwardedHeaders []string, tags map[string]string) (*cloudfront.Distribution, error)
-	Update(distId string, domains []string, origin, path string, insecureOrigin bool, forwardedHeaders []string) (*cloudfront.Distribution, error)
+	Create(callerReference string, domains []string, origin, path string, insecureOrigin bool, forwardedHeaders []string, forwardCookies bool, tags map[string]string) (*cloudfront.Distribution, error)
+	Update(distId string, domains []string, origin, path string, insecureOrigin bool, forwardedHeaders []string, forwardCookies bool) (*cloudfront.Distribution, error)
 	Get(distId string) (*cloudfront.Distribution, error)
 	SetCertificate(distId, certId string) error
 	Disable(distId string) error

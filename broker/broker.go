@@ -217,7 +217,7 @@ func (b *CdnServiceBroker) createBrokerOptions(details []byte) (options Options,
 	}
 	options = Options{
 		Origin: b.settings.DefaultOrigin,
-		Cookies: true
+		Cookies: true,
 	}
 	err = json.Unmarshal(details, &options)
 	if err != nil {

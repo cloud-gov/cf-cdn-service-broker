@@ -68,8 +68,8 @@ type Certificate struct {
 }
 
 type RouteManagerIface interface {
-	Create(instanceId, domain, origin, path string, insecureOrigin bool, forwardedHeaders []string, tags map[string]string) (*Route, error)
-	Update(instanceId string, domain, origin string, path string, insecureOrigin bool, forwardedHeaders []string) error
+	Create(instanceId, domain, origin, path string, insecureOrigin bool, forwardedHeaders []string, forwardCookies bool, tags map[string]string) (*Route, error)
+	Update(instanceId string, domain, origin string, path string, insecureOrigin bool, forwardedHeaders []string, forwardCookies bool) error
 	Get(instanceId string) (*Route, error)
 	Poll(route *Route) error
 	Disable(route *Route) error
@@ -95,7 +95,7 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 		InsecureOrigin: insecureOrigin,
 	}
 
-	dist, err := m.CloudFront.Create(instanceId, route.GetDomains(), origin, path, insecureOrigin, forwardedHeaders, forwadedCookies, tags)
+	dist, err := m.CloudFront.Create(instanceId, route.GetDomains(), origin, path, insecureOrigin, forwardedHeaders, forwardCookies, tags)
 	if err != nil {
 		return nil, err
 	}
