@@ -21,6 +21,7 @@ type Options struct {
 	Origin         string `json:"origin"`
 	Path           string `json:"path"`
 	InsecureOrigin bool   `json:"insecure_origin"`
+	Cookies        bool   `json:"cookies"`
 }
 
 type CdnServiceBroker struct {
@@ -88,7 +89,7 @@ func (b *CdnServiceBroker) Provision(
 		"Plan":         details.PlanID,
 	}
 
-	_, err = b.manager.Create(instanceID, options.Domain, options.Origin, options.Path, options.InsecureOrigin, headers, tags)
+	_, err = b.manager.Create(instanceID, options.Domain, options.Origin, options.Path, options.InsecureOrigin, headers, options.Cookies, tags)
 	if err != nil {
 		return spec, err
 	}
@@ -200,7 +201,7 @@ func (b *CdnServiceBroker) Update(
 
 	headers := b.getHeaders(options)
 
-	err = b.manager.Update(instanceID, options.Domain, options.Origin, options.Path, options.InsecureOrigin, headers)
+	err = b.manager.Update(instanceID, options.Domain, options.Origin, options.Path, options.InsecureOrigin, headers, options.Cookies)
 	if err != nil {
 		return brokerapi.UpdateServiceSpec{}, err
 	}
@@ -215,7 +216,8 @@ func (b *CdnServiceBroker) createBrokerOptions(details []byte) (options Options,
 		return
 	}
 	options = Options{
-		Origin: b.settings.DefaultOrigin,
+		Origin:  b.settings.DefaultOrigin,
+		Cookies: true,
 	}
 	err = json.Unmarshal(details, &options)
 	if err != nil {

@@ -9,7 +9,7 @@ type RouteManagerIface struct {
 }
 
 // Create provides a mock function with given fields: instanceId, domain, origin, path, insecureOrigin, forwardedHeaders, tags
-func (_m *RouteManagerIface) Create(instanceId string, domain string, origin string, path string, insecureOrigin bool, forwardedHeaders []string, tags map[string]string) (*models.Route, error) {
+func (_m *RouteManagerIface) Create(instanceId string, domain string, origin string, path string, insecureOrigin bool, forwardedHeaders []string, forwardCookies bool, tags map[string]string) (*models.Route, error) {
 	ret := _m.Called(instanceId, domain, origin, path, insecureOrigin, forwardedHeaders, tags)
 
 	var r0 *models.Route
@@ -102,7 +102,7 @@ func (_m *RouteManagerIface) RenewAll() {
 }
 
 // Update provides a mock function with given fields: instanceId, domain, origin, path, insecureOrigin, forwardedHeaders
-func (_m *RouteManagerIface) Update(instanceId string, domain string, origin string, path string, insecureOrigin bool, forwardedHeaders []string) error {
+func (_m *RouteManagerIface) Update(instanceId string, domain string, origin string, path string, insecureOrigin bool, forwardedHeaders []string, forwardCookies bool) error {
 	ret := _m.Called(instanceId, domain, origin, path, insecureOrigin, forwardedHeaders)
 
 	var r0 error
