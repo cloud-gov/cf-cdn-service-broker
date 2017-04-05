@@ -21,7 +21,7 @@ type Options struct {
 	Origin         string `json:"origin"`
 	Path           string `json:"path"`
 	InsecureOrigin bool   `json:"insecure_origin"`
-	Cookies        bool   `json:cookies`
+	Cookies        bool   `json:"cookies"`
 }
 
 type CdnServiceBroker struct {
@@ -216,7 +216,7 @@ func (b *CdnServiceBroker) createBrokerOptions(details []byte) (options Options,
 		return
 	}
 	options = Options{
-		Origin: b.settings.DefaultOrigin,
+		Origin:  b.settings.DefaultOrigin,
 		Cookies: true,
 	}
 	err = json.Unmarshal(details, &options)

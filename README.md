@@ -118,6 +118,17 @@ $ cf create-service cdn-route cdn-route my-cdn-route \
 Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
 ```
 
+## Cookie Forwarding
+
+If you do not want cookies forwarded to your origin, you'll need to add another parameter:
+
+```bash
+$ cf create-service cdn-route cdn-route my-cdn-route \
+    -c '{"domain": "my.domain.gov", "cookies": false}'
+
+Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
+```
+
 ## Debugging
 
 By default, Cloud Controller will expire asynchronous service instances that have been pending for over one week. If your instance expires, run a dummy update

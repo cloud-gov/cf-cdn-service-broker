@@ -71,7 +71,7 @@ func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionCon
 	config.IsIPV6Enabled = aws.Bool(true)
 
 	cookies := aws.String("all")
-	if ! forwardCookies == false {
+	if forwardCookies == false {
 		cookies = aws.String("none")
 	}
 
