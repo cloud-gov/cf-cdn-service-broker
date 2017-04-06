@@ -16,6 +16,7 @@ type DistributionIface interface {
 	SetCertificate(distId, certId string) error
 	Disable(distId string) error
 	Delete(distId string) (bool, error)
+	ListDistributions(callback func(cloudfront.DistributionSummary) bool) error
 }
 
 type Distribution struct {
@@ -324,6 +325,22 @@ func (d *Distribution) Delete(distId string) (bool, error) {
 	})
 
 	return err == nil, err
+}
+
+func (d *Distribution) ListDistributions(callback func(cloudfront.DistributionSummary) bool) error {
+	params := &cloudfront.ListDistributionsInput{}
+
+	return d.Service.ListDistributionsPages(params,
+		func(page *cloudfront.ListDistributionsOutput, lastPage bool) bool {
+			for _, v := range page.DistributionList.Items {
+				// stop iteration if the callback tells us to
+				if callback(*v) == false {
+					return false
+				}
+			}
+
+			return true
+		})
 }
 
 func getOriginProtocolPolicy(insecure bool) *string {

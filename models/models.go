@@ -14,6 +14,9 @@ import (
 	"github.com/pivotal-cf/brokerapi"
 	"github.com/xenolf/lego/acme"
 
+	"github.com/aws/aws-sdk-go/service/cloudfront"
+	"github.com/aws/aws-sdk-go/service/iam"
+
 	"github.com/18F/cf-cdn-service-broker/utils"
 )
 
@@ -75,6 +78,7 @@ type RouteManagerIface interface {
 	Disable(route *Route) error
 	Renew(route *Route) error
 	RenewAll()
+	DeleteOrphanedCerts()
 }
 
 type RouteManager struct {
@@ -207,6 +211,40 @@ func (m *RouteManager) Renew(r *Route) error {
 	return m.DB.Save(&certRow).Error
 }
 
+func (m *RouteManager) DeleteOrphanedCerts() {
+
+	// iterate over all distributions and record all certificates in-use by these distributions
+	activeCerts := make(map[string]string)
+
+	m.CloudFront.ListDistributions(func(distro cloudfront.DistributionSummary) bool {
+		if distro.ViewerCertificate.IAMCertificateId != nil {
+			activeCerts[*distro.ViewerCertificate.IAMCertificateId] = *distro.ARN
+		}
+		return true
+	})
+
+	// iterate over all certificates
+	m.Iam.ListCertificates(func(cert iam.ServerCertificateMetadata) bool {
+
+		// delete any certs not attached to a disribution that are older than 24 hours
+		_, active := activeCerts[*cert.ServerCertificateId]
+		if !active && time.Since(*cert.UploadDate).Hours() > 24 {
+			m.Logger.Info("Deleting orphaned certificate", lager.Data{
+				"cert": cert,
+			})
+
+			err := m.Iam.DeleteCertificate(*cert.ServerCertificateName)
+			if err != nil {
+				m.Logger.Error("Error deleting certificate", err, lager.Data{
+					"cert": cert,
+				})
+			}
+		}
+
+		return true
+	})
+}
+
 func (m *RouteManager) RenewAll() {
 	routes := []Route{}
 
@@ -220,11 +258,17 @@ func (m *RouteManager) RenewAll() {
 
 	for _, route := range routes {
 		err := m.Renew(&route)
-		m.Logger.Info("Renewing certificate", lager.Data{
-			"domain": route.DomainExternal,
-			"origin": route.Origin,
-			"status": err,
-		})
+		if err != nil {
+			m.Logger.Error("Error Renewing certificate", err, lager.Data{
+				"domain": route.DomainExternal,
+				"origin": route.Origin,
+			})
+		} else {
+			m.Logger.Info("Successfully Renewed certificate", lager.Data{
+				"domain": route.DomainExternal,
+				"origin": route.Origin,
+			})
+		}
 	}
 }
 
@@ -263,11 +307,6 @@ func (m *RouteManager) updateDeprovisioning(r *Route) error {
 	}
 
 	if deleted {
-		err = m.Iam.DeleteCertificate(fmt.Sprintf("cdn-route-%s", r.DomainExternal), false)
-		if err != nil {
-			return err
-		}
-
 		r.State = Deprovisioned
 		m.DB.Save(r)
 	}
@@ -281,7 +320,7 @@ func (m *RouteManager) provisionCert(r *Route) (acme.CertificateResource, error)
 		return acme.CertificateResource{}, err
 	}
 
-	err = m.deployCertificate(r.DomainExternal, r.DistId, cert)
+	err = m.deployCertificate(r.InstanceId, r.DistId, cert)
 	if err != nil {
 		return acme.CertificateResource{}, err
 	}
@@ -346,19 +385,18 @@ func (m *RouteManager) checkDistribution(r *Route) bool {
 	return *dist.Status == "Deployed" && *dist.DistributionConfig.Enabled
 }
 
-func (m *RouteManager) deployCertificate(domain, distId string, cert acme.CertificateResource) error {
-	prev := fmt.Sprintf("cdn-route-%s-new", domain)
-	next := fmt.Sprintf("cdn-route-%s", domain)
-
-	certId, err := m.Iam.UploadCertificate(prev, cert)
+func (m *RouteManager) deployCertificate(instanceId, distId string, cert acme.CertificateResource) error {
+	expires, err := acme.GetPEMCertExpiration(cert.Certificate)
 	if err != nil {
 		return err
 	}
 
-	err = m.CloudFront.SetCertificate(distId, certId)
+	name := fmt.Sprintf("cdn-route-%s-%s", instanceId, expires)
+
+	certId, err := m.Iam.UploadCertificate(name, cert)
 	if err != nil {
 		return err
 	}
 
-	return m.Iam.RenameCertificate(prev, next)
+	return m.CloudFront.SetCertificate(distId, certId)
 }

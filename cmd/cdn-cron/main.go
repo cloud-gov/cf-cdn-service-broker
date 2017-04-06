@@ -48,6 +48,11 @@ func main() {
 		manager.RenewAll()
 	})
 
+	c.AddFunc(settings.Schedule, func() {
+		logger.Info("Running cert cleanup")
+		manager.DeleteOrphanedCerts()
+	})
+
 	logger.Info("Starting cron")
 	c.Start()
 
