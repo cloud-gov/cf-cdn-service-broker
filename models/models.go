@@ -391,7 +391,9 @@ func (m *RouteManager) deployCertificate(instanceId, distId string, cert acme.Ce
 		return err
 	}
 
-	name := fmt.Sprintf("cdn-route-%s-%s", instanceId, expires)
+	name := fmt.Sprintf("cdn-route-%s-%s", instanceId, expires.Format("2006-01-02_15-04-05"))
+
+	m.Logger.Info("Uploading certificate to IAM", lager.Data{"name": name})
 
 	certId, err := m.Iam.UploadCertificate(name, cert)
 	if err != nil {
