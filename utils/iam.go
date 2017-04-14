@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/iam"
 
 	"github.com/xenolf/lego/acme"
@@ -14,8 +13,8 @@ import (
 
 type IamIface interface {
 	UploadCertificate(name string, cert acme.CertificateResource) (string, error)
-	RenameCertificate(prev, next string) error
-	DeleteCertificate(name string, allowError bool) error
+	DeleteCertificate(name string) error
+	ListCertificates(callback func(iam.ServerCertificateMetadata) bool) error
 }
 
 type Iam struct {
@@ -37,34 +36,28 @@ func (i *Iam) UploadCertificate(name string, cert acme.CertificateResource) (str
 	return *resp.ServerCertificateMetadata.ServerCertificateId, nil
 }
 
-func (i *Iam) RenameCertificate(prev, next string) error {
-	err := i.DeleteCertificate(next, true)
-	if err != nil {
-		return err
+func (i *Iam) ListCertificates(callback func(iam.ServerCertificateMetadata) bool) error {
+	params := &iam.ListServerCertificatesInput{
+		PathPrefix: aws.String(fmt.Sprintf("/cloudfront/%s/", i.Settings.IamPathPrefix)),
 	}
 
-	_, err = i.Service.UpdateServerCertificate(&iam.UpdateServerCertificateInput{
-		ServerCertificateName:    aws.String(prev),
-		NewServerCertificateName: aws.String(next),
-	})
+	return i.Service.ListServerCertificatesPages(params,
+		func(page *iam.ListServerCertificatesOutput, lastPage bool) bool {
+			for _, v := range page.ServerCertificateMetadataList {
+				// stop iteration if the callback tells us to
+				if callback(*v) == false {
+					return false
+				}
+			}
 
-	return err
+			return true
+		})
 }
 
-func (i *Iam) DeleteCertificate(name string, allowError bool) error {
+func (i *Iam) DeleteCertificate(name string) error {
 	_, err := i.Service.DeleteServerCertificate(&iam.DeleteServerCertificateInput{
 		ServerCertificateName: aws.String(name),
 	})
 
-	// If caller passes `allowError`, ignore 403 and 404 errors;
-	// deleting a non-existing certificate may throw either error
-	// depending on permissions.
-	if err != nil && allowError {
-		code := err.(awserr.RequestFailure).StatusCode()
-		if code != 403 && code != 404 {
-			return err
-		}
-	}
-
-	return nil
+	return err
 }

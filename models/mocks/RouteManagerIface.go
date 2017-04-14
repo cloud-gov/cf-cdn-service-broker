@@ -101,6 +101,11 @@ func (_m *RouteManagerIface) RenewAll() {
 	_m.Called()
 }
 
+// DeleteOrphanedCerts provides a mock function with given fields:
+func (_m *RouteManagerIface) DeleteOrphanedCerts() {
+	_m.Called()
+}
+
 // Update provides a mock function with given fields: instanceId, domain, origin, path, insecureOrigin, forwardedHeaders
 func (_m *RouteManagerIface) Update(instanceId string, domain string, origin string, path string, insecureOrigin bool, forwardedHeaders []string, forwardCookies bool) error {
 	ret := _m.Called(instanceId, domain, origin, path, insecureOrigin, forwardedHeaders)
