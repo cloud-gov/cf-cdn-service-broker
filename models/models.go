@@ -34,11 +34,14 @@ func (s State) Value() (driver.Value, error) {
 
 // Unmarshal an `interface{}` to a `State` when reading from the database
 func (s *State) Scan(value interface{}) error {
-	bytes, ok := value.([]byte)
-	if !ok {
-		return fmt.Errorf("error scanning status %s", value)
+	switch value.(type) {
+	case string:
+		*s = State(value.(string))
+	case []byte:
+		*s = State(value.([]byte))
+	default:
+		return fmt.Errorf("Incompatible type for %s", value)
 	}
-	*s = State(bytes)
 	return nil
 }
 
