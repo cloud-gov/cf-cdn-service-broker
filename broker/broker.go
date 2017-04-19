@@ -10,6 +10,7 @@ import (
 
 	"code.cloudfoundry.org/lager"
 	"github.com/pivotal-cf/brokerapi"
+	"github.com/xenolf/lego/acme"
 
 	"github.com/18F/cf-cdn-service-broker/cf"
 	"github.com/18F/cf-cdn-service-broker/config"
@@ -119,12 +120,29 @@ func (b *CdnServiceBroker) LastOperation(
 
 	switch route.State {
 	case models.Provisioning:
-		return brokerapi.LastOperation{
-			State: brokerapi.InProgress,
-			Description: fmt.Sprintf(
-				"Provisioning in progress [%s => %s]; CNAME domain %s to %s.",
+		var description string
+		if len(route.ChallengeJSON) > 0 {
+			instructions, err := getDNSInstructions(route.ChallengeJSON)
+			if err != nil {
+				return brokerapi.LastOperation{}, err
+			}
+			if len(instructions) != len(route.GetDomains()) {
+				return brokerapi.LastOperation{}, fmt.Errorf("Expected to find %d tokens; found %d", len(route.GetDomains()), len(instructions))
+			}
+			description = fmt.Sprintf(
+				"Provisioning in progress [%s => %s]; CNAME or ALIAS domain %s to %s or create TXT record(s): \n%s",
 				route.DomainExternal, route.Origin, route.DomainExternal, route.DomainInternal,
-			),
+				strings.Join(instructions, "\n"),
+			)
+		} else {
+			description = fmt.Sprintf(
+				"Provisioning in progress [%s => %s]; CNAME or ALIAS domain %s to %s.",
+				route.DomainExternal, route.Origin, route.DomainExternal, route.DomainInternal,
+			)
+		}
+		return brokerapi.LastOperation{
+			State:       brokerapi.InProgress,
+			Description: description,
 		}, nil
 	case models.Deprovisioning:
 		return brokerapi.LastOperation{
@@ -249,11 +267,7 @@ func (b *CdnServiceBroker) parseProvisionDetails(details brokerapi.ProvisionDeta
 // parseUpdateDetails will attempt to parse the update details and then verify that at least "domain" or "origin"
 // are provided.
 func (b *CdnServiceBroker) parseUpdateDetails(details brokerapi.UpdateDetails) (options Options, err error) {
-	rawJSON, err := json.Marshal(details.Parameters)
-	if err != nil {
-		return
-	}
-	options, err = b.createBrokerOptions(rawJSON)
+	options, err = b.createBrokerOptions(details.RawParameters)
 	if err != nil {
 		return
 	}
@@ -307,4 +321,21 @@ func (b *CdnServiceBroker) getHeaders(options Options) []string {
 		return []string{"Host"}
 	}
 	return []string{}
+}
+
+func getDNSInstructions(data []byte) ([]string, error) {
+	var instructions []string
+	var challenges []acme.AuthorizationResource
+	if err := json.Unmarshal(data, &challenges); err != nil {
+		return instructions, err
+	}
+	for _, auth := range challenges {
+		for _, challenge := range auth.Body.Challenges {
+			if challenge.Type == acme.DNS01 {
+				fqdn, value, ttl := acme.DNS01Record(auth.Domain, challenge.Token)
+				instructions = append(instructions, fmt.Sprintf("name: %s, value: %s, ttl: %d", fqdn, value, ttl))
+			}
+		}
+	}
+	return instructions, nil
 }

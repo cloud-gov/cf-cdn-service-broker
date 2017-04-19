@@ -2,10 +2,8 @@ package models
 
 import (
 	"database/sql/driver"
+	"encoding/json"
 	"fmt"
-	"net"
-	"reflect"
-	"sort"
 	"strings"
 	"time"
 
@@ -48,6 +46,7 @@ type Route struct {
 	gorm.Model
 	InstanceId     string `gorm:"not null;unique_index"`
 	State          State  `gorm:"not null;index"`
+	ChallengeJSON  []byte
 	DomainExternal string
 	DomainInternal string
 	DistId         string
@@ -82,11 +81,27 @@ type RouteManagerIface interface {
 }
 
 type RouteManager struct {
-	Logger     lager.Logger
-	Iam        utils.IamIface
-	CloudFront utils.DistributionIface
-	Acme       utils.AcmeIface
-	DB         *gorm.DB
+	logger     lager.Logger
+	iam        utils.IamIface
+	cloudFront utils.DistributionIface
+	acmeClient *acme.Client
+	db         *gorm.DB
+}
+
+func NewManager(
+	logger lager.Logger,
+	iam utils.IamIface,
+	cloudFront utils.DistributionIface,
+	acmeClient *acme.Client,
+	db *gorm.DB,
+) RouteManager {
+	return RouteManager{
+		logger:     logger,
+		iam:        iam,
+		cloudFront: cloudFront,
+		acmeClient: acmeClient,
+		db:         db,
+	}
 }
 
 func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureOrigin bool, forwardedHeaders []string, forwardCookies bool, tags map[string]string) (*Route, error) {
@@ -99,7 +114,7 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 		InsecureOrigin: insecureOrigin,
 	}
 
-	dist, err := m.CloudFront.Create(instanceId, route.GetDomains(), origin, path, insecureOrigin, forwardedHeaders, forwardCookies, tags)
+	dist, err := m.cloudFront.Create(instanceId, route.GetDomains(), origin, path, insecureOrigin, forwardedHeaders, forwardCookies, tags)
 	if err != nil {
 		return nil, err
 	}
@@ -107,13 +122,23 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 	route.DomainInternal = *dist.DomainName
 	route.DistId = *dist.Id
 
-	m.DB.Create(route)
+	challenges, errs := m.acmeClient.GetChallenges(route.GetDomains())
+	if len(errs) > 0 {
+		return nil, fmt.Errorf("Error(s) getting challenges: %v", errs)
+	}
+
+	route.ChallengeJSON, err = json.Marshal(challenges)
+	if err != nil {
+		return nil, err
+	}
+
+	m.db.Create(route)
 	return route, nil
 }
 
 func (m *RouteManager) Get(instanceId string) (*Route, error) {
 	route := Route{}
-	result := m.DB.First(&route, Route{InstanceId: instanceId})
+	result := m.db.First(&route, Route{InstanceId: instanceId})
 	if result.Error == nil {
 		return &route, nil
 	} else if result.RecordNotFound() {
@@ -145,7 +170,7 @@ func (m *RouteManager) Update(instanceId, domain, origin string, path string, in
 	}
 
 	// Update the distribution
-	dist, err := m.CloudFront.Update(route.DistId, route.GetDomains(),
+	dist, err := m.cloudFront.Update(route.DistId, route.GetDomains(),
 		route.Origin, route.Path, route.InsecureOrigin, forwardedHeaders, forwardCookies)
 	if err != nil {
 		return err
@@ -157,7 +182,7 @@ func (m *RouteManager) Update(instanceId, domain, origin string, path string, in
 	route.DistId = *dist.Id
 
 	// Save the database.
-	result := m.DB.Save(route)
+	result := m.db.Save(route)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -176,31 +201,34 @@ func (m *RouteManager) Poll(r *Route) error {
 }
 
 func (m *RouteManager) Disable(r *Route) error {
-	err := m.CloudFront.Disable(r.DistId)
+	err := m.cloudFront.Disable(r.DistId)
 	if err != nil {
 		return err
 	}
 
 	r.State = Deprovisioning
-	m.DB.Save(r)
+	m.db.Save(r)
 
 	return nil
 }
 
 func (m *RouteManager) Renew(r *Route) error {
 	var certRow Certificate
-	err := m.DB.Model(r).Related(&certRow, "Certificate").Error
+	err := m.db.Model(r).Related(&certRow, "Certificate").Error
 	if err != nil {
 		return err
 	}
 
-	certResource, err := m.provisionCert(r)
-	if err != nil {
-		return err
+	certResource, errs := m.acmeClient.ObtainCertificate(r.GetDomains(), true, nil, false)
+	if len(errs) > 0 {
+		return fmt.Errorf("Error(s) obtaining certificate: %v", errs)
 	}
-
 	expires, err := acme.GetPEMCertExpiration(certResource.Certificate)
 	if err != nil {
+		return err
+	}
+
+	if err := m.deployCertificate(r.InstanceId, r.DistId, certResource); err != nil {
 		return err
 	}
 
@@ -208,15 +236,14 @@ func (m *RouteManager) Renew(r *Route) error {
 	certRow.CertURL = certResource.CertURL
 	certRow.Certificate = certResource.Certificate
 	certRow.Expires = expires
-	return m.DB.Save(&certRow).Error
+	return m.db.Save(&certRow).Error
 }
 
 func (m *RouteManager) DeleteOrphanedCerts() {
-
 	// iterate over all distributions and record all certificates in-use by these distributions
 	activeCerts := make(map[string]string)
 
-	m.CloudFront.ListDistributions(func(distro cloudfront.DistributionSummary) bool {
+	m.cloudFront.ListDistributions(func(distro cloudfront.DistributionSummary) bool {
 		if distro.ViewerCertificate.IAMCertificateId != nil {
 			activeCerts[*distro.ViewerCertificate.IAMCertificateId] = *distro.ARN
 		}
@@ -224,18 +251,18 @@ func (m *RouteManager) DeleteOrphanedCerts() {
 	})
 
 	// iterate over all certificates
-	m.Iam.ListCertificates(func(cert iam.ServerCertificateMetadata) bool {
+	m.iam.ListCertificates(func(cert iam.ServerCertificateMetadata) bool {
 
-		// delete any certs not attached to a disribution that are older than 24 hours
+		// delete any certs not attached to a distribution that are older than 24 hours
 		_, active := activeCerts[*cert.ServerCertificateId]
 		if !active && time.Since(*cert.UploadDate).Hours() > 24 {
-			m.Logger.Info("Deleting orphaned certificate", lager.Data{
+			m.logger.Info("Deleting orphaned certificate", lager.Data{
 				"cert": cert,
 			})
 
-			err := m.Iam.DeleteCertificate(*cert.ServerCertificateName)
+			err := m.iam.DeleteCertificate(*cert.ServerCertificateName)
 			if err != nil {
-				m.Logger.Error("Error deleting certificate", err, lager.Data{
+				m.logger.Error("Error deleting certificate", err, lager.Data{
 					"cert": cert,
 				})
 			}
@@ -248,7 +275,7 @@ func (m *RouteManager) DeleteOrphanedCerts() {
 func (m *RouteManager) RenewAll() {
 	routes := []Route{}
 
-	m.DB.Where(
+	m.db.Where(
 		"state = ? and expires < now() + interval '30 days'", string(Provisioned),
 	).Joins(
 		"join certificates on routes.id = certificates.route_id",
@@ -259,12 +286,12 @@ func (m *RouteManager) RenewAll() {
 	for _, route := range routes {
 		err := m.Renew(&route)
 		if err != nil {
-			m.Logger.Error("Error Renewing certificate", err, lager.Data{
+			m.logger.Error("Error Renewing certificate", err, lager.Data{
 				"domain": route.DomainExternal,
 				"origin": route.Origin,
 			})
 		} else {
-			m.Logger.Info("Successfully Renewed certificate", lager.Data{
+			m.logger.Info("Successfully Renewed certificate", lager.Data{
 				"domain": route.DomainExternal,
 				"origin": route.Origin,
 			})
@@ -273,111 +300,62 @@ func (m *RouteManager) RenewAll() {
 }
 
 func (m *RouteManager) updateProvisioning(r *Route) error {
-	if (m.checkCNAME(r) || m.checkHosts(r)) && m.checkDistribution(r) {
-		certResource, err := m.provisionCert(r)
+	if m.checkDistribution(r) {
+		var challenges []acme.AuthorizationResource
+		if err := json.Unmarshal(r.ChallengeJSON, &challenges); err != nil {
+			return err
+		}
+		if errs := m.acmeClient.SolveChallenges(challenges); len(errs) > 0 {
+			return fmt.Errorf("Error(s) solving challenges: %v", errs)
+		}
+
+		cert, err := m.acmeClient.RequestCertificate(challenges, true, nil, false)
 		if err != nil {
 			return err
 		}
 
-		expires, err := acme.GetPEMCertExpiration(certResource.Certificate)
+		expires, err := acme.GetPEMCertExpiration(cert.Certificate)
 		if err != nil {
+			return err
+		}
+		if err := m.deployCertificate(r.InstanceId, r.DistId, cert); err != nil {
 			return err
 		}
 
 		certRow := Certificate{
-			Domain:      certResource.Domain,
-			CertURL:     certResource.CertURL,
-			Certificate: certResource.Certificate,
+			Domain:      cert.Domain,
+			CertURL:     cert.CertURL,
+			Certificate: cert.Certificate,
 			Expires:     expires,
 		}
-		m.DB.Create(&certRow)
+		if err := m.db.Create(&certRow).Error; err != nil {
+			return err
+		}
 
 		r.State = Provisioned
 		r.Certificate = certRow
-		m.DB.Save(r)
+		return m.db.Save(r).Error
 	}
 
 	return nil
 }
 
 func (m *RouteManager) updateDeprovisioning(r *Route) error {
-	deleted, err := m.CloudFront.Delete(r.DistId)
+	deleted, err := m.cloudFront.Delete(r.DistId)
 	if err != nil {
 		return err
 	}
 
 	if deleted {
 		r.State = Deprovisioned
-		m.DB.Save(r)
+		m.db.Save(r)
 	}
 
 	return nil
 }
 
-func (m *RouteManager) provisionCert(r *Route) (acme.CertificateResource, error) {
-	cert, err := m.Acme.ObtainCertificate(r.GetDomains())
-	if err != nil {
-		return acme.CertificateResource{}, err
-	}
-
-	err = m.deployCertificate(r.InstanceId, r.DistId, cert)
-	if err != nil {
-		return acme.CertificateResource{}, err
-	}
-
-	return cert, nil
-}
-
-func (m *RouteManager) checkCNAME(r *Route) bool {
-	expects := fmt.Sprintf("%s.", r.DomainInternal)
-
-	for _, d := range r.GetDomains() {
-		cname, err := net.LookupCNAME(d)
-		if err != nil || cname != expects {
-			return false
-		}
-	}
-
-	return true
-}
-
-func removeV6hosts(hosts []string) []string {
-	v4hosts := []string{}
-
-	for _, host := range hosts {
-		if strings.Index(host, ":") == -1 {
-			v4hosts = append(v4hosts, host)
-		}
-	}
-
-	return v4hosts
-}
-
-func (m *RouteManager) checkHosts(r *Route) bool {
-	hosts, err := net.LookupHost(r.DomainInternal)
-	if err != nil {
-		return false
-	}
-	sort.Strings(hosts)
-	hosts = removeV6hosts(hosts)
-
-	for _, d := range r.GetDomains() {
-		obsHosts, err := net.LookupHost(d)
-		if err != nil {
-			return false
-		}
-		sort.Strings(obsHosts)
-		obsHosts = removeV6hosts(obsHosts)
-		if !reflect.DeepEqual(hosts, obsHosts) {
-			return false
-		}
-	}
-
-	return true
-}
-
 func (m *RouteManager) checkDistribution(r *Route) bool {
-	dist, err := m.CloudFront.Get(r.DistId)
+	dist, err := m.cloudFront.Get(r.DistId)
 	if err != nil {
 		return false
 	}
@@ -393,12 +371,12 @@ func (m *RouteManager) deployCertificate(instanceId, distId string, cert acme.Ce
 
 	name := fmt.Sprintf("cdn-route-%s-%s", instanceId, expires.Format("2006-01-02_15-04-05"))
 
-	m.Logger.Info("Uploading certificate to IAM", lager.Data{"name": name})
+	m.logger.Info("Uploading certificate to IAM", lager.Data{"name": name})
 
-	certId, err := m.Iam.UploadCertificate(name, cert)
+	certId, err := m.iam.UploadCertificate(name, cert)
 	if err != nil {
 		return err
 	}
 
-	return m.CloudFront.SetCertificate(distId, certId)
+	return m.cloudFront.SetCertificate(distId, certId)
 }

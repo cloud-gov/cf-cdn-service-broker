@@ -27,19 +27,25 @@ func main() {
 		logger.Fatal("new-settings", err)
 	}
 
+	session := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
+
+	client, err := utils.NewClient(settings, s3.New(session))
+	if err != nil {
+		logger.Fatal("acme-client", err)
+	}
+
 	db, err := config.Connect(settings)
 	if err != nil {
 		logger.Fatal("connect", err)
 	}
 
-	session := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
-	manager := models.RouteManager{
-		Logger:     logger,
-		Iam:        &utils.Iam{settings, iam.New(session)},
-		CloudFront: &utils.Distribution{settings, cloudfront.New(session)},
-		Acme:       &utils.Acme{settings, s3.New(session)},
-		DB:         db,
-	}
+	manager := models.NewManager(
+		logger,
+		&utils.Iam{settings, iam.New(session)},
+		&utils.Distribution{settings, cloudfront.New(session)},
+		client,
+		db,
+	)
 
 	c := cron.New()
 

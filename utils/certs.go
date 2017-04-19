@@ -1,18 +1,15 @@
 package utils
 
 import (
-	"fmt"
-	"path"
-	"strings"
-
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
-
-	"github.com/xenolf/lego/acme"
+	"path"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/xenolf/lego/acme"
 
 	"github.com/18F/cf-cdn-service-broker/config"
 )
@@ -63,31 +60,17 @@ func (p *HTTPProvider) CleanUp(domain, token, keyAuth string) error {
 	return err
 }
 
-type AcmeIface interface {
-	ObtainCertificate(domains []string) (acme.CertificateResource, error)
+type DNSProvider struct{}
+
+func (p *DNSProvider) Present(domain, token, keyAuth string) error {
+	return nil
 }
 
-type Acme struct {
-	Settings config.Settings
-	Service  *s3.S3
+func (p *DNSProvider) CleanUp(domain, token, keyAuth string) error {
+	return nil
 }
 
-func (a *Acme) ObtainCertificate(domains []string) (acme.CertificateResource, error) {
-	client, err := a.newClient()
-	if err != nil {
-		return acme.CertificateResource{}, err
-	}
-
-	certificate, failures := client.ObtainCertificate(domains, true, nil)
-
-	if len(failures) > 0 {
-		return acme.CertificateResource{}, fmt.Errorf("Error(s) obtaining cert: %s", failures)
-	}
-
-	return certificate, nil
-}
-
-func (a *Acme) newClient() (*acme.Client, error) {
+func NewClient(settings config.Settings, s3Service *s3.S3) (*acme.Client, error) {
 	keySize := 2048
 	key, err := rsa.GenerateKey(rand.Reader, keySize)
 	if err != nil {
@@ -95,11 +78,11 @@ func (a *Acme) newClient() (*acme.Client, error) {
 	}
 
 	user := User{
-		Email: a.Settings.Email,
+		Email: settings.Email,
 		key:   key,
 	}
 
-	client, err := acme.NewClient(a.Settings.AcmeUrl, &user, acme.RSA2048)
+	client, err := acme.NewClient(settings.AcmeUrl, &user, acme.RSA2048)
 	if err != nil {
 		return &acme.Client{}, err
 	}
@@ -119,10 +102,11 @@ func (a *Acme) newClient() (*acme.Client, error) {
 	}
 
 	client.SetChallengeProvider(acme.HTTP01, &HTTPProvider{
-		Settings: a.Settings,
-		Service:  a.Service,
+		Settings: settings,
+		Service:  s3Service,
 	})
-	client.ExcludeChallenges([]acme.Challenge{acme.DNS01, acme.TLSSNI01})
+	client.SetChallengeProvider(acme.DNS01, &DNSProvider{})
+	client.ExcludeChallenges([]acme.Challenge{acme.TLSSNI01})
 
 	return client, nil
 }

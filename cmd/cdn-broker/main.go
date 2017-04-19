@@ -35,28 +35,34 @@ func main() {
 		logger.Fatal("connect", err)
 	}
 
-	client, err := cfclient.NewClient(&cfclient.Config{
+	cfClient, err := cfclient.NewClient(&cfclient.Config{
 		ApiAddress:   settings.APIAddress,
 		ClientID:     settings.ClientID,
 		ClientSecret: settings.ClientSecret,
 	})
 	if err != nil {
-		logger.Fatal("client", err)
+		logger.Fatal("cf-client", err)
+	}
+
+	session := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
+
+	acmeClient, err := utils.NewClient(settings, s3.New(session))
+	if err != nil {
+		logger.Fatal("acme-client", err)
 	}
 
 	db.AutoMigrate(&models.Route{}, &models.Certificate{})
 
-	session := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
-	manager := models.RouteManager{
-		Logger:     logger,
-		Iam:        &utils.Iam{settings, iam.New(session)},
-		CloudFront: &utils.Distribution{settings, cloudfront.New(session)},
-		Acme:       &utils.Acme{settings, s3.New(session)},
-		DB:         db,
-	}
+	manager := models.NewManager(
+		logger,
+		&utils.Iam{settings, iam.New(session)},
+		&utils.Distribution{settings, cloudfront.New(session)},
+		acmeClient,
+		db,
+	)
 	broker := broker.New(
 		&manager,
-		client,
+		cfClient,
 		settings,
 		logger,
 	)

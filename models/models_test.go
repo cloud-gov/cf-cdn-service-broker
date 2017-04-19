@@ -6,10 +6,8 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/lager"
-
-	"github.com/18F/cf-cdn-service-broker/config"
-	"github.com/18F/cf-cdn-service-broker/models"
-	"github.com/18F/cf-cdn-service-broker/utils"
+	"github.com/jinzhu/gorm"
+	"github.com/xenolf/lego/acme"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/request"
@@ -17,8 +15,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"github.com/aws/aws-sdk-go/service/iam"
 
+	"github.com/18F/cf-cdn-service-broker/config"
+	"github.com/18F/cf-cdn-service-broker/models"
+	"github.com/18F/cf-cdn-service-broker/utils"
+
 	"github.com/stretchr/testify/mock"
-	"github.com/xenolf/lego/acme"
 )
 
 type MockUtilsIam struct {
@@ -137,11 +138,13 @@ func TestDeleteOrphanedCerts(t *testing.T) {
 	mui.On("DeleteCertificate", "some-orphaned-cert").Return(nil)
 	mui.On("DeleteCertificate", "some-other-orphaned-cert").Return(nil)
 
-	m := models.RouteManager{
-		Logger:     logger,
-		Iam:        mui,
-		CloudFront: &utils.Distribution{settings, fakecf},
-	}
+	m := models.NewManager(
+		logger,
+		mui,
+		&utils.Distribution{settings, fakecf},
+		&acme.Client{},
+		&gorm.DB{},
+	)
 
 	//run the test
 	m.DeleteOrphanedCerts()
