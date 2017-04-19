@@ -340,6 +340,7 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 		return m.db.Save(r).Error
 	}
 
+	m.logger.Info("distribution-provisioning", lager.Data{"instance_id": r.InstanceId})
 	return nil
 }
 

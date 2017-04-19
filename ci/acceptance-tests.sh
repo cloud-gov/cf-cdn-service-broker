@@ -28,7 +28,7 @@ opts=$(jq -n --arg domain "${DOMAIN}" '{domain: $domain}')
 cf create-service "${SERVICE_NAME}" "${PLAN_NAME}" "${SERVICE_INSTANCE_NAME}" -c "${opts}"
 
 # Get CNAME instructions
-regex="CNAME domain (.*) to (.*)\.$"
+regex="CNAME or ALIAS domain (.*) to (.*) or"
 
 elapsed=60
 until [ "${elapsed}" -le 0 ]; do

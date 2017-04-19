@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"errors"
 	"io/ioutil"
 	"net/http"
@@ -35,6 +36,12 @@ func (u *User) GetPrivateKey() crypto.PrivateKey {
 	return u.key
 }
 
+var insecureClient = &http.Client{
+	Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	},
+}
+
 type HTTPProvider struct {
 	Settings config.Settings
 	Service  *s3.S3
@@ -54,7 +61,7 @@ func (p *HTTPProvider) Present(domain, token, keyAuth string) error {
 	}
 
 	return acme.WaitFor(60, 15, func() (bool, error) {
-		resp, err := http.Get("https://" + path.Join(domain, ".well-known", "acme-challenge", token))
+		resp, err := insecureClient.Get("https://" + path.Join(domain, ".well-known", "acme-challenge", token))
 		if err != nil {
 			return false, err
 		}
