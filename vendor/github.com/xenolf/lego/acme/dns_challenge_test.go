@@ -35,16 +35,24 @@ var lookupNameserversTestsErr = []struct {
 }{
 	// invalid tld
 	{"_null.n0n0.",
-		"Could not determine zone authoritatively",
+		"Could not determine the zone",
 	},
 	// invalid domain
 	{"_null.com.",
-		"Could not determine zone authoritatively",
+		"Could not determine the zone",
 	},
 	// invalid domain
 	{"in-valid.co.uk.",
-		"Could not determine zone authoritatively",
+		"Could not determine the zone",
 	},
+}
+
+var findZoneByFqdnTests = []struct {
+	fqdn string
+	zone string
+}{
+	{"mail.google.com.", "google.com."}, // domain is a CNAME
+	{"foo.google.com.", "google.com."},  // domain is a non-existent subdomain
 }
 
 var checkAuthoritativeNssTests = []struct {
@@ -77,8 +85,17 @@ var checkAuthoritativeNssTestsErr = []struct {
 	},
 }
 
+var checkResolvConfServersTests = []struct {
+	fixture  string
+	expected []string
+	defaults []string
+}{
+	{"testdata/resolv.conf.1", []string{"10.200.3.249:53", "10.200.3.250:5353", "[2001:4860:4860::8844]:53", "[10.0.0.1]:5353"}, []string{"127.0.0.1:53"}},
+	{"testdata/resolv.conf.nonexistant", []string{"127.0.0.1:53"}, []string{"127.0.0.1:53"}},
+}
+
 func TestDNSValidServerResponse(t *testing.T) {
-	preCheckDNS = func(fqdn, value string) (bool, error) {
+	PreCheckDNS = func(fqdn, value string) (bool, error) {
 		return true, nil
 	}
 	privKey, _ := rsa.GenerateKey(rand.Reader, 512)
@@ -106,7 +123,7 @@ func TestDNSValidServerResponse(t *testing.T) {
 }
 
 func TestPreCheckDNS(t *testing.T) {
-	ok, err := preCheckDNS("acme-staging.api.letsencrypt.org", "fe01=")
+	ok, err := PreCheckDNS("acme-staging.api.letsencrypt.org", "fe01=")
 	if err != nil || !ok {
 		t.Errorf("preCheckDNS failed for acme-staging.api.letsencrypt.org")
 	}
@@ -142,6 +159,18 @@ func TestLookupNameserversErr(t *testing.T) {
 	}
 }
 
+func TestFindZoneByFqdn(t *testing.T) {
+	for _, tt := range findZoneByFqdnTests {
+		res, err := FindZoneByFqdn(tt.fqdn, RecursiveNameservers)
+		if err != nil {
+			t.Errorf("FindZoneByFqdn failed for %s: %v", tt.fqdn, err)
+		}
+		if res != tt.zone {
+			t.Errorf("%s: got %s; want %s", tt.fqdn, res, tt.zone)
+		}
+	}
+}
+
 func TestCheckAuthoritativeNss(t *testing.T) {
 	for _, tt := range checkAuthoritativeNssTests {
 		ok, _ := checkAuthoritativeNss(tt.fqdn, tt.value, tt.ns)
@@ -160,6 +189,18 @@ func TestCheckAuthoritativeNssErr(t *testing.T) {
 		if !strings.Contains(err.Error(), tt.error) {
 			t.Errorf("#%s: expected %q (error); got %q", tt.fqdn, tt.error, err)
 			continue
+		}
+	}
+}
+
+func TestResolveConfServers(t *testing.T) {
+	for _, tt := range checkResolvConfServersTests {
+		result := getNameservers(tt.fixture, tt.defaults)
+
+		sort.Strings(result)
+		sort.Strings(tt.expected)
+		if !reflect.DeepEqual(result, tt.expected) {
+			t.Errorf("#%s: expected %q; got %q", tt.fixture, tt.expected, result)
 		}
 	}
 }

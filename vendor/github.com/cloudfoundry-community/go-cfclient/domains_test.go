@@ -8,7 +8,7 @@ import (
 
 func TestListDomains(t *testing.T) {
 	Convey("List domains", t, func() {
-		setup(MockRoute{"GET", "/v2/private_domains", listDomainsPayload, ""}, t)
+		setup(MockRoute{"GET", "/v2/private_domains", listDomainsPayload, "", 200, "", nil}, t)
 		defer teardown()
 		c := &Config{
 			ApiAddress: server.URL,
@@ -29,9 +29,31 @@ func TestListDomains(t *testing.T) {
 	})
 }
 
+func TestListSharedDomains(t *testing.T) {
+	Convey("List shared domains", t, func() {
+		setup(MockRoute{"GET", "/v2/shared_domains", listSharedDomainsPayload, "", 200, "", nil}, t)
+		defer teardown()
+		c := &Config{
+			ApiAddress: server.URL,
+			Token:      "foobar",
+		}
+		client, err := NewClient(c)
+		So(err, ShouldBeNil)
+
+		domains, err := client.ListSharedDomains()
+		So(err, ShouldBeNil)
+
+		So(len(domains), ShouldEqual, 1)
+		So(domains[0].Guid, ShouldEqual, "91977695-8ad9-40db-858f-4df782603ec3")
+		So(domains[0].Name, ShouldEqual, "domain-49.example.com")
+		So(domains[0].RouterGroupGuid, ShouldEqual, "my-random-guid")
+		So(domains[0].RouterGroupType, ShouldEqual, "tcp")
+	})
+}
+
 func TestCreateDomain(t *testing.T) {
 	Convey("Create domain", t, func() {
-		setup(MockRoute{"POST", "/v2/private_domains", postDomainPayload, ""}, t)
+		setup(MockRoute{"POST", "/v2/private_domains", postDomainPayload, "", 201, "", nil}, t)
 		defer teardown()
 		c := &Config{
 			ApiAddress: server.URL,
@@ -49,7 +71,7 @@ func TestCreateDomain(t *testing.T) {
 
 func TestDeleteDomain(t *testing.T) {
 	Convey("Delete domain", t, func() {
-		setup(MockRoute{"DELETE", "/v2/private_domains/b2a35f0c-d5ad-4a59-bea7-461711d96b0d", "", ""}, t)
+		setup(MockRoute{"DELETE", "/v2/private_domains/b2a35f0c-d5ad-4a59-bea7-461711d96b0d", "", "", 204, "", nil}, t)
 		defer teardown()
 		c := &Config{
 			ApiAddress: server.URL,

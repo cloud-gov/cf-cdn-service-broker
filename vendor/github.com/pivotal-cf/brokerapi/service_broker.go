@@ -1,9 +1,9 @@
 package brokerapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
-	"context"
 )
 
 type ServiceBroker interface {
@@ -18,6 +18,22 @@ type ServiceBroker interface {
 	Update(context context.Context, instanceID string, details UpdateDetails, asyncAllowed bool) (UpdateServiceSpec, error)
 
 	LastOperation(context context.Context, instanceID, operationData string) (LastOperation, error)
+}
+
+type DetailsWithRawParameters interface {
+	GetRawParameters() json.RawMessage
+}
+
+func (d ProvisionDetails) GetRawParameters() json.RawMessage {
+	return d.RawParameters
+}
+
+func (d BindDetails) GetRawParameters() json.RawMessage {
+	return d.RawParameters
+}
+
+func (d UpdateDetails) GetRawParameters() json.RawMessage {
+	return d.RawParameters
 }
 
 type ProvisionDetails struct {
@@ -35,11 +51,11 @@ type ProvisionedServiceSpec struct {
 }
 
 type BindDetails struct {
-	AppGUID      string                 `json:"app_guid"`
-	PlanID       string                 `json:"plan_id"`
-	ServiceID    string                 `json:"service_id"`
-	BindResource *BindResource          `json:"bind_resource,omitempty"`
-	Parameters   map[string]interface{} `json:"parameters,omitempty"`
+	AppGUID       string          `json:"app_guid"`
+	PlanID        string          `json:"plan_id"`
+	ServiceID     string          `json:"service_id"`
+	BindResource  *BindResource   `json:"bind_resource,omitempty"`
+	RawParameters json.RawMessage `json:"parameters,omitempty"`
 }
 
 type BindResource struct {
@@ -68,10 +84,10 @@ type DeprovisionDetails struct {
 }
 
 type UpdateDetails struct {
-	ServiceID      string                 `json:"service_id"`
-	PlanID         string                 `json:"plan_id"`
-	Parameters     map[string]interface{} `json:"parameters"`
-	PreviousValues PreviousValues         `json:"previous_values"`
+	ServiceID      string          `json:"service_id"`
+	PlanID         string          `json:"plan_id"`
+	RawParameters  json.RawMessage `json:"parameters,omitempty"`
+	PreviousValues PreviousValues  `json:"previous_values"`
 }
 
 type PreviousValues struct {
@@ -119,6 +135,7 @@ var (
 	ErrInstanceDoesNotExist   = errors.New("instance does not exist")
 	ErrInstanceLimitMet       = errors.New("instance limit for this service has been reached")
 	ErrPlanQuotaExceeded      = errors.New("The quota for this service plan has been exceeded. Please contact your Operator for help.")
+	ErrServiceQuotaExceeded   = errors.New("The quota for this service has been exceeded. Please contact your Operator for help.")
 	ErrBindingAlreadyExists   = errors.New("binding already exists")
 	ErrBindingDoesNotExist    = errors.New("binding does not exist")
 	ErrAsyncRequired          = errors.New("This service plan requires client support for asynchronous service operations.")

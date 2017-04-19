@@ -2,9 +2,10 @@ package cfclient
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/url"
+
+	"github.com/pkg/errors"
 )
 
 type RoutesResponse struct {
@@ -31,8 +32,11 @@ type Route struct {
 }
 
 func (c *Client) ListRoutesByQuery(query url.Values) ([]Route, error) {
+	return c.fetchRoutes("/v2/routes?" + query.Encode())
+}
+
+func (c *Client) fetchRoutes(requestUrl string) ([]Route, error) {
 	var routes []Route
-	requestUrl := "/v2/routes?" + query.Encode()
 	for {
 		routesResp, err := c.getRoutesResponse(requestUrl)
 		if err != nil {
@@ -60,16 +64,16 @@ func (c *Client) getRoutesResponse(requestUrl string) (RoutesResponse, error) {
 	r := c.NewRequest("GET", requestUrl)
 	resp, err := c.DoRequest(r)
 	if err != nil {
-		return RoutesResponse{}, fmt.Errorf("Error requesting routes %v", err)
+		return RoutesResponse{}, errors.Wrap(err, "Error requesting routes")
 	}
 	resBody, err := ioutil.ReadAll(resp.Body)
 	defer resp.Body.Close()
 	if err != nil {
-		return RoutesResponse{}, fmt.Errorf("Error reading routes body %v", err)
+		return RoutesResponse{}, errors.Wrap(err, "Error reading routes body")
 	}
 	err = json.Unmarshal(resBody, &routesResp)
 	if err != nil {
-		return RoutesResponse{}, fmt.Errorf("Error unmarshalling routes %v", err)
+		return RoutesResponse{}, errors.Wrap(err, "Error unmarshalling routes")
 	}
 	return routesResp, nil
 }

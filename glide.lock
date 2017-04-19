@@ -1,10 +1,10 @@
-hash: ba8a210ca030cee047b36cba02a52b4ba402b51b735bc286c58f54664d38ecb5
-updated: 2017-02-09T17:06:08.79114682-05:00
+hash: 54e41784d66fa88c45503c2b35a96ab024ee35fe6a5174e9c7b147ad41af957a
+updated: 2017-04-18T23:11:14.244159283-04:00
 imports:
 - name: code.cloudfoundry.org/lager
-  version: 6cfe365fb6bb84343f0034b4a53cd250d173b61f
+  version: de8e9c6c6e474e5e3668aea1a9817bdb4ceeceb0
 - name: github.com/aws/aws-sdk-go
-  version: db14171eb3a0a13125d9cc2d9ebc7cbdb4e737b6
+  version: 00fb2125993965df739fa3398b03bef3eb2e198f
   subpackages:
   - aws
   - aws/awserr
@@ -34,19 +34,19 @@ imports:
   - service/s3
   - service/sts
 - name: github.com/cloudfoundry-community/go-cfclient
-  version: 80c3c517232069b3f63c056750bf9b0098376cfe
+  version: 519c9eb6445d32120dfaf3659668e3b7032ea415
 - name: github.com/davecgh/go-spew
   version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9
   subpackages:
   - spew
 - name: github.com/go-ini/ini
-  version: 12f418cc7edc5a618a51407b7ac1f1f512139df3
+  version: e7fea39b01aea8d5671f6858f0532f56e8bff3a5
 - name: github.com/golang/protobuf
-  version: 874264fbbb43f4d91e999fecb4b40143ed611400
+  version: 2bba0603135d7d7f5cb73b2125beeda19c09f4ef
   subpackages:
   - proto
 - name: github.com/gorilla/context
-  version: a8d44e7d8e4d532b6a27a02dd82abb31cc1b01bd
+  version: 08b5f424b9271eedf6f9f0ce86cb9396ed337a42
 - name: github.com/gorilla/mux
   version: cf79e51a62d8219d52060dfc1b4e810414ba2d15
 - name: github.com/jinzhu/gorm
@@ -54,22 +54,24 @@ imports:
   subpackages:
   - dialects/postgres
 - name: github.com/jinzhu/inflection
-  version: 3272df6c21d04180007eb3349844c89a3856bc25
+  version: 1c35d901db3da928c72a72d8458480cc9ade058f
 - name: github.com/jmespath/go-jmespath
-  version: 0b12d6b521d83fc7f755e7cfc1b1fbdd35a01a74
+  version: bd40a432e4c76585ef6b72d3fd96fb9b6dc7b68d
 - name: github.com/kelseyhightower/envconfig
   version: 9aca109c9aec4633fced9717c4a09ecab3d33111
 - name: github.com/lib/pq
-  version: dd3290b2f71a8b30bee8e4e75a337a825263d26f
+  version: 2704adc878c21e1329f46f6e56a1c387d788ff94
   subpackages:
   - hstore
   - oid
 - name: github.com/miekg/dns
-  version: 48ab6605c66ac797e07f615101c3e9e10e932b66
+  version: 6ebcb714d36901126ee2807031543b38c56de963
 - name: github.com/pivotal-cf/brokerapi
-  version: 3dcb3e88faf1f81359679aa1b931df45d30f01de
+  version: 8f25c50c2794f9401a0162e260801e877ea3d002
   subpackages:
   - auth
+- name: github.com/pkg/errors
+  version: bfd5150e4e41705ded2129ec33379de1cb90b513
 - name: github.com/pmezard/go-difflib
   version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
   subpackages:
@@ -86,11 +88,12 @@ imports:
   - require
   - suite
 - name: github.com/xenolf/lego
-  version: 96a24777ffb3c6a25f6bb0b3a7997969c1fcde4b
+  version: bfd80bed937cea256b5a8b32539fca4d3997404b
+  repo: git@github.com:jmcarp/lego.git
   subpackages:
   - acme
 - name: golang.org/x/crypto
-  version: 1e61df8d9ea476e2e1504cd9a32b40280c7c6c7e
+  version: 12c985af8526c1f6f0c463bbfd9d69623d13b323
   subpackages:
   - ocsp
 - name: golang.org/x/net
@@ -104,7 +107,7 @@ imports:
   - clientcredentials
   - internal
 - name: google.golang.org/appengine
-  version: e234e71924d4aa52444bc76f2f831f13fa1eca60
+  version: 170382fa85b10b94728989dfcf6cc818b335c952
   subpackages:
   - internal
   - internal/base
@@ -114,7 +117,7 @@ imports:
   - internal/urlfetch
   - urlfetch
 - name: gopkg.in/square/go-jose.v1
-  version: e3f973b66b91445ec816dd7411ad1b6495a5a2fc
+  version: aa2e30fdd1fe9dd3394119af66451ae790d50e0d
   subpackages:
   - cipher
   - json

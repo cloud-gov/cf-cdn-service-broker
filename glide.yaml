@@ -25,7 +25,8 @@ import:
   subpackages:
   - mock
 - package: github.com/xenolf/lego
-  version: ~0.3.1
+  repo: git@github.com:jmcarp/lego.git
+  version: expose-methods
   subpackages:
   - acme
 - package: github.com/cloudfoundry-community/go-cfclient

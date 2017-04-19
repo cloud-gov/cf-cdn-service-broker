@@ -9,8 +9,8 @@ import (
 func TestListSpaces(t *testing.T) {
 	Convey("List Space", t, func() {
 		mocks := []MockRoute{
-			{"GET", "/v2/spaces", listSpacesPayload, ""},
-			{"GET", "/v2/spacesPage2", listSpacesPayloadPage2, ""},
+			{"GET", "/v2/spaces", listSpacesPayload, "", 200, "", nil},
+			{"GET", "/v2/spacesPage2", listSpacesPayloadPage2, "", 200, "", nil},
 		}
 		setupMultiple(mocks, t)
 		defer teardown()
@@ -27,18 +27,43 @@ func TestListSpaces(t *testing.T) {
 		So(len(spaces), ShouldEqual, 4)
 		So(spaces[0].Guid, ShouldEqual, "8efd7c5c-d83c-4786-b399-b7bd548839e1")
 		So(spaces[0].Name, ShouldEqual, "dev")
+		So(spaces[0].OrganizationGuid, ShouldEqual, "a537761f-9d93-4b30-af17-3d73dbca181b")
 		So(spaces[1].Guid, ShouldEqual, "657b5923-7de0-486a-9928-b4d78ee24931")
 		So(spaces[1].Name, ShouldEqual, "demo")
+		So(spaces[1].OrganizationGuid, ShouldEqual, "da0dba14-6064-4f7a-b15a-ff9e677e49b2")
 		So(spaces[2].Guid, ShouldEqual, "9ffd7c5c-d83c-4786-b399-b7bd54883977")
 		So(spaces[2].Name, ShouldEqual, "test")
+		So(spaces[2].OrganizationGuid, ShouldEqual, "a537761f-9d93-4b30-af17-3d73dbca181b")
 		So(spaces[3].Guid, ShouldEqual, "329b5923-7de0-486a-9928-b4d78ee24982")
 		So(spaces[3].Name, ShouldEqual, "prod")
+		So(spaces[3].OrganizationGuid, ShouldEqual, "da0dba14-6064-4f7a-b15a-ff9e677e49b2")
+	})
+}
+
+func TestCreateSpace(t *testing.T) {
+	Convey("Create Space", t, func() {
+		setup(MockRoute{"POST", "/v2/spaces", spacePayload, "", 201, "", nil}, t)
+		defer teardown()
+		c := &Config{
+			ApiAddress: server.URL,
+			Token:      "foobar",
+		}
+		client, err := NewClient(c)
+		So(err, ShouldBeNil)
+
+		spaceRequest := SpaceRequest{Name: "test-space", OrganizationGuid: "da0dba14-6064-4f7a-b15a-ff9e677e49b2"}
+
+		space, err := client.CreateSpace(spaceRequest)
+		So(err, ShouldBeNil)
+
+		So(space.Name, ShouldEqual, "test-space")
+		So(space.OrganizationGuid, ShouldEqual, "da0dba14-6064-4f7a-b15a-ff9e677e49b2")
 	})
 }
 
 func TestSpaceOrg(t *testing.T) {
 	Convey("Find space org", t, func() {
-		setup(MockRoute{"GET", "/v2/org/foobar", orgPayload, ""}, t)
+		setup(MockRoute{"GET", "/v2/org/foobar", orgPayload, "", 200, "", nil}, t)
 		defer teardown()
 		c := &Config{
 			ApiAddress: server.URL,
@@ -63,7 +88,7 @@ func TestSpaceOrg(t *testing.T) {
 
 func TestSpaceQuota(t *testing.T) {
 	Convey("Get space quota", t, func() {
-		setup(MockRoute{"GET", "/v2/space_quota_definitions/9ffd7c5c-d83c-4786-b399-b7bd54883977", spaceQuotaPayload, ""}, t)
+		setup(MockRoute{"GET", "/v2/space_quota_definitions/9ffd7c5c-d83c-4786-b399-b7bd54883977", spaceQuotaPayload, "", 200, "", nil}, t)
 		defer teardown()
 		c := &Config{
 			ApiAddress: server.URL,
@@ -96,7 +121,7 @@ func TestSpaceQuota(t *testing.T) {
 
 func TestSpaceSummary(t *testing.T) {
 	Convey("Get space summary", t, func() {
-		setup(MockRoute{"GET", "/v2/spaces/494d8b64-8181-4183-a6d3-6279db8fec6e/summary", spaceSummaryPayload, ""}, t)
+		setup(MockRoute{"GET", "/v2/spaces/494d8b64-8181-4183-a6d3-6279db8fec6e/summary", spaceSummaryPayload, "", 200, "", nil}, t)
 		defer teardown()
 		c := &Config{
 			ApiAddress: server.URL,
@@ -136,7 +161,7 @@ func TestSpaceSummary(t *testing.T) {
 
 func TestSpaceRoles(t *testing.T) {
 	Convey("Get space roles", t, func() {
-		setup(MockRoute{"GET", "/v2/spaces/494d8b64-8181-4183-a6d3-6279db8fec6e/user_roles", spaceRolesPayload, ""}, t)
+		setup(MockRoute{"GET", "/v2/spaces/494d8b64-8181-4183-a6d3-6279db8fec6e/user_roles", spaceRolesPayload, "", 200, "", nil}, t)
 		defer teardown()
 		c := &Config{
 			ApiAddress: server.URL,
@@ -167,5 +192,90 @@ func TestSpaceRoles(t *testing.T) {
 		So(roles[0].AuditedOrganizationsUrl, ShouldEqual, "/v2/users/uaa-id-363/audited_organizations")
 		So(roles[0].ManagedSpacesUrl, ShouldEqual, "/v2/users/uaa-id-363/managed_spaces")
 		So(roles[0].AuditedSpacesUrl, ShouldEqual, "/v2/users/uaa-id-363/audited_spaces")
+	})
+}
+
+func TestAssociateSpaceAuditorByUsername(t *testing.T) {
+	Convey("Associate auditor by username", t, func() {
+		setup(MockRoute{"PUT", "/v2/spaces/bc7b4caf-f4b8-4d85-b126-0729b9351e56/auditors", associateSpaceAuditorPayload, "", 201, "", nil}, t)
+		defer teardown()
+		c := &Config{
+			ApiAddress: server.URL,
+			Token:      "foobar",
+		}
+		client, err := NewClient(c)
+		So(err, ShouldBeNil)
+
+		space := &Space{
+			Guid: "bc7b4caf-f4b8-4d85-b126-0729b9351e56",
+			c:    client,
+		}
+
+		newSpace, err := space.AssociateAuditorByUsername("user-name")
+		So(err, ShouldBeNil)
+		So(newSpace.Guid, ShouldEqual, "bc7b4caf-f4b8-4d85-b126-0729b9351e56")
+	})
+}
+
+func TestAssociateSpaceDeveloperByUsername(t *testing.T) {
+	Convey("Associate developer by username", t, func() {
+		setup(MockRoute{"PUT", "/v2/spaces/bc7b4caf-f4b8-4d85-b126-0729b9351e56/developers", associateSpaceDeveloperPayload, "", 201, "", nil}, t)
+		defer teardown()
+		c := &Config{
+			ApiAddress: server.URL,
+			Token:      "foobar",
+		}
+		client, err := NewClient(c)
+		So(err, ShouldBeNil)
+
+		space := &Space{
+			Guid: "bc7b4caf-f4b8-4d85-b126-0729b9351e56",
+			c:    client,
+		}
+
+		newSpace, err := space.AssociateDeveloperByUsername("user-name")
+		So(err, ShouldBeNil)
+		So(newSpace.Guid, ShouldEqual, "bc7b4caf-f4b8-4d85-b126-0729b9351e56")
+	})
+}
+
+func TestRemoveSpaceDeveloperByUsername(t *testing.T) {
+	Convey("Remove developer by username", t, func() {
+		setup(MockRoute{"DELETE", "/v2/spaces/bc7b4caf-f4b8-4d85-b126-0729b9351e56/developers", "", "", 204, "", nil}, t)
+		defer teardown()
+		c := &Config{
+			ApiAddress: server.URL,
+			Token:      "foobar",
+		}
+		client, err := NewClient(c)
+		So(err, ShouldBeNil)
+
+		space := &Space{
+			Guid: "bc7b4caf-f4b8-4d85-b126-0729b9351e56",
+			c:    client,
+		}
+
+		err = space.RemoveDeveloperByUsername("user-name")
+		So(err, ShouldBeNil)
+	})
+}
+func TestRemoveSpaceAuditorByUsername(t *testing.T) {
+	Convey("Remove auditor by username", t, func() {
+		setup(MockRoute{"DELETE", "/v2/spaces/bc7b4caf-f4b8-4d85-b126-0729b9351e56/auditors", "", "", 204, "", nil}, t)
+		defer teardown()
+		c := &Config{
+			ApiAddress: server.URL,
+			Token:      "foobar",
+		}
+		client, err := NewClient(c)
+		So(err, ShouldBeNil)
+
+		space := &Space{
+			Guid: "bc7b4caf-f4b8-4d85-b126-0729b9351e56",
+			c:    client,
+		}
+
+		err = space.RemoveAuditorByUsername("user-name")
+		So(err, ShouldBeNil)
 	})
 }
