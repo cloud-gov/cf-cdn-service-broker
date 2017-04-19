@@ -4,6 +4,9 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
+	"errors"
+	"io/ioutil"
+	"net/http"
 	"path"
 	"strings"
 
@@ -46,9 +49,25 @@ func (p *HTTPProvider) Present(domain, token, keyAuth string) error {
 	if p.Settings.ServerSideEncryption != "" {
 		input.ServerSideEncryption = aws.String(p.Settings.ServerSideEncryption)
 	}
-	_, err := p.Service.PutObject(&input)
+	if _, err := p.Service.PutObject(&input); err != nil {
+		return err
+	}
 
-	return err
+	return acme.WaitFor(60, 15, func() (bool, error) {
+		resp, err := http.Get("https://" + path.Join(domain, ".well-known", "acme-challenge", token))
+		if err != nil {
+			return false, err
+		}
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return false, err
+		}
+		if string(body) == keyAuth {
+			return true, nil
+		}
+		return false, errors.New("HTTP-01 token mismatch")
+	})
 }
 
 func (p *HTTPProvider) CleanUp(domain, token, keyAuth string) error {
@@ -56,7 +75,6 @@ func (p *HTTPProvider) CleanUp(domain, token, keyAuth string) error {
 		Bucket: aws.String(p.Settings.Bucket),
 		Key:    aws.String(path.Join(".well-known", "acme-challenge", token)),
 	})
-
 	return err
 }
 
