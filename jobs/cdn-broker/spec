@@ -1,0 +1,51 @@
+---
+name: cdn-broker
+templates:
+  bin/job_properties.sh.erb: bin/job_properties.sh
+  bin/cdn-broker-ctl.erb: bin/cdn-broker-ctl
+  config/cdn-config.json.erb: config/cdn-config.json
+
+packages:
+  - bosh-helpers
+  - cdn-broker
+
+properties:
+  cdn-broker.port:
+    description: "Broker Listen Port"
+    default: 3000
+  cdn-broker.username:
+    description: "broker auth username"
+    default: "cdn-broker"
+  cdn-broker.database_url:
+    description: "Broker Database URL"
+  cdn-broker.email:
+    description: "An email for generating the cert"
+  cdn-broker.acme_url:
+    description: "ACME url"
+  cdn-broker.bucket:
+    description: "Broker bucket, used to store certstrap HTTP challenges"
+  cdn-broker.iam_path_prefix:
+    description: "IAM path prefix"
+    default: "letsencrypt"
+  cdn-broker.cloudfront_prefix:
+    description: "CloudFront Prefix"
+  cdn-broker.aws_access_key_id:
+    description: "AWS Access Key ID"
+  cdn-broker.aws_secret_access_key:
+    description: "AWS Secret Access Key"
+  cdn-broker.aws_region:
+    description: "AWS RDS Region"
+    default: "eu-west-1"
+  cdn-broker.server_side_encryption:
+    description: "Server side encryption"
+  cdn-broker.api_address:
+    description: "API address for the CLI"
+  cdn-broker.client_id:
+    description: "Client ID"
+  cdn-broker.client_secret:
+    description: "Client secret"
+  cdn-broker.default_origin:
+    description: "Default origin. e.g. example.com"
+  cdn-broker.schedule:
+    description: "Cron schedlue"
+    default: "0 0 * * * *"

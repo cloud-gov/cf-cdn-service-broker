@@ -1,0 +1,33 @@
+#!/bin/bash
+
+set -e # exit immediately if a simple command exits with a non-zero status
+
+# Setup common env vars and folders
+source /var/vcap/packages/bosh-helpers/ctl_setup.sh 'cdn-broker'
+export CDN_BROKER_PID_FILE=${CDN_BROKER_PID_DIR}/cdn-broker.pid
+
+case $1 in
+
+  start)
+    pid_guard ${CDN_BROKER_PID_FILE} ${JOB_NAME}
+    echo $$ > ${CDN_BROKER_PID_FILE}
+
+    # Start CDN Broker service
+    exec /var/vcap/packages/cdn-broker/bin/cdn-broker \
+      --config=${CDN_BROKER_CONF_DIR}/cdn-config.json \
+      > >(tee -a ${CDN_BROKER_LOG_DIR}/${OUTPUT_LABEL}.stdout.log | logger -t vcap.${OUTPUT_LABEL}.stdout) \
+      2> >(tee -a ${CDN_BROKER_LOG_DIR}/${OUTPUT_LABEL}.stderr.log | logger -t vcap.${OUTPUT_LABEL}.stderr)
+    ;;
+
+  stop)
+    # Stop CDN Broker service
+    kill_and_wait ${CDN_BROKER_PID_FILE}
+    ;;
+
+  *)
+    echo "Usage: $0 {start|stop}"
+    exit 1
+    ;;
+
+esac
+exit 0

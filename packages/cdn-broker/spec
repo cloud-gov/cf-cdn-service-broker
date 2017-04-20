@@ -1,0 +1,6 @@
+---
+name: cdn-broker
+dependencies:
+  - golang
+files:
+  - github.com/alphagov/cdn-broker/**/*
