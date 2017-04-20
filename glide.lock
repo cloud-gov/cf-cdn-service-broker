@@ -1,5 +1,5 @@
 hash: 54e41784d66fa88c45503c2b35a96ab024ee35fe6a5174e9c7b147ad41af957a
-updated: 2017-04-18T23:11:14.244159283-04:00
+updated: 2017-04-19T21:22:16.400213903-04:00
 imports:
 - name: code.cloudfoundry.org/lager
   version: de8e9c6c6e474e5e3668aea1a9817bdb4ceeceb0
@@ -88,7 +88,7 @@ imports:
   - require
   - suite
 - name: github.com/xenolf/lego
-  version: bfd80bed937cea256b5a8b32539fca4d3997404b
+  version: 7dd0b2771aa257ec739184aea86952a97863a673
   repo: git@github.com:jmcarp/lego.git
   subpackages:
   - acme

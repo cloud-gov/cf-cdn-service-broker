@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"path"
@@ -48,6 +49,7 @@ type HTTPProvider struct {
 }
 
 func (p *HTTPProvider) Present(domain, token, keyAuth string) error {
+	fmt.Println("DEBUG:PRESENT", domain, token, keyAuth)
 	input := s3.PutObjectInput{
 		Bucket: aws.String(p.Settings.Bucket),
 		Key:    aws.String(path.Join(".well-known", "acme-challenge", token)),
@@ -62,6 +64,7 @@ func (p *HTTPProvider) Present(domain, token, keyAuth string) error {
 
 	return acme.WaitFor(60, 15, func() (bool, error) {
 		resp, err := insecureClient.Get("https://" + path.Join(domain, ".well-known", "acme-challenge", token))
+		fmt.Println("DEBUG:HTTP", resp, err)
 		if err != nil {
 			return false, err
 		}
