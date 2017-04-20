@@ -308,7 +308,7 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 		if err := json.Unmarshal(r.ChallengeJSON, &challenges); err != nil {
 			return err
 		}
-		if errs := m.acmeClient.SolveChallenges(challenges); len(errs) > 0 {
+		if errs := m.solveChallenges(challenges); len(errs) > 0 {
 			return fmt.Errorf("Error(s) solving challenges: %v", errs)
 		}
 
@@ -365,6 +365,40 @@ func (m *RouteManager) checkDistribution(r *Route) bool {
 	}
 
 	return *dist.Status == "Deployed" && *dist.DistributionConfig.Enabled
+}
+
+func (m *RouteManager) solveChallenges(challenges []acme.AuthorizationResource) map[string]error {
+	fmt.Println(fmt.Sprintf("CHALLENGES: %+v", challenges))
+	clients := map[acme.Challenge]*acme.Client{
+		acme.DNS01:  &acme.Client{},
+		acme.HTTP01: &acme.Client{},
+	}
+	*clients[acme.DNS01] = *m.acmeClient
+	*clients[acme.HTTP01] = *m.acmeClient
+	clients[acme.DNS01].ExcludeChallenges([]acme.Challenge{acme.HTTP01})
+	clients[acme.HTTP01].ExcludeChallenges([]acme.Challenge{acme.DNS01})
+
+	errs := make(chan map[string]error)
+
+	for _, client := range clients {
+		go func(client *acme.Client) {
+			errs <- client.SolveChallenges(challenges)
+		}(client)
+	}
+
+	var failures map[string]error
+	for challenge, _ := range clients {
+		failures = <-errs
+		m.logger.Info("solve-challenges", lager.Data{
+			"challenge": challenge,
+			"failures":  failures,
+		})
+		if len(failures) == 0 {
+			return failures
+		}
+	}
+
+	return failures
 }
 
 func (m *RouteManager) deployCertificate(instanceId, distId string, cert acme.CertificateResource) error {
