@@ -2,12 +2,11 @@ package utils
 
 import (
 	"crypto"
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/tls"
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"path"
 	"strings"
@@ -18,6 +17,22 @@ import (
 
 	"github.com/18F/cf-cdn-service-broker/config"
 )
+
+func preCheckDNS(fqdn, value string) (bool, error) {
+	record, err := net.LookupTXT(fqdn)
+	if err != nil {
+		return false, err
+	}
+	_, token, _ := acme.DNS01Record("", value)
+	if len(record) == 1 && record[0] == token {
+		return true, nil
+	}
+	return false, fmt.Errorf("DNS precheck failed on name %s, value %s", fqdn, token)
+}
+
+func init() {
+	acme.PreCheckDNS = preCheckDNS
+}
 
 type User struct {
 	Email        string
@@ -35,6 +50,10 @@ func (u *User) GetRegistration() *acme.RegistrationResource {
 
 func (u *User) GetPrivateKey() crypto.PrivateKey {
 	return u.key
+}
+
+func (u *User) SetPrivateKey(key crypto.PrivateKey) {
+	u.key = key
 }
 
 var insecureClient = &http.Client{
@@ -98,35 +117,22 @@ func (p *DNSProvider) CleanUp(domain, token, keyAuth string) error {
 	return nil
 }
 
-func NewClient(settings config.Settings, s3Service *s3.S3) (*acme.Client, error) {
-	keySize := 2048
-	key, err := rsa.GenerateKey(rand.Reader, keySize)
+func NewClient(settings config.Settings, user *User, s3Service *s3.S3, excludes []acme.Challenge) (*acme.Client, error) {
+	client, err := acme.NewClient(settings.AcmeUrl, user, acme.RSA2048)
 	if err != nil {
 		return &acme.Client{}, err
 	}
 
-	user := User{
-		Email: settings.Email,
-		key:   key,
+	if user.GetRegistration() == nil {
+		reg, err := client.Register()
+		if err != nil {
+			return client, err
+		}
+		user.Registration = reg
 	}
 
-	client, err := acme.NewClient(settings.AcmeUrl, &user, acme.RSA2048)
-	if err != nil {
-		return &acme.Client{}, err
-	}
-
-	reg, err := client.Register()
-
-	if err != nil {
-		return &acme.Client{}, err
-	}
-
-	user.Registration = reg
-
-	err = client.AgreeToTOS()
-
-	if err != nil {
-		return &acme.Client{}, err
+	if err := client.AgreeToTOS(); err != nil {
+		return client, err
 	}
 
 	client.SetChallengeProvider(acme.HTTP01, &HTTPProvider{
@@ -134,7 +140,7 @@ func NewClient(settings config.Settings, s3Service *s3.S3) (*acme.Client, error)
 		Service:  s3Service,
 	})
 	client.SetChallengeProvider(acme.DNS01, &DNSProvider{})
-	client.ExcludeChallenges([]acme.Challenge{acme.TLSSNI01})
+	client.ExcludeChallenges(excludes)
 
 	return client, nil
 }

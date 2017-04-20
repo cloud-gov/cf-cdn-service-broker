@@ -142,7 +142,9 @@ func TestDeleteOrphanedCerts(t *testing.T) {
 		logger,
 		mui,
 		&utils.Distribution{settings, fakecf},
-		&acme.Client{},
+		map[acme.Challenge]*acme.Client{
+			acme.HTTP01: &acme.Client{},
+		},
 		&gorm.DB{},
 	)
 

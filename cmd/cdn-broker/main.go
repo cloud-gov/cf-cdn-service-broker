@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/cloudfoundry-community/go-cfclient"
+	"github.com/xenolf/lego/acme"
 
 	"github.com/18F/cf-cdn-service-broker/broker"
 	"github.com/18F/cf-cdn-service-broker/config"
@@ -46,18 +47,33 @@ func main() {
 
 	session := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
 
-	acmeClient, err := utils.NewClient(settings, s3.New(session))
+	db.AutoMigrate(&models.Route{}, &models.Certificate{}, &models.UserData{})
+
+	user, userData, err := models.GetOrCreateUser(db, settings.Email)
+	fmt.Println("DEBUG:USER:GETORCREATE", user, userData, err)
+	if err != nil {
+		logger.Fatal("acme-create-user", err)
+	}
+
+	acmeClients := map[acme.Challenge]*acme.Client{}
+	acmeClients[acme.HTTP01], err = utils.NewClient(settings, &user, s3.New(session), []acme.Challenge{acme.TLSSNI01, acme.DNS01})
+	if err != nil {
+		logger.Fatal("acme-client", err)
+	}
+	acmeClients[acme.DNS01], err = utils.NewClient(settings, &user, s3.New(session), []acme.Challenge{acme.TLSSNI01, acme.HTTP01})
 	if err != nil {
 		logger.Fatal("acme-client", err)
 	}
 
-	db.AutoMigrate(&models.Route{}, &models.Certificate{})
+	if err := models.SaveUser(db, user, userData); err != nil {
+		logger.Fatal("acme-save-user", err)
+	}
 
 	manager := models.NewManager(
 		logger,
 		&utils.Iam{settings, iam.New(session)},
 		&utils.Distribution{settings, cloudfront.New(session)},
-		acmeClient,
+		acmeClients,
 		db,
 	)
 	broker := broker.New(

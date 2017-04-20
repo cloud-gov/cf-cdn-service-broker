@@ -1,8 +1,15 @@
 package models
 
 import (
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"database/sql/driver"
 	"encoding/json"
+	"encoding/pem"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -45,6 +52,93 @@ func (s *State) Scan(value interface{}) error {
 	return nil
 }
 
+type UserData struct {
+	gorm.Model
+	Email string `gorm:"not null;unique_index"`
+	Reg   []byte
+	Key   []byte
+}
+
+func GetOrCreateUser(db *gorm.DB, email string) (utils.User, UserData, error) {
+	var user utils.User
+	var userData UserData
+	if res := db.First(&userData, &UserData{Email: email}); res.Error != nil {
+		fmt.Println("DEBUG:USER", res, res.RecordNotFound())
+		if res.RecordNotFound() {
+			user, err := CreateUser(email)
+			return user, userData, err
+		}
+		return user, userData, res.Error
+	}
+	if err := json.Unmarshal(userData.Reg, &user); err != nil {
+		return user, userData, err
+	}
+	key, err := loadPrivateKey(userData.Key)
+	user.SetPrivateKey(key)
+	return user, userData, err
+}
+
+func CreateUser(email string) (utils.User, error) {
+	user := utils.User{Email: email}
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return user, err
+	}
+	user.SetPrivateKey(key)
+	return user, nil
+}
+
+func SaveUser(db *gorm.DB, user utils.User, userData UserData) error {
+	var err error
+	userData.Key, err = savePrivateKey(user.GetPrivateKey())
+	if err != nil {
+		return err
+	}
+	userData.Reg, err = json.Marshal(user)
+	if err != nil {
+		return err
+	}
+	if userData.ID == 0 {
+		return db.Create(&userData).Error
+	}
+	return db.Save(&userData).Error
+}
+
+// loadPrivateKey loads a PEM-encoded ECC/RSA private key from an array of bytes.
+func loadPrivateKey(keyBytes []byte) (crypto.PrivateKey, error) {
+	keyBlock, _ := pem.Decode(keyBytes)
+
+	switch keyBlock.Type {
+	case "RSA PRIVATE KEY":
+		return x509.ParsePKCS1PrivateKey(keyBlock.Bytes)
+	case "EC PRIVATE KEY":
+		return x509.ParseECPrivateKey(keyBlock.Bytes)
+	}
+
+	return nil, errors.New("unknown private key type")
+}
+
+// savePrivateKey saves a PEM-encoded ECC/RSA private key to an array of bytes.
+func savePrivateKey(key crypto.PrivateKey) ([]byte, error) {
+	var pemType string
+	var keyBytes []byte
+	switch key := key.(type) {
+	case *ecdsa.PrivateKey:
+		var err error
+		pemType = "EC"
+		keyBytes, err = x509.MarshalECPrivateKey(key)
+		if err != nil {
+			return nil, err
+		}
+	case *rsa.PrivateKey:
+		pemType = "RSA"
+		keyBytes = x509.MarshalPKCS1PrivateKey(key)
+	}
+
+	pemKey := pem.Block{Type: pemType + " PRIVATE KEY", Bytes: keyBytes}
+	return pem.EncodeToMemory(&pemKey), nil
+}
+
 type Route struct {
 	gorm.Model
 	InstanceId     string `gorm:"not null;unique_index"`
@@ -84,26 +178,28 @@ type RouteManagerIface interface {
 }
 
 type RouteManager struct {
-	logger     lager.Logger
-	iam        utils.IamIface
-	cloudFront utils.DistributionIface
-	acmeClient *acme.Client
-	db         *gorm.DB
+	logger      lager.Logger
+	iam         utils.IamIface
+	cloudFront  utils.DistributionIface
+	acmeClient  *acme.Client
+	acmeClients map[acme.Challenge]*acme.Client
+	db          *gorm.DB
 }
 
 func NewManager(
 	logger lager.Logger,
 	iam utils.IamIface,
 	cloudFront utils.DistributionIface,
-	acmeClient *acme.Client,
+	acmeClients map[acme.Challenge]*acme.Client,
 	db *gorm.DB,
 ) RouteManager {
 	return RouteManager{
-		logger:     logger,
-		iam:        iam,
-		cloudFront: cloudFront,
-		acmeClient: acmeClient,
-		db:         db,
+		logger:      logger,
+		iam:         iam,
+		cloudFront:  cloudFront,
+		acmeClient:  acmeClients[acme.HTTP01],
+		acmeClients: acmeClients,
+		db:          db,
 	}
 }
 
@@ -369,25 +465,17 @@ func (m *RouteManager) checkDistribution(r *Route) bool {
 
 func (m *RouteManager) solveChallenges(challenges []acme.AuthorizationResource) map[string]error {
 	fmt.Println(fmt.Sprintf("CHALLENGES: %+v", challenges))
-	clients := map[acme.Challenge]*acme.Client{
-		acme.DNS01:  &acme.Client{},
-		acme.HTTP01: &acme.Client{},
-	}
-	*clients[acme.DNS01] = *m.acmeClient
-	*clients[acme.HTTP01] = *m.acmeClient
-	clients[acme.DNS01].ExcludeChallenges([]acme.Challenge{acme.HTTP01})
-	clients[acme.HTTP01].ExcludeChallenges([]acme.Challenge{acme.DNS01})
 
 	errs := make(chan map[string]error)
 
-	for _, client := range clients {
+	for _, client := range m.acmeClients {
 		go func(client *acme.Client) {
 			errs <- client.SolveChallenges(challenges)
 		}(client)
 	}
 
 	var failures map[string]error
-	for challenge, _ := range clients {
+	for challenge, _ := range m.acmeClients {
 		failures = <-errs
 		m.logger.Info("solve-challenges", lager.Data{
 			"challenge": challenge,
