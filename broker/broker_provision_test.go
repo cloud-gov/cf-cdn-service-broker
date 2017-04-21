@@ -88,7 +88,7 @@ func (s *ProvisionSuite) TestSuccess() {
 	s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
 	route := &models.Route{State: models.Provisioning}
 	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
-	s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", "", false, []string{"Host"},
+	s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", "", false, []string{"Host"}, true,
 		map[string]string{"Organization": "", "Space": "", "Service": "", "Plan": ""}).Return(route, nil)
 
 	details := brokerapi.ProvisionDetails{
@@ -101,7 +101,7 @@ func (s *ProvisionSuite) TestSuccess() {
 func (s *ProvisionSuite) TestSuccessCustomOrigin() {
 	s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
 	route := &models.Route{State: models.Provisioning}
-	s.Manager.On("Create", "123", "domain.gov", "custom.cloud.gov", "", false, []string{},
+	s.Manager.On("Create", "123", "domain.gov", "custom.cloud.gov", "", false, []string{}, true,
 		map[string]string{"Organization": "", "Space": "", "Service": "", "Plan": ""}).Return(route, nil)
 
 	details := brokerapi.ProvisionDetails{

@@ -8,13 +8,13 @@ type RouteManagerIface struct {
 	mock.Mock
 }
 
-// Create provides a mock function with given fields: instanceId, domain, origin, path, insecureOrigin, forwardedHeaders, tags
+// Create provides a mock function with given fields: instanceId, domain, origin, path, insecureOrigin, forwardedHeaders, forwardCookies, tags
 func (_m *RouteManagerIface) Create(instanceId string, domain string, origin string, path string, insecureOrigin bool, forwardedHeaders []string, forwardCookies bool, tags map[string]string) (*models.Route, error) {
-	ret := _m.Called(instanceId, domain, origin, path, insecureOrigin, forwardedHeaders, tags)
+	ret := _m.Called(instanceId, domain, origin, path, insecureOrigin, forwardedHeaders, forwardCookies, tags)
 
 	var r0 *models.Route
-	if rf, ok := ret.Get(0).(func(string, string, string, string, bool, []string, map[string]string) *models.Route); ok {
-		r0 = rf(instanceId, domain, origin, path, insecureOrigin, forwardedHeaders, tags)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, bool, []string, bool, map[string]string) *models.Route); ok {
+		r0 = rf(instanceId, domain, origin, path, insecureOrigin, forwardedHeaders, forwardCookies, tags)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Route)
@@ -22,13 +22,18 @@ func (_m *RouteManagerIface) Create(instanceId string, domain string, origin str
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string, string, string, string, bool, []string, map[string]string) error); ok {
-		r1 = rf(instanceId, domain, origin, path, insecureOrigin, forwardedHeaders, tags)
+	if rf, ok := ret.Get(1).(func(string, string, string, string, bool, []string, bool, map[string]string) error); ok {
+		r1 = rf(instanceId, domain, origin, path, insecureOrigin, forwardedHeaders, forwardCookies, tags)
 	} else {
 		r1 = ret.Error(1)
 	}
 
 	return r0, r1
+}
+
+// DeleteOrphanedCerts provides a mock function with given fields:
+func (_m *RouteManagerIface) DeleteOrphanedCerts() {
+	_m.Called()
 }
 
 // Disable provides a mock function with given fields: route
@@ -61,6 +66,29 @@ func (_m *RouteManagerIface) Get(instanceId string) (*models.Route, error) {
 	var r1 error
 	if rf, ok := ret.Get(1).(func(string) error); ok {
 		r1 = rf(instanceId)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetDNSInstructions provides a mock function with given fields: _a0
+func (_m *RouteManagerIface) GetDNSInstructions(_a0 []byte) ([]string, error) {
+	ret := _m.Called(_a0)
+
+	var r0 []string
+	if rf, ok := ret.Get(0).(func([]byte) []string); ok {
+		r0 = rf(_a0)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func([]byte) error); ok {
+		r1 = rf(_a0)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -101,18 +129,13 @@ func (_m *RouteManagerIface) RenewAll() {
 	_m.Called()
 }
 
-// DeleteOrphanedCerts provides a mock function with given fields:
-func (_m *RouteManagerIface) DeleteOrphanedCerts() {
-	_m.Called()
-}
-
-// Update provides a mock function with given fields: instanceId, domain, origin, path, insecureOrigin, forwardedHeaders
+// Update provides a mock function with given fields: instanceId, domain, origin, path, insecureOrigin, forwardedHeaders, forwardCookies
 func (_m *RouteManagerIface) Update(instanceId string, domain string, origin string, path string, insecureOrigin bool, forwardedHeaders []string, forwardCookies bool) error {
-	ret := _m.Called(instanceId, domain, origin, path, insecureOrigin, forwardedHeaders)
+	ret := _m.Called(instanceId, domain, origin, path, insecureOrigin, forwardedHeaders, forwardCookies)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string, bool, []string) error); ok {
-		r0 = rf(instanceId, domain, origin, path, insecureOrigin, forwardedHeaders)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, bool, []string, bool) error); ok {
+		r0 = rf(instanceId, domain, origin, path, insecureOrigin, forwardedHeaders, forwardCookies)
 	} else {
 		r0 = ret.Error(0)
 	}

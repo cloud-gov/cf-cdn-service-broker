@@ -60,7 +60,7 @@ func (s *UpdateSuite) TestUpdateSuccessOnlyDomain() {
 	details := brokerapi.UpdateDetails{
 		RawParameters: json.RawMessage(`{"domain": "domain.gov"}`),
 	}
-	s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", "", false, []string{"Host"}).Return(nil)
+	s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", "", false, []string{"Host"}, true).Return(nil)
 	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 	_, err := s.Broker.Update(s.ctx, "", details, true)
 	s.Nil(err)
@@ -70,7 +70,7 @@ func (s *UpdateSuite) TestUpdateSuccessOnlyOrigin() {
 	details := brokerapi.UpdateDetails{
 		RawParameters: json.RawMessage(`{"origin": "origin.gov"}`),
 	}
-	s.Manager.On("Update", "", "", "origin.gov", "", false, []string{}).Return(nil)
+	s.Manager.On("Update", "", "", "origin.gov", "", false, []string{}, true).Return(nil)
 	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 	_, err := s.Broker.Update(s.ctx, "", details, true)
 	s.Nil(err)
@@ -84,7 +84,7 @@ func (s *UpdateSuite) TestUpdateSuccess() {
 			"path": "."
 		}`),
 	}
-	s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", ".", true, []string{"Host"}).Return(nil)
+	s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", ".", true, []string{"Host"}, true).Return(nil)
 	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 	_, err := s.Broker.Update(s.ctx, "", details, true)
 	s.Nil(err)
@@ -97,7 +97,7 @@ func (s *UpdateSuite) TestDomainNotExists() {
 		},
 		RawParameters: json.RawMessage(`{"domain": "domain.gov"}`),
 	}
-	s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", ".", true, []string{"Host"}).Return(nil)
+	s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", ".", true, []string{"Host"}, true).Return(nil)
 	s.cfclient.On("GetOrgByGuid", "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5").Return(cfclient.Org{Name: "my-org"}, nil)
 	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, errors.New("bad"))
 	_, err := s.Broker.Update(s.ctx, "", details, true)

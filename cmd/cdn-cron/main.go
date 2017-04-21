@@ -60,6 +60,7 @@ func main() {
 		logger,
 		&utils.Iam{settings, iam.New(session)},
 		&utils.Distribution{settings, cloudfront.New(session)},
+		user,
 		acmeClients,
 		db,
 	)

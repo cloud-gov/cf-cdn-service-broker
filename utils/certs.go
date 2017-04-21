@@ -23,11 +23,10 @@ func preCheckDNS(fqdn, value string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	_, token, _ := acme.DNS01Record("", value)
-	if len(record) == 1 && record[0] == token {
+	if len(record) == 1 && record[0] == value {
 		return true, nil
 	}
-	return false, fmt.Errorf("DNS precheck failed on name %s, value %s", fqdn, token)
+	return false, fmt.Errorf("DNS precheck failed on name %s, value %s", fqdn, value)
 }
 
 func init() {

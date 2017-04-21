@@ -175,12 +175,14 @@ type RouteManagerIface interface {
 	Renew(route *Route) error
 	RenewAll()
 	DeleteOrphanedCerts()
+	GetDNSInstructions([]byte) ([]string, error)
 }
 
 type RouteManager struct {
 	logger      lager.Logger
 	iam         utils.IamIface
 	cloudFront  utils.DistributionIface
+	acmeUser    utils.User
 	acmeClient  *acme.Client
 	acmeClients map[acme.Challenge]*acme.Client
 	db          *gorm.DB
@@ -190,6 +192,7 @@ func NewManager(
 	logger lager.Logger,
 	iam utils.IamIface,
 	cloudFront utils.DistributionIface,
+	acmeUser utils.User,
 	acmeClients map[acme.Challenge]*acme.Client,
 	db *gorm.DB,
 ) RouteManager {
@@ -197,6 +200,7 @@ func NewManager(
 		logger:      logger,
 		iam:         iam,
 		cloudFront:  cloudFront,
+		acmeUser:    acmeUser,
 		acmeClient:  acmeClients[acme.HTTP01],
 		acmeClients: acmeClients,
 		db:          db,
@@ -505,4 +509,25 @@ func (m *RouteManager) deployCertificate(instanceId, distId string, cert acme.Ce
 	}
 
 	return m.cloudFront.SetCertificate(distId, certId)
+}
+
+func (m *RouteManager) GetDNSInstructions(data []byte) ([]string, error) {
+	var instructions []string
+	var challenges []acme.AuthorizationResource
+	if err := json.Unmarshal(data, &challenges); err != nil {
+		return instructions, err
+	}
+	for _, auth := range challenges {
+		for _, challenge := range auth.Body.Challenges {
+			if challenge.Type == acme.DNS01 {
+				keyAuth, err := acme.GetKeyAuthorization(challenge.Token, m.acmeUser.GetPrivateKey())
+				if err != nil {
+					return instructions, err
+				}
+				fqdn, value, ttl := acme.DNS01Record(auth.Domain, keyAuth)
+				instructions = append(instructions, fmt.Sprintf("name: %s, value: %s, ttl: %d", fqdn, value, ttl))
+			}
+		}
+	}
+	return instructions, nil
 }

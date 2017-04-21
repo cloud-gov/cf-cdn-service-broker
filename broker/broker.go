@@ -10,7 +10,6 @@ import (
 
 	"code.cloudfoundry.org/lager"
 	"github.com/pivotal-cf/brokerapi"
-	"github.com/xenolf/lego/acme"
 
 	"github.com/18F/cf-cdn-service-broker/cf"
 	"github.com/18F/cf-cdn-service-broker/config"
@@ -122,7 +121,7 @@ func (b *CdnServiceBroker) LastOperation(
 	case models.Provisioning:
 		var description string
 		if len(route.ChallengeJSON) > 0 {
-			instructions, err := getDNSInstructions(route.ChallengeJSON)
+			instructions, err := b.manager.GetDNSInstructions(route.ChallengeJSON)
 			if err != nil {
 				return brokerapi.LastOperation{}, err
 			}
@@ -321,21 +320,4 @@ func (b *CdnServiceBroker) getHeaders(options Options) []string {
 		return []string{"Host"}
 	}
 	return []string{}
-}
-
-func getDNSInstructions(data []byte) ([]string, error) {
-	var instructions []string
-	var challenges []acme.AuthorizationResource
-	if err := json.Unmarshal(data, &challenges); err != nil {
-		return instructions, err
-	}
-	for _, auth := range challenges {
-		for _, challenge := range auth.Body.Challenges {
-			if challenge.Type == acme.DNS01 {
-				fqdn, value, ttl := acme.DNS01Record(auth.Domain, challenge.Token)
-				instructions = append(instructions, fmt.Sprintf("name: %s, value: %s, ttl: %d", fqdn, value, ttl))
-			}
-		}
-	}
-	return instructions, nil
 }
