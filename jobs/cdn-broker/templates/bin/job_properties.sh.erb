@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+#
+# CDN Broker properties
+#
+
+# Directory to store the CDN Broker configuration files
+export CDN_BROKER_CONF_DIR=${JOB_DIR}/config
+
+# Directory to store the CDN Broker log files
+export CDN_BROKER_LOG_DIR=${LOG_DIR}
+
+# Directory to store the CDN Broker process IDs
+export CDN_BROKER_PID_DIR=${RUN_DIR}
+
+# Directory to store the CDN Broker data files
+export CDN_BROKER_STORE_DIR=${STORE_DIR}
+
+# Directory to store the CDN Broker temp files
+export CDN_BROKER_TMP_DIR=${TMP_DIR}
+
+# Broker Listen Port
+export CDN_BROKER_PORT="<%= p('cdn-broker.port') %>"
+
+# AWS Access Key ID
+export AWS_ACCESS_KEY_ID="<%= p('cdn-broker.aws_access_key_id') %>"
+
+# AWS Secret Access Key
+export AWS_SECRET_ACCESS_KEY="<%= p('cdn-broker.aws_secret_access_key') %>"

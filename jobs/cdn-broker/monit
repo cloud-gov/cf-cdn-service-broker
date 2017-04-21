@@ -1,0 +1,5 @@
+check process cdn-broker
+  with pidfile /var/vcap/sys/run/cdn-broker/cdn-broker.pid
+  start program "/var/vcap/packages/bosh-helpers/monit_debugger cdn-broker-ctl '/var/vcap/jobs/cdn-broker/bin/cdn-broker-ctl start'"
+  stop program "/var/vcap/packages/bosh-helpers/monit_debugger cdn-broker-ctl '/var/vcap/jobs/cdn-broker/bin/cdn-broker-ctl stop'"
+  group vcap
