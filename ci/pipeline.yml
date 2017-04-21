@@ -80,18 +80,25 @@ jobs:
   - get: broker-src
     passed: [push-cf-cdn-service-broker-staging]
     trigger: true
-  - task: acceptance-tests
-    file: broker-src/ci/acceptance-tests.yml
-    params:
-      <<: *cf-creds-staging
-      SERVICE_NAME: cdn-route
-      PLAN_NAME: cdn-route
-      SERVICE_INSTANCE_NAME: cdn-acceptance-test-%s
-      AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id-staging}}
-      AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key-staging}}
-      HOSTED_ZONE_ID: {{hosted-zone-id-staging}}
-      DOMAIN: {{domain-url-staging}}
-      CDN_TIMEOUT: {{cdn-timeout}}
+  - aggregate:
+    - task: acceptance-tests-http-01
+      file: broker-src/ci/acceptance-tests.yml
+      params: &acceptance-tests-params-staging
+        <<: *cf-creds-staging
+        SERVICE_NAME: cdn-route
+        PLAN_NAME: cdn-route
+        SERVICE_INSTANCE_NAME: cdn-acceptance-test-%s
+        CHALLENGE_TYPE: HTTP-01
+        AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id-staging}}
+        AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key-staging}}
+        HOSTED_ZONE_ID: {{hosted-zone-id-staging}}
+        DOMAIN: {{domain-url-staging}}
+        CDN_TIMEOUT: {{cdn-timeout}}
+    - task: acceptance-tests-dns-01
+      file: broker-src/ci/acceptance-tests.yml
+      params:
+        <<: *acceptance-tests-params-staging
+        CHALLENGE_TYPE: DNS-01
 
 - name: push-cf-cdn-service-broker-production
   plan:
@@ -166,18 +173,25 @@ jobs:
   - get: broker-src
     passed: [push-cf-cdn-service-broker-production]
     trigger: true
-  - task: acceptance-tests
-    file: broker-src/ci/acceptance-tests.yml
-    params:
-      <<: *cf-creds-production
-      SERVICE_NAME: cdn-route
-      PLAN_NAME: cdn-route
-      SERVICE_INSTANCE_NAME: cdn-acceptance-test-%s
-      AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id-production}}
-      AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key-production}}
-      HOSTED_ZONE_ID: {{hosted-zone-id-production}}
-      DOMAIN: {{domain-url-production}}
-      CDN_TIMEOUT: {{cdn-timeout}}
+  - aggregate:
+    - task: acceptance-tests-http-01
+      file: broker-src/ci/acceptance-tests.yml
+      params: &acceptance-tests-params-production
+        <<: *cf-creds-production
+        SERVICE_NAME: cdn-route
+        PLAN_NAME: cdn-route
+        SERVICE_INSTANCE_NAME: cdn-acceptance-test-%s
+        CHALLENGE_TYPE: HTTP-01
+        AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id-production}}
+        AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key-production}}
+        HOSTED_ZONE_ID: {{hosted-zone-id-production}}
+        DOMAIN: {{domain-url-production}}
+        CDN_TIMEOUT: {{cdn-timeout}}
+    - task: acceptance-tests-dns-01
+      file: broker-src/ci/acceptance-tests.yml
+      params:
+        <<: *acceptance-tests-params-production
+        CHALLENGE_TYPE: DNS-01
 
 resources:
 - name: broker-src
