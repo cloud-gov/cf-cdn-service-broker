@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -80,7 +81,7 @@ func (p *HTTPProvider) Present(domain, token, keyAuth string) error {
 		return err
 	}
 
-	return acme.WaitFor(60, 15, func() (bool, error) {
+	return acme.WaitFor(10*time.Second, 2*time.Second, func() (bool, error) {
 		resp, err := insecureClient.Get("https://" + path.Join(domain, ".well-known", "acme-challenge", token))
 		fmt.Println("DEBUG:HTTP", resp, err)
 		if err != nil {
@@ -114,6 +115,10 @@ func (p *DNSProvider) Present(domain, token, keyAuth string) error {
 
 func (p *DNSProvider) CleanUp(domain, token, keyAuth string) error {
 	return nil
+}
+
+func (p *DNSProvider) Timeout() (time.Duration, time.Duration) {
+	return 10 * time.Second, 2 * time.Second
 }
 
 func NewClient(settings config.Settings, user *User, s3Service *s3.S3, excludes []acme.Challenge) (*acme.Client, error) {
