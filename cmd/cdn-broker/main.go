@@ -50,7 +50,6 @@ func main() {
 	db.AutoMigrate(&models.Route{}, &models.Certificate{}, &models.UserData{})
 
 	user, userData, err := models.GetOrCreateUser(db, settings.Email)
-	fmt.Println("DEBUG:USER:GETORCREATE", user, userData, err)
 	if err != nil {
 		logger.Fatal("acme-create-user", err)
 	}

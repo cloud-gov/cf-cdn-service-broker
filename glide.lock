@@ -1,5 +1,5 @@
 hash: 54e41784d66fa88c45503c2b35a96ab024ee35fe6a5174e9c7b147ad41af957a
-updated: 2017-04-19T21:22:16.400213903-04:00
+updated: 2017-04-24T12:20:35.782076402-04:00
 imports:
 - name: code.cloudfoundry.org/lager
   version: de8e9c6c6e474e5e3668aea1a9817bdb4ceeceb0
@@ -88,12 +88,12 @@ imports:
   - require
   - suite
 - name: github.com/xenolf/lego
-  version: 7dd0b2771aa257ec739184aea86952a97863a673
+  version: 86dabace60c9c77f40b6be8cacc26bbb900d4eb6
   repo: git@github.com:jmcarp/lego.git
   subpackages:
   - acme
 - name: golang.org/x/crypto
-  version: 12c985af8526c1f6f0c463bbfd9d69623d13b323
+  version: 3543873453996aaab2fc6b3928a35fc5ca2b5afb
   subpackages:
   - ocsp
 - name: golang.org/x/net

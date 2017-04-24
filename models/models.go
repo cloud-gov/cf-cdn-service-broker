@@ -63,7 +63,6 @@ func GetOrCreateUser(db *gorm.DB, email string) (utils.User, UserData, error) {
 	var user utils.User
 	var userData UserData
 	if res := db.First(&userData, &UserData{Email: email}); res.Error != nil {
-		fmt.Println("DEBUG:USER", res, res.RecordNotFound())
 		if res.RecordNotFound() {
 			user, err := CreateUser(email)
 			return user, userData, err
@@ -468,8 +467,6 @@ func (m *RouteManager) checkDistribution(r *Route) bool {
 }
 
 func (m *RouteManager) solveChallenges(challenges []acme.AuthorizationResource) map[string]error {
-	fmt.Println(fmt.Sprintf("CHALLENGES: %+v", challenges))
-
 	errs := make(chan map[string]error)
 
 	for _, client := range m.acmeClients {

@@ -138,8 +138,6 @@ func checkDNSPropagation(fqdn, value string) (bool, error) {
 	}
 
 	authoritativeNss, err := lookupNameservers(fqdn)
-	fmt.Println("DEBUG:FQDN", fqdn)
-	fmt.Println("DEBUG:NSS", authoritativeNss)
 	if err != nil {
 		return false, err
 	}

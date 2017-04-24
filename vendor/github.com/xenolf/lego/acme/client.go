@@ -371,7 +371,6 @@ func (c *Client) ObtainCertificate(domains []string, bundle bool, privKey crypto
 	}
 
 	challenges, failures := c.GetChallenges(domains)
-	fmt.Println(fmt.Sprintf("CHALLENGES: %+v", challenges))
 	// If any challenge fails - return. Do not generate partial SAN certificates.
 	if len(failures) > 0 {
 		return CertificateResource{}, failures
@@ -489,11 +488,9 @@ func (c *Client) SolveChallenges(challenges []AuthorizationResource) map[string]
 			continue
 		}
 		// no solvers - no solving
-		fmt.Println("DEBUG:SOLVERS", c.chooseSolvers(authz.Body, authz.Domain))
 		if solvers := c.chooseSolvers(authz.Body, authz.Domain); solvers != nil {
 			for i, solver := range solvers {
 				err := solver.Solve(authz.Body.Challenges[i], authz.Domain)
-				fmt.Println("DEBUG", solver, err)
 				if err == nil {
 					delete(failures, authz.Domain)
 					continue
@@ -506,7 +503,6 @@ func (c *Client) SolveChallenges(challenges []AuthorizationResource) map[string]
 		}
 	}
 
-	fmt.Println("FAILURES", failures)
 	return failures
 }
 

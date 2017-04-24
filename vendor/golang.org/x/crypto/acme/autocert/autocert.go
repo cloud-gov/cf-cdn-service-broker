@@ -112,7 +112,7 @@ type Manager struct {
 	// RenewBefore optionally specifies how early certificates should
 	// be renewed before they expire.
 	//
-	// If zero, they're renewed 1 week before expiration.
+	// If zero, they're renewed 30 days before expiration.
 	RenewBefore time.Duration
 
 	// Client is used to perform low-level operations, such as account registration
@@ -162,6 +162,10 @@ type Manager struct {
 // The error is propagated back to the caller of GetCertificate and is user-visible.
 // This does not affect cached certs. See HostPolicy field description for more details.
 func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+	if m.Prompt == nil {
+		return nil, errors.New("acme/autocert: Manager.Prompt not set")
+	}
+
 	name := hello.ServerName
 	if name == "" {
 		return nil, errors.New("acme/autocert: missing server name")
@@ -631,10 +635,10 @@ func (m *Manager) hostPolicy() HostPolicy {
 }
 
 func (m *Manager) renewBefore() time.Duration {
-	if m.RenewBefore > maxRandRenew {
+	if m.RenewBefore > renewJitter {
 		return m.RenewBefore
 	}
-	return 7 * 24 * time.Hour // 1 week
+	return 720 * time.Hour // 30 days
 }
 
 // certState is ready when its mutex is unlocked for reading.
