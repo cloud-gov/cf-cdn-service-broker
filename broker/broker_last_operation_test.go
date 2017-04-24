@@ -88,8 +88,10 @@ func (s *LastOperationSuite) TestLastOperationProvisioning() {
 		State:          models.Provisioning,
 		DomainExternal: "cdn.cloud.gov",
 		Origin:         "cdn.apps.cloud.gov",
+		ChallengeJSON:  []byte("[]"),
 	}
 	manager.On("Get", "123").Return(route, nil)
+	manager.On("GetDNSInstructions", []byte("[]")).Return([]string{"token"}, nil)
 	manager.On("Poll", route).Return(nil)
 	b := broker.New(
 		&manager,

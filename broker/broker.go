@@ -119,26 +119,18 @@ func (b *CdnServiceBroker) LastOperation(
 
 	switch route.State {
 	case models.Provisioning:
-		var description string
-		if len(route.ChallengeJSON) > 0 {
-			instructions, err := b.manager.GetDNSInstructions(route.ChallengeJSON)
-			if err != nil {
-				return brokerapi.LastOperation{}, err
-			}
-			if len(instructions) != len(route.GetDomains()) {
-				return brokerapi.LastOperation{}, fmt.Errorf("Expected to find %d tokens; found %d", len(route.GetDomains()), len(instructions))
-			}
-			description = fmt.Sprintf(
-				"Provisioning in progress [%s => %s]; CNAME or ALIAS domain %s to %s or create TXT record(s): \n%s",
-				route.DomainExternal, route.Origin, route.DomainExternal, route.DomainInternal,
-				strings.Join(instructions, "\n"),
-			)
-		} else {
-			description = fmt.Sprintf(
-				"Provisioning in progress [%s => %s]; CNAME or ALIAS domain %s to %s.",
-				route.DomainExternal, route.Origin, route.DomainExternal, route.DomainInternal,
-			)
+		instructions, err := b.manager.GetDNSInstructions(route.ChallengeJSON)
+		if err != nil {
+			return brokerapi.LastOperation{}, err
 		}
+		if len(instructions) != len(route.GetDomains()) {
+			return brokerapi.LastOperation{}, fmt.Errorf("Expected to find %d tokens; found %d", len(route.GetDomains()), len(instructions))
+		}
+		description := fmt.Sprintf(
+			"Provisioning in progress [%s => %s]; CNAME or ALIAS domain %s to %s or create TXT record(s): \n%s",
+			route.DomainExternal, route.Origin, route.DomainExternal, route.DomainInternal,
+			strings.Join(instructions, "\n"),
+		)
 		return brokerapi.LastOperation{
 			State:       brokerapi.InProgress,
 			Description: description,

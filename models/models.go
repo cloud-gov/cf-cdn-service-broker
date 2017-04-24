@@ -224,13 +224,7 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 	route.DomainInternal = *dist.DomainName
 	route.DistId = *dist.Id
 
-	challenges, errs := m.acmeClient.GetChallenges(route.GetDomains())
-	if len(errs) > 0 {
-		return nil, fmt.Errorf("Error(s) getting challenges: %v", errs)
-	}
-
-	route.ChallengeJSON, err = json.Marshal(challenges)
-	if err != nil {
+	if err := m.ensureChallenges(route, false); err != nil {
 		return nil, err
 	}
 
@@ -402,6 +396,11 @@ func (m *RouteManager) RenewAll() {
 }
 
 func (m *RouteManager) updateProvisioning(r *Route) error {
+	// Handle provisioning instances created before DNS challenge
+	if err := m.ensureChallenges(r, true); err != nil {
+		return err
+	}
+
 	if m.checkDistribution(r) {
 		var challenges []acme.AuthorizationResource
 		if err := json.Unmarshal(r.ChallengeJSON, &challenges); err != nil {
@@ -506,6 +505,28 @@ func (m *RouteManager) deployCertificate(instanceId, distId string, cert acme.Ce
 	}
 
 	return m.cloudFront.SetCertificate(distId, certId)
+}
+
+func (m *RouteManager) ensureChallenges(route *Route, update bool) error {
+	if len(route.ChallengeJSON) == 0 {
+		challenges, errs := m.acmeClient.GetChallenges(route.GetDomains())
+		if len(errs) > 0 {
+			return fmt.Errorf("Error(s) getting challenges: %v", errs)
+		}
+
+		var err error
+		route.ChallengeJSON, err = json.Marshal(challenges)
+		if err != nil {
+			return err
+		}
+
+		if update {
+			return m.db.Save(route).Error
+		}
+		return nil
+	}
+
+	return nil
 }
 
 func (m *RouteManager) GetDNSInstructions(data []byte) ([]string, error) {
