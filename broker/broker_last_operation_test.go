@@ -65,6 +65,7 @@ func (s *LastOperationSuite) TestLastOperationSucceeded() {
 	route := &models.Route{
 		State:          models.Provisioned,
 		DomainExternal: "cdn.cloud.gov",
+		DomainInternal: "abc.cloudfront.net",
 		Origin:         "cdn.apps.cloud.gov",
 	}
 	manager.On("Get", "123").Return(route, nil)
@@ -78,7 +79,7 @@ func (s *LastOperationSuite) TestLastOperationSucceeded() {
 
 	operation, err := b.LastOperation(s.ctx, "123", "")
 	s.Equal(operation.State, brokerapi.Succeeded)
-	s.Equal(operation.Description, "Service instance provisioned [cdn.cloud.gov => cdn.apps.cloud.gov]")
+	s.Equal(operation.Description, "Service instance provisioned [cdn.cloud.gov => cdn.apps.cloud.gov]; CDN domain abc.cloudfront.net")
 	s.Nil(err)
 }
 
@@ -111,6 +112,7 @@ func (s *LastOperationSuite) TestLastOperationDeprovisioning() {
 	route := &models.Route{
 		State:          models.Deprovisioning,
 		DomainExternal: "cdn.cloud.gov",
+		DomainInternal: "abc.cloudfront.net",
 		Origin:         "cdn.apps.cloud.gov",
 	}
 	manager.On("Get", "123").Return(route, nil)
@@ -124,6 +126,6 @@ func (s *LastOperationSuite) TestLastOperationDeprovisioning() {
 
 	operation, err := b.LastOperation(s.ctx, "123", "")
 	s.Equal(operation.State, brokerapi.InProgress)
-	s.Equal(operation.Description, "Deprovisioning in progress [cdn.cloud.gov => cdn.apps.cloud.gov]")
+	s.Equal(operation.Description, "Deprovisioning in progress [cdn.cloud.gov => cdn.apps.cloud.gov]; CDN domain abc.cloudfront.net")
 	s.Nil(err)
 }

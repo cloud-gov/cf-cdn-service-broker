@@ -139,16 +139,16 @@ func (b *CdnServiceBroker) LastOperation(
 		return brokerapi.LastOperation{
 			State: brokerapi.InProgress,
 			Description: fmt.Sprintf(
-				"Deprovisioning in progress [%s => %s]",
-				route.DomainExternal, route.Origin,
+				"Deprovisioning in progress [%s => %s]; CDN domain %s",
+				route.DomainExternal, route.Origin, route.DomainInternal,
 			),
 		}, nil
 	default:
 		return brokerapi.LastOperation{
 			State: brokerapi.Succeeded,
 			Description: fmt.Sprintf(
-				"Service instance provisioned [%s => %s]",
-				route.DomainExternal, route.Origin,
+				"Service instance provisioned [%s => %s]; CDN domain %s",
+				route.DomainExternal, route.Origin, route.DomainInternal,
 			),
 		}, nil
 	}
