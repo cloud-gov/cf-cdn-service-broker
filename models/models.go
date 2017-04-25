@@ -277,6 +277,13 @@ func (m *RouteManager) Update(instanceId, domain, origin string, path string, in
 	route.DomainInternal = *dist.DomainName
 	route.DistId = *dist.Id
 
+	if domain != "" {
+		route.ChallengeJSON = []byte("")
+		if err := m.ensureChallenges(route, false); err != nil {
+			return err
+		}
+	}
+
 	// Save the database.
 	result := m.db.Save(route)
 	if result.Error != nil {
