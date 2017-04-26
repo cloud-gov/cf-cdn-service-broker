@@ -47,7 +47,9 @@ func main() {
 
 	session := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
 
-	db.AutoMigrate(&models.Route{}, &models.Certificate{}, &models.UserData{})
+	if err := db.AutoMigrate(&models.Route{}, &models.Certificate{}, &models.UserData{}).Error; err != nil {
+		logger.Fatal("migrate", err)
+	}
 
 	user, userData, err := models.GetOrCreateUser(db, settings.Email)
 	if err != nil {
