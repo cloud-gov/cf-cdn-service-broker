@@ -61,8 +61,8 @@ type UserData struct {
 
 func GetOrCreateUser(db *gorm.DB, email string) (utils.User, UserData, error) {
 	var user utils.User
-	var userData UserData
-	if res := db.First(&userData, &UserData{Email: email}); res.Error != nil {
+	userData := UserData{Email: email}
+	if res := db.First(&userData, &userData); res.Error != nil {
 		if res.RecordNotFound() {
 			user, err := CreateUser(email)
 			return user, userData, err
