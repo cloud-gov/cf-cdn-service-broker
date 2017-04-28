@@ -89,7 +89,16 @@ func main() {
 		Password: settings.BrokerPassword,
 	}
 
+	server := buildHTTPHandler(broker, logger, credentials)
+	http.ListenAndServe(fmt.Sprintf(":%s", settings.Port), server)
+}
+
+func buildHTTPHandler(broker *broker.CdnServiceBroker, logger lager.Logger, credentials brokerapi.BrokerCredentials) http.Handler {
 	brokerAPI := brokerapi.New(broker, logger, credentials)
-	http.Handle("/", brokerAPI)
-	http.ListenAndServe(fmt.Sprintf(":%s", settings.Port), nil)
+	mux := http.NewServeMux()
+	mux.Handle("/", brokerAPI)
+	mux.HandleFunc("/healthcheck", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	return mux
 }
