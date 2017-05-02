@@ -34,7 +34,7 @@ imports:
   - service/s3
   - service/sts
 - name: github.com/cloudfoundry-community/go-cfclient
-  version: 519c9eb6445d32120dfaf3659668e3b7032ea415
+  version: 23156ed0e73babdbde160007042a4a4e35aec8d1
 - name: github.com/davecgh/go-spew
   version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9
   subpackages:
