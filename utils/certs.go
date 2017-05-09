@@ -3,7 +3,6 @@ package utils
 import (
 	"crypto"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -93,7 +92,7 @@ func (p *HTTPProvider) Present(domain, token, keyAuth string) error {
 		if string(body) == keyAuth {
 			return true, nil
 		}
-		return false, errors.New("HTTP-01 token mismatch")
+		return false, fmt.Errorf("HTTP-01 token mismatch for %s: expected %s, got %s", token, keyAuth, string(body))
 	})
 }
 
