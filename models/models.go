@@ -229,8 +229,8 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 	route.DistId = *dist.Id
 
 	if err := m.db.Create(route).Error; err != nil {
-        return nil, err
-    }
+		return nil, err
+	}
 
 	return route, nil
 }
