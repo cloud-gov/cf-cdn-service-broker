@@ -216,6 +216,10 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 		InsecureOrigin: insecureOrigin,
 	}
 
+	if err := m.ensureChallenges(route, false); err != nil {
+		return nil, err
+	}
+
 	dist, err := m.cloudFront.Create(instanceId, route.GetDomains(), origin, path, insecureOrigin, forwardedHeaders, forwardCookies, tags)
 	if err != nil {
 		return nil, err
@@ -224,11 +228,10 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 	route.DomainInternal = *dist.DomainName
 	route.DistId = *dist.Id
 
-	if err := m.ensureChallenges(route, false); err != nil {
-		return nil, err
-	}
+	if err := m.db.Create(route).Error; err != nil {
+        return nil, err
+    }
 
-	m.db.Create(route)
 	return route, nil
 }
 
