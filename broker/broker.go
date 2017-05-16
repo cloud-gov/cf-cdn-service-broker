@@ -119,7 +119,7 @@ func (b *CdnServiceBroker) LastOperation(
 
 	switch route.State {
 	case models.Provisioning:
-		instructions, err := b.manager.GetDNSInstructions(route.ChallengeJSON)
+		instructions, err := b.manager.GetDNSInstructions(route)
 		if err != nil {
 			return brokerapi.LastOperation{}, err
 		}

@@ -6,15 +6,13 @@ import (
 	"os"
 
 	"code.cloudfoundry.org/lager"
+	"github.com/cloudfoundry-community/go-cfclient"
 	"github.com/pivotal-cf/brokerapi"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"github.com/aws/aws-sdk-go/service/iam"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/cloudfoundry-community/go-cfclient"
-	"github.com/xenolf/lego/acme"
 
 	"github.com/18F/cf-cdn-service-broker/broker"
 	"github.com/18F/cf-cdn-service-broker/config"
@@ -51,31 +49,11 @@ func main() {
 		logger.Fatal("migrate", err)
 	}
 
-	user, userData, err := models.GetOrCreateUser(db, settings.Email)
-	if err != nil {
-		logger.Fatal("acme-create-user", err)
-	}
-
-	acmeClients := map[acme.Challenge]*acme.Client{}
-	acmeClients[acme.HTTP01], err = utils.NewClient(settings, &user, s3.New(session), []acme.Challenge{acme.TLSSNI01, acme.DNS01})
-	if err != nil {
-		logger.Fatal("acme-client", err)
-	}
-	acmeClients[acme.DNS01], err = utils.NewClient(settings, &user, s3.New(session), []acme.Challenge{acme.TLSSNI01, acme.HTTP01})
-	if err != nil {
-		logger.Fatal("acme-client", err)
-	}
-
-	if err := models.SaveUser(db, user, userData); err != nil {
-		logger.Fatal("acme-save-user", err)
-	}
-
 	manager := models.NewManager(
 		logger,
 		&utils.Iam{settings, iam.New(session)},
 		&utils.Distribution{settings, cloudfront.New(session)},
-		user,
-		acmeClients,
+		settings,
 		db,
 	)
 	broker := broker.New(

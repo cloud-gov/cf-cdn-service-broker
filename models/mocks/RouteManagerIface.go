@@ -73,13 +73,13 @@ func (_m *RouteManagerIface) Get(instanceId string) (*models.Route, error) {
 	return r0, r1
 }
 
-// GetDNSInstructions provides a mock function with given fields: _a0
-func (_m *RouteManagerIface) GetDNSInstructions(_a0 []byte) ([]string, error) {
-	ret := _m.Called(_a0)
+// GetDNSInstructions provides a mock function with given fields: route
+func (_m *RouteManagerIface) GetDNSInstructions(route *models.Route) ([]string, error) {
+	ret := _m.Called(route)
 
 	var r0 []string
-	if rf, ok := ret.Get(0).(func([]byte) []string); ok {
-		r0 = rf(_a0)
+	if rf, ok := ret.Get(0).(func(*models.Route) []string); ok {
+		r0 = rf(route)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]string)
@@ -87,8 +87,8 @@ func (_m *RouteManagerIface) GetDNSInstructions(_a0 []byte) ([]string, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func([]byte) error); ok {
-		r1 = rf(_a0)
+	if rf, ok := ret.Get(1).(func(*models.Route) error); ok {
+		r1 = rf(route)
 	} else {
 		r1 = ret.Error(1)
 	}
