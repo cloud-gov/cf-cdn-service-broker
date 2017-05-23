@@ -55,12 +55,6 @@ func (u *User) SetPrivateKey(key crypto.PrivateKey) {
 	u.key = key
 }
 
-var insecureClient = &http.Client{
-	Transport: &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	},
-}
-
 type HTTPProvider struct {
 	Settings config.Settings
 	Service  *s3.S3
@@ -77,6 +71,12 @@ func (p *HTTPProvider) Present(domain, token, keyAuth string) error {
 	}
 	if _, err := p.Service.PutObject(&input); err != nil {
 		return err
+	}
+
+	insecureClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
 	}
 
 	return acme.WaitFor(10*time.Second, 2*time.Second, func() (bool, error) {
