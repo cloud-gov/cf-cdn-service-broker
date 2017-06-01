@@ -4,8 +4,13 @@ go:
 - "1.7"
 - tip
 
-# Dependencies live in /vendor/
-install: true
+# Only applicable to our fork
+install: |
+  cd ../.. && \
+  mv alphagov 18F && \
+  cd 18F && \
+  mv paas-cdn-broker cf-cdn-service-broker && \
+  cd cf-cdn-service-broker
 
 # Skip vendor tests
 script: go test -v $(go list ./... | grep -v /vendor/)
