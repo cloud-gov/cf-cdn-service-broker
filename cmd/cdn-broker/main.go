@@ -16,6 +16,7 @@ import (
 
 	"github.com/18F/cf-cdn-service-broker/broker"
 	"github.com/18F/cf-cdn-service-broker/config"
+	"github.com/18F/cf-cdn-service-broker/healthchecks"
 	"github.com/18F/cf-cdn-service-broker/models"
 	"github.com/18F/cf-cdn-service-broker/utils"
 )
@@ -68,6 +69,14 @@ func main() {
 	}
 
 	brokerAPI := brokerapi.New(broker, logger, credentials)
-	http.Handle("/", brokerAPI)
-	http.ListenAndServe(fmt.Sprintf(":%s", settings.Port), nil)
+	server := bindHTTPHandlers(brokerAPI, settings)
+	http.ListenAndServe(fmt.Sprintf(":%s", settings.Port), server)
+}
+
+func bindHTTPHandlers(handler http.Handler, settings config.Settings) http.Handler {
+	mux := http.NewServeMux()
+	mux.Handle("/", handler)
+	healthchecks.Bind(mux, settings)
+
+	return mux
 }
