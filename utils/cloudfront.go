@@ -24,6 +24,30 @@ type Distribution struct {
 	Service  *cloudfront.CloudFront
 }
 
+func (d *Distribution) getCustomErrorResponses() *cloudfront.CustomErrorResponses {
+
+	// supported codes as of 2017-06
+	// http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-cloudfront-distributionconfig-customerrorresponse.html
+	codes := []int64{400, 403, 404, 405, 414, 500, 501, 502, 503, 504}
+
+	var items []*cloudfront.CustomErrorResponse
+
+	for _, code := range codes {
+		items = append(
+			items,
+			&cloudfront.CustomErrorResponse{
+				ErrorCode:          aws.Int64(code),
+				ErrorCachingMinTTL: aws.Int64(0),
+			},
+		)
+	}
+
+	return &cloudfront.CustomErrorResponses{
+		Quantity: aws.Int64(int64(len(items))),
+		Items:    items,
+	}
+}
+
 func (d *Distribution) getAliases(domains []string) *cloudfront.Aliases {
 	var items []*string
 	for _, d := range domains {
@@ -207,6 +231,7 @@ func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionCon
 		},
 	}
 	config.Aliases = d.getAliases(domains)
+	config.CustomErrorResponses = d.getCustomErrorResponses()
 	config.PriceClass = aws.String("PriceClass_100")
 }
 
