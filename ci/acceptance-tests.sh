@@ -133,7 +133,7 @@ fi
 cat << EOF > "${path}/app/manifest.yml"
 ---
 applications:
-- name: cdn-broker-test
+- name: cdn-broker-test-${CHALLENGE_TYPE}
   buildpack: staticfile_buildpack
   domain: ${DOMAIN}
   no-hostname: true
