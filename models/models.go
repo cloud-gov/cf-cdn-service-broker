@@ -361,11 +361,17 @@ func (m *RouteManager) Disable(r *Route) error {
 }
 
 func (m *RouteManager) stillActive(r *Route) error {
+
+	m.logger.Info("Starting canary check", lager.Data{
+		"route":    r,
+		"settings": m.settings,
+	})
+
 	session := session.New(aws.NewConfig().WithRegion(m.settings.AwsDefaultRegion))
 
 	s3client := s3.New(session)
 
-	target := path.Join(".well-known", "acme-challenge", "canary")
+	target := path.Join(".well-known", "acme-challenge", "canary", r.InstanceId)
 
 	input := s3.PutObjectInput{
 		Bucket: aws.String(m.settings.Bucket),
@@ -485,13 +491,21 @@ func (m *RouteManager) DeleteOrphanedCerts() {
 func (m *RouteManager) RenewAll() {
 	routes := []Route{}
 
-	m.db.Where(
-		"state = ? and expires < now() + interval '30 days'", string(Provisioned),
+	m.logger.Info("Looking for routes that are expiring soon")
+
+	m.db.Having(
+		"max(expires) < now() + interval '30 days'",
+	).Group(
+		"routes.id",
+	).Where(
+		"state = ?", string(Provisioned),
 	).Joins(
 		"join certificates on routes.id = certificates.route_id",
-	).Preload(
-		"Certificate",
 	).Find(&routes)
+
+	m.logger.Info("Found routes that need renewal", lager.Data{
+		"num-routes": len(routes),
+	})
 
 	for _, route := range routes {
 		err := m.Renew(&route)
