@@ -5,12 +5,16 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"database/sql/driver"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"path"
 	"strings"
 	"time"
 
@@ -356,9 +360,61 @@ func (m *RouteManager) Disable(r *Route) error {
 	return nil
 }
 
+func (m *RouteManager) stillActive(r *Route) error {
+	session := session.New(aws.NewConfig().WithRegion(m.settings.AwsDefaultRegion))
+
+	s3client := s3.New(session)
+
+	target := path.Join(".well-known", "acme-challenge", "canary")
+
+	input := s3.PutObjectInput{
+		Bucket: aws.String(m.settings.Bucket),
+		Key:    aws.String(target),
+		Body:   strings.NewReader(r.InstanceId),
+	}
+
+	if m.settings.ServerSideEncryption != "" {
+		input.ServerSideEncryption = aws.String(m.settings.ServerSideEncryption)
+	}
+
+	if _, err := s3client.PutObject(&input); err != nil {
+		return err
+	}
+
+	insecureClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+
+	for _, domain := range r.GetDomains() {
+		resp, err := insecureClient.Get("https://" + path.Join(domain, target))
+		if err != nil {
+			return err
+		}
+
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+
+		if string(body) != r.InstanceId {
+			return fmt.Errorf("Canary check failed for %s; expected %s, got %s", domain, r.InstanceId, string(body))
+		}
+	}
+
+	return nil
+}
+
 func (m *RouteManager) Renew(r *Route) error {
+	err := m.stillActive(r)
+	if err != nil {
+		return fmt.Errorf("Route is not active, skipping renewal: %v", err)
+	}
+
 	var certRow Certificate
-	err := m.db.Model(r).Related(&certRow, "Certificate").Error
+	err = m.db.Model(r).Related(&certRow, "Certificate").Error
 	if err != nil {
 		return err
 	}
