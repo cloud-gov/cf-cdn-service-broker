@@ -16,6 +16,7 @@ import (
 	"github.com/18F/cf-cdn-service-broker/config"
 	"github.com/18F/cf-cdn-service-broker/models"
 	"github.com/18F/cf-cdn-service-broker/models/mocks"
+	"github.com/18F/cf-cdn-service-broker/utils"
 )
 
 func TestProvisioning(t *testing.T) {
@@ -88,7 +89,7 @@ func (s *ProvisionSuite) TestSuccess() {
 	s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
 	route := &models.Route{State: models.Provisioning}
 	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
-	s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", "", false, []string{"Host"}, true,
+	s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", "", false, utils.Headers{"Host": true}, true,
 		map[string]string{"Organization": "", "Space": "", "Service": "", "Plan": ""}).Return(route, nil)
 
 	details := brokerapi.ProvisionDetails{
@@ -101,7 +102,7 @@ func (s *ProvisionSuite) TestSuccess() {
 func (s *ProvisionSuite) TestSuccessCustomOrigin() {
 	s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
 	route := &models.Route{State: models.Provisioning}
-	s.Manager.On("Create", "123", "domain.gov", "custom.cloud.gov", "", false, []string{}, true,
+	s.Manager.On("Create", "123", "domain.gov", "custom.cloud.gov", "", false, utils.Headers{}, true,
 		map[string]string{"Organization": "", "Space": "", "Service": "", "Plan": ""}).Return(route, nil)
 
 	details := brokerapi.ProvisionDetails{
@@ -150,5 +151,100 @@ func (s *ProvisionSuite) TestMultipleDomainsMoreThanOneNotExists() {
 	s.NotContains(err.Error(), "domain.gov")
 	s.Contains(err.Error(), "domain2.gov")
 	s.Contains(err.Error(), "domain3.gov")
+}
 
+func (s *ProvisionSuite) setupTestOfHeaderForwarding() {
+	s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
+	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
+}
+
+func (s *ProvisionSuite) allowCreateWithExpectedHeaders(expectedHeaders utils.Headers) {
+	route := &models.Route{State: models.Provisioning}
+	s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", "", false, expectedHeaders, true,
+		map[string]string{"Organization": "", "Space": "", "Service": "", "Plan": ""}).Return(route, nil)
+}
+
+func (s *ProvisionSuite) failCreateWithExpectedHeaders(expectedHeaders utils.Headers) {
+	s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", "", false, expectedHeaders, true,
+		map[string]string{"Organization": "", "Space": "", "Service": "", "Plan": ""}).Return(nil, errors.New("fail"))
+}
+
+func (s *ProvisionSuite) TestSuccessForwardingDuplicatedHostHeader() {
+	s.setupTestOfHeaderForwarding()
+	s.allowCreateWithExpectedHeaders(utils.Headers{"Host": true})
+
+	details := brokerapi.ProvisionDetails{
+		RawParameters: []byte(`{"domain": "domain.gov", "headers": ["Host"]}`),
+	}
+	_, err := s.Broker.Provision(s.ctx, "123", details, true)
+	s.Nil(err)
+}
+
+func (s *ProvisionSuite) TestSuccessForwardedSingleHeader() {
+	s.setupTestOfHeaderForwarding()
+	s.allowCreateWithExpectedHeaders(utils.Headers{"User-Agent": true, "Host": true})
+
+	details := brokerapi.ProvisionDetails{
+		RawParameters: []byte(`{"domain": "domain.gov", "headers": ["User-Agent"]}`),
+	}
+	_, err := s.Broker.Provision(s.ctx, "123", details, true)
+	s.Nil(err)
+}
+
+func (s *ProvisionSuite) TestSuccessForwardingWildcardHeader() {
+	s.setupTestOfHeaderForwarding()
+	s.allowCreateWithExpectedHeaders(utils.Headers{"*": true})
+
+	details := brokerapi.ProvisionDetails{
+		RawParameters: []byte(`{"domain": "domain.gov", "headers": ["*"]}`),
+	}
+	_, err := s.Broker.Provision(s.ctx, "123", details, true)
+	s.Nil(err)
+}
+
+func (s *ProvisionSuite) TestSuccessNineForwardedHeaders() {
+	s.setupTestOfHeaderForwarding()
+	s.allowCreateWithExpectedHeaders(utils.Headers{"One": true, "Two": true, "Three": true, "Four": true, "Five": true, "Six": true, "Seven": true, "Eight": true, "Nine": true, "Host": true})
+
+	details := brokerapi.ProvisionDetails{
+		RawParameters: []byte(`{"domain": "domain.gov", "headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"]}`),
+	}
+	_, err := s.Broker.Provision(s.ctx, "123", details, true)
+	s.Nil(err)
+}
+
+func (s *ProvisionSuite) TestForwardedHeadersDuplicates() {
+	s.setupTestOfHeaderForwarding()
+	s.failCreateWithExpectedHeaders(utils.Headers{"User-Agent": true, "Host": true})
+
+	details := brokerapi.ProvisionDetails{
+		RawParameters: []byte(`{"domain": "domain.gov", "headers": ["User-Agent", "Host", "User-Agent"]}`),
+	}
+	_, err := s.Broker.Provision(s.ctx, "123", details, true)
+	s.NotNil(err)
+	s.Contains(err.Error(), "must not pass duplicated header 'User-Agent'")
+}
+
+func (s *ProvisionSuite) TestForwardedHeadersWhitelistAndWildcard() {
+	s.setupTestOfHeaderForwarding()
+	s.failCreateWithExpectedHeaders(utils.Headers{"*": true})
+
+	details := brokerapi.ProvisionDetails{
+		RawParameters: []byte(`{"domain": "domain.gov", "headers": ["*", "User-Agent"]}`),
+	}
+	_, err := s.Broker.Provision(s.ctx, "123", details, true)
+	s.NotNil(err)
+	s.Contains(err.Error(), "must not pass whitelisted headers alongside wildcard")
+}
+
+func (s *ProvisionSuite) TestForwardedHeadersMoreThanNine() {
+	s.setupTestOfHeaderForwarding()
+	s.failCreateWithExpectedHeaders(utils.Headers{"One": true, "Two": true, "Three": true, "Four": true, "Five": true, "Six": true, "Seven": true, "Eight": true, "Nine": true, "Ten": true, "Host": true})
+
+	details := brokerapi.ProvisionDetails{
+		RawParameters: []byte(`{"domain": "domain.gov", "headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"]}`),
+	}
+	_, err := s.Broker.Provision(s.ctx, "123", details, true)
+	s.NotNil(err)
+	s.Contains(err.Error(), "must pass no more than 9 custom headers to forward")
 }

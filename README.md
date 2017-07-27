@@ -129,6 +129,28 @@ $ cf create-service cdn-route cdn-route my-cdn-route \
 Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
 ```
 
+## Header Forwarding
+
+CloudFront forwards a [limited set of headers](http://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/RequestAndResponseBehaviorCustomOrigin.html#request-custom-headers-behavior) by default. If you want extra headers forwarded to your origin, you'll want to add another parameter. Here we forward both the `User-Agent` and `Referer` headers:
+
+```bash
+$ cf create-service cdn-route cdn-route my-cdn-route \
+    -c '{"domain": "my.domain.gov", "headers": ["User-Agent", "Referer"]}'
+
+Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
+```
+
+You can whitelist up to 9 headers. If you want exceed this limit or forward all headers you can use a wildcard:
+
+```bash
+$ cf create-service cdn-route cdn-route my-cdn-route \
+    -c '{"domain": "my.domain.gov", "headers": ["*"]}'
+
+Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
+```
+
+When making requests to the origin, CloudFront's caching mechanism associates HTTP requests with their response. The more variation within the forwarded request, the fewer cache hits and the less effective the cache. Limiting the headers forwarded is therefore key to cache performance. Caching is disabled altogether when using a wildcard.
+
 ## Debugging
 
 By default, Cloud Controller will expire asynchronous service instances that have been pending for over one week. If your instance expires, run a dummy update
