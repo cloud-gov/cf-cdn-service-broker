@@ -5,12 +5,16 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"database/sql/driver"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"path"
 	"strings"
 	"time"
 
@@ -356,9 +360,67 @@ func (m *RouteManager) Disable(r *Route) error {
 	return nil
 }
 
+func (m *RouteManager) stillActive(r *Route) error {
+
+	m.logger.Info("Starting canary check", lager.Data{
+		"route":    r,
+		"settings": m.settings,
+	})
+
+	session := session.New(aws.NewConfig().WithRegion(m.settings.AwsDefaultRegion))
+
+	s3client := s3.New(session)
+
+	target := path.Join(".well-known", "acme-challenge", "canary", r.InstanceId)
+
+	input := s3.PutObjectInput{
+		Bucket: aws.String(m.settings.Bucket),
+		Key:    aws.String(target),
+		Body:   strings.NewReader(r.InstanceId),
+	}
+
+	if m.settings.ServerSideEncryption != "" {
+		input.ServerSideEncryption = aws.String(m.settings.ServerSideEncryption)
+	}
+
+	if _, err := s3client.PutObject(&input); err != nil {
+		return err
+	}
+
+	insecureClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+
+	for _, domain := range r.GetDomains() {
+		resp, err := insecureClient.Get("https://" + path.Join(domain, target))
+		if err != nil {
+			return err
+		}
+
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+
+		if string(body) != r.InstanceId {
+			return fmt.Errorf("Canary check failed for %s; expected %s, got %s", domain, r.InstanceId, string(body))
+		}
+	}
+
+	return nil
+}
+
 func (m *RouteManager) Renew(r *Route) error {
+	err := m.stillActive(r)
+	if err != nil {
+		return fmt.Errorf("Route is not active, skipping renewal: %v", err)
+	}
+
 	var certRow Certificate
-	err := m.db.Model(r).Related(&certRow, "Certificate").Error
+	err = m.db.Model(r).Related(&certRow, "Certificate").Error
 	if err != nil {
 		return err
 	}
@@ -429,13 +491,21 @@ func (m *RouteManager) DeleteOrphanedCerts() {
 func (m *RouteManager) RenewAll() {
 	routes := []Route{}
 
-	m.db.Where(
-		"state = ? and expires < now() + interval '30 days'", string(Provisioned),
+	m.logger.Info("Looking for routes that are expiring soon")
+
+	m.db.Having(
+		"max(expires) < now() + interval '30 days'",
+	).Group(
+		"routes.id",
+	).Where(
+		"state = ?", string(Provisioned),
 	).Joins(
 		"join certificates on routes.id = certificates.route_id",
-	).Preload(
-		"Certificate",
 	).Find(&routes)
+
+	m.logger.Info("Found routes that need renewal", lager.Data{
+		"num-routes": len(routes),
+	})
 
 	for _, route := range routes {
 		err := m.Renew(&route)
