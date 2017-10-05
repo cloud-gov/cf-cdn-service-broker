@@ -131,12 +131,21 @@ Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check oper
 
 ## Debugging
 
+### Restore to pending
+
 By default, Cloud Controller will expire asynchronous service instances that have been pending for over one week. If your instance expires, run a dummy update
 to restore it to the pending state so that Cloud Controller will continue to check for updates:
 
 ```bash
 cf update-service my-cdn-route -c '{"timestamp": 20161001}'
 ```
+
+### Reset pending cdn-route service creation
+
+The `create-service` command for the cdn-route broker will be in a pending state until either a) the tenant completes the verification of domain ownership or b) one week elapses. If someone has mistyped a domain, they won't want to wait a week to try again.
+
+To resolve this, an operator can force the service from the provisioning state to provisioned via database updates, as with this script, https://github.com/18F/cg-scripts/blob/master/poke-cdn.sh. Then delete or update the service to the correct settings.
+
 
 ## Tests
 
