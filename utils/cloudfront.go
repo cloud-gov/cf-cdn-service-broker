@@ -136,7 +136,7 @@ func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionCon
 					HTTPSPort:            aws.Int64(443),
 					OriginProtocolPolicy: getOriginProtocolPolicy(insecureOrigin),
 					OriginSslProtocols: &cloudfront.OriginSslProtocols{
-						Quantity: aws.Int64(3),
+						Quantity: aws.Int64(2),
 						Items: []*string{
 							aws.String("TLSv1.1"),
 							aws.String("TLSv1.2"),
