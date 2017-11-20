@@ -14,14 +14,16 @@ import (
 	"github.com/18F/cf-cdn-service-broker/cf"
 	"github.com/18F/cf-cdn-service-broker/config"
 	"github.com/18F/cf-cdn-service-broker/models"
+	"github.com/18F/cf-cdn-service-broker/utils"
 )
 
 type Options struct {
-	Domain         string `json:"domain"`
-	Origin         string `json:"origin"`
-	Path           string `json:"path"`
-	InsecureOrigin bool   `json:"insecure_origin"`
-	Cookies        bool   `json:"cookies"`
+	Domain         string   `json:"domain"`
+	Origin         string   `json:"origin"`
+	Path           string   `json:"path"`
+	InsecureOrigin bool     `json:"insecure_origin"`
+	Cookies        bool     `json:"cookies"`
+	Headers        []string `json:"headers"`
 }
 
 type CdnServiceBroker struct {
@@ -44,6 +46,10 @@ func New(
 		logger:   logger,
 	}
 }
+
+var (
+	MAX_HEADER_COUNT = 10
+)
 
 func (*CdnServiceBroker) Services(context context.Context) []brokerapi.Service {
 	var service brokerapi.Service
@@ -80,7 +86,10 @@ func (b *CdnServiceBroker) Provision(
 		return spec, brokerapi.ErrInstanceAlreadyExists
 	}
 
-	headers := b.getHeaders(options)
+	headers, err := b.getHeaders(options)
+	if err != nil {
+		return spec, err
+	}
 
 	tags := map[string]string{
 		"Organization": details.OrganizationGUID,
@@ -208,7 +217,10 @@ func (b *CdnServiceBroker) Update(
 		return brokerapi.UpdateServiceSpec{}, err
 	}
 
-	headers := b.getHeaders(options)
+	headers, err := b.getHeaders(options)
+	if err != nil {
+		return brokerapi.UpdateServiceSpec{}, err
+	}
 
 	err = b.manager.Update(instanceID, options.Domain, options.Origin, options.Path, options.InsecureOrigin, headers, options.Cookies)
 	if err != nil {
@@ -227,6 +239,7 @@ func (b *CdnServiceBroker) createBrokerOptions(details []byte) (options Options,
 	options = Options{
 		Origin:  b.settings.DefaultOrigin,
 		Cookies: true,
+		Headers: []string{},
 	}
 	err = json.Unmarshal(details, &options)
 	if err != nil {
@@ -280,7 +293,7 @@ func (b *CdnServiceBroker) checkDomain(domain, orgGUID string) error {
 	domains := strings.Split(domain, ",")
 	var errorlist []string
 
-	var orgName string = "<organization>"
+	orgName := "<organization>"
 
 	for i := range domains {
 		if _, err := b.cfclient.GetDomainByName(domains[i]); err != nil {
@@ -299,17 +312,38 @@ func (b *CdnServiceBroker) checkDomain(domain, orgGUID string) error {
 	if len(errorlist) > 0 {
 		if len(errorlist) > 1 {
 			return fmt.Errorf("Multiple domains do not exist; create them with:\n%s", strings.Join(errorlist, "\n"))
-		} else {
-			return fmt.Errorf("Domain does not exist; create it with %s", errorlist[0])
 		}
+		return fmt.Errorf("Domain does not exist; create it with %s", errorlist[0])
 	}
 
 	return nil
 }
 
-func (b *CdnServiceBroker) getHeaders(options Options) []string {
-	if options.Origin == b.settings.DefaultOrigin {
-		return []string{"Host"}
+func (b *CdnServiceBroker) getHeaders(options Options) (headers utils.Headers, err error) {
+	headers = utils.Headers{}
+	for _, header := range options.Headers {
+		if headers.Contains(header) {
+			err = fmt.Errorf("must not pass duplicated header '%s'", header)
+			return
+		}
+		headers.Add(header)
 	}
-	return []string{}
+
+	// Forbid accompanying a wildcard with specific headers.
+	if headers.Contains("*") && len(headers) > 1 {
+		err = errors.New("must not pass whitelisted headers alongside wildcard")
+		return
+	}
+
+	// Ensure the Host header is forwarded if using a CloudFoundry origin.
+	if options.Origin == b.settings.DefaultOrigin && !headers.Contains("*") {
+		headers.Add("Host")
+	}
+
+	if len(headers) > MAX_HEADER_COUNT {
+		err = fmt.Errorf("must not set more than %d headers; got %d", MAX_HEADER_COUNT, len(headers))
+		return
+	}
+
+	return
 }
