@@ -47,6 +47,10 @@ func New(
 	}
 }
 
+var (
+	MAX_HEADER_COUNT = 10
+)
+
 func (*CdnServiceBroker) Services(context context.Context) []brokerapi.Service {
 	var service brokerapi.Service
 	buf, err := ioutil.ReadFile("./catalog.json")
@@ -261,10 +265,6 @@ func (b *CdnServiceBroker) parseProvisionDetails(details brokerapi.ProvisionDeta
 			return
 		}
 	}
-	if len(options.Headers) > 9 {
-		err = errors.New("must pass no more than 9 custom headers to forward")
-		return
-	}
 	return
 }
 
@@ -285,10 +285,6 @@ func (b *CdnServiceBroker) parseUpdateDetails(details brokerapi.UpdateDetails) (
 			return
 		}
 	}
-	if len(options.Headers) > 9 {
-		err = errors.New("must pass no more than 9 custom headers to forward")
-		return
-	}
 	return
 }
 
@@ -297,7 +293,7 @@ func (b *CdnServiceBroker) checkDomain(domain, orgGUID string) error {
 	domains := strings.Split(domain, ",")
 	var errorlist []string
 
-	var orgName string = "<organization>"
+	orgName := "<organization>"
 
 	for i := range domains {
 		if _, err := b.cfclient.GetDomainByName(domains[i]); err != nil {
@@ -316,9 +312,8 @@ func (b *CdnServiceBroker) checkDomain(domain, orgGUID string) error {
 	if len(errorlist) > 0 {
 		if len(errorlist) > 1 {
 			return fmt.Errorf("Multiple domains do not exist; create them with:\n%s", strings.Join(errorlist, "\n"))
-		} else {
-			return fmt.Errorf("Domain does not exist; create it with %s", errorlist[0])
 		}
+		return fmt.Errorf("Domain does not exist; create it with %s", errorlist[0])
 	}
 
 	return nil
@@ -343,6 +338,11 @@ func (b *CdnServiceBroker) getHeaders(options Options) (headers utils.Headers, e
 	// Ensure the Host header is forwarded if using a CloudFoundry origin.
 	if options.Origin == b.settings.DefaultOrigin && !headers.Contains("*") {
 		headers.Add("Host")
+	}
+
+	if len(headers) > MAX_HEADER_COUNT {
+		err = fmt.Errorf("must not set more than %d headers; got %d", MAX_HEADER_COUNT, len(headers))
+		return
 	}
 
 	return
