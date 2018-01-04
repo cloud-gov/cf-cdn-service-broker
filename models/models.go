@@ -5,12 +5,16 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"database/sql/driver"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"path"
 	"strings"
 	"time"
 
@@ -19,9 +23,13 @@ import (
 	"github.com/pivotal-cf/brokerapi"
 	"github.com/xenolf/lego/acme"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"github.com/aws/aws-sdk-go/service/iam"
+	"github.com/aws/aws-sdk-go/service/s3"
 
+	"github.com/18F/cf-cdn-service-broker/config"
 	"github.com/18F/cf-cdn-service-broker/utils"
 )
 
@@ -54,53 +62,54 @@ func (s *State) Scan(value interface{}) error {
 
 type UserData struct {
 	gorm.Model
-	Email string `gorm:"not null;unique_index"`
+	Email string `gorm:"not null"`
 	Reg   []byte
 	Key   []byte
 }
 
-func GetOrCreateUser(db *gorm.DB, email string) (utils.User, UserData, error) {
-	var user utils.User
-	userData := UserData{Email: email}
-	if res := db.First(&userData, &userData); res.Error != nil {
-		if res.RecordNotFound() {
-			user, err := CreateUser(email)
-			return user, userData, err
-		}
-		return user, userData, res.Error
-	}
-	if err := json.Unmarshal(userData.Reg, &user); err != nil {
-		return user, userData, err
-	}
-	key, err := loadPrivateKey(userData.Key)
-	user.SetPrivateKey(key)
-	return user, userData, err
-}
-
 func CreateUser(email string) (utils.User, error) {
 	user := utils.User{Email: email}
+
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return user, err
 	}
 	user.SetPrivateKey(key)
+
 	return user, nil
 }
 
-func SaveUser(db *gorm.DB, user utils.User, userData UserData) error {
+func SaveUser(db *gorm.DB, user utils.User) (UserData, error) {
 	var err error
+	userData := UserData{Email: user.GetEmail()}
+
 	userData.Key, err = savePrivateKey(user.GetPrivateKey())
 	if err != nil {
-		return err
+		return userData, err
 	}
 	userData.Reg, err = json.Marshal(user)
 	if err != nil {
-		return err
+		return userData, err
 	}
-	if userData.ID == 0 {
-		return db.Create(&userData).Error
+
+	if err := db.Save(&userData).Error; err != nil {
+		return userData, err
 	}
-	return db.Save(&userData).Error
+
+	return userData, nil
+}
+
+func LoadUser(userData UserData) (utils.User, error) {
+	var user utils.User
+	if err := json.Unmarshal(userData.Reg, &user); err != nil {
+		return user, err
+	}
+	key, err := loadPrivateKey(userData.Key)
+	if err != nil {
+		return user, err
+	}
+	user.SetPrivateKey(key)
+	return user, nil
 }
 
 // loadPrivateKey loads a PEM-encoded ECC/RSA private key from an array of bytes.
@@ -150,10 +159,21 @@ type Route struct {
 	Path           string
 	InsecureOrigin bool
 	Certificate    Certificate
+	UserData       UserData
+	UserDataID     int
 }
 
 func (r *Route) GetDomains() []string {
 	return strings.Split(r.DomainExternal, ",")
+}
+
+func (r *Route) loadUser(db *gorm.DB) (utils.User, error) {
+	var userData UserData
+	if err := db.Model(r).Related(&userData).Error; err != nil {
+		return utils.User{}, err
+	}
+
+	return LoadUser(userData)
 }
 
 type Certificate struct {
@@ -174,35 +194,30 @@ type RouteManagerIface interface {
 	Renew(route *Route) error
 	RenewAll()
 	DeleteOrphanedCerts()
-	GetDNSInstructions([]byte) ([]string, error)
+	GetDNSInstructions(route *Route) ([]string, error)
 }
 
 type RouteManager struct {
-	logger      lager.Logger
-	iam         utils.IamIface
-	cloudFront  utils.DistributionIface
-	acmeUser    utils.User
-	acmeClient  *acme.Client
-	acmeClients map[acme.Challenge]*acme.Client
-	db          *gorm.DB
+	logger     lager.Logger
+	iam        utils.IamIface
+	cloudFront utils.DistributionIface
+	settings   config.Settings
+	db         *gorm.DB
 }
 
 func NewManager(
 	logger lager.Logger,
 	iam utils.IamIface,
 	cloudFront utils.DistributionIface,
-	acmeUser utils.User,
-	acmeClients map[acme.Challenge]*acme.Client,
+	settings config.Settings,
 	db *gorm.DB,
 ) RouteManager {
 	return RouteManager{
-		logger:      logger,
-		iam:         iam,
-		cloudFront:  cloudFront,
-		acmeUser:    acmeUser,
-		acmeClient:  acmeClients[acme.HTTP01],
-		acmeClients: acmeClients,
-		db:          db,
+		logger:     logger,
+		iam:        iam,
+		cloudFront: cloudFront,
+		settings:   settings,
+		db:         db,
 	}
 }
 
@@ -216,6 +231,27 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 		InsecureOrigin: insecureOrigin,
 	}
 
+	user, err := CreateUser(m.settings.Email)
+	if err != nil {
+		return nil, err
+	}
+
+	clients, err := m.getClients(&user, m.settings)
+	if err != nil {
+		return nil, err
+	}
+
+	userData, err := SaveUser(m.db, user)
+	if err != nil {
+		return nil, err
+	}
+
+	route.UserData = userData
+
+	if err := m.ensureChallenges(route, clients[acme.HTTP01], false); err != nil {
+		return nil, err
+	}
+
 	dist, err := m.cloudFront.Create(instanceId, route.GetDomains(), origin, path, insecureOrigin, forwardedHeaders, forwardCookies, tags)
 	if err != nil {
 		return nil, err
@@ -224,11 +260,10 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 	route.DomainInternal = *dist.DomainName
 	route.DistId = *dist.Id
 
-	if err := m.ensureChallenges(route, false); err != nil {
+	if err := m.db.Create(route).Error; err != nil {
 		return nil, err
 	}
 
-	m.db.Create(route)
 	return route, nil
 }
 
@@ -278,8 +313,18 @@ func (m *RouteManager) Update(instanceId, domain, origin string, path string, in
 	route.DistId = *dist.Id
 
 	if domain != "" {
+		user, err := route.loadUser(m.db)
+		if err != nil {
+			return err
+		}
+
+		clients, err := m.getClients(&user, m.settings)
+		if err != nil {
+			return err
+		}
+
 		route.ChallengeJSON = []byte("")
-		if err := m.ensureChallenges(route, false); err != nil {
+		if err := m.ensureChallenges(route, clients[acme.HTTP01], false); err != nil {
 			return err
 		}
 	}
@@ -315,14 +360,82 @@ func (m *RouteManager) Disable(r *Route) error {
 	return nil
 }
 
+func (m *RouteManager) stillActive(r *Route) error {
+
+	m.logger.Info("Starting canary check", lager.Data{
+		"route":    r,
+		"settings": m.settings,
+	})
+
+	session := session.New(aws.NewConfig().WithRegion(m.settings.AwsDefaultRegion))
+
+	s3client := s3.New(session)
+
+	target := path.Join(".well-known", "acme-challenge", "canary", r.InstanceId)
+
+	input := s3.PutObjectInput{
+		Bucket: aws.String(m.settings.Bucket),
+		Key:    aws.String(target),
+		Body:   strings.NewReader(r.InstanceId),
+	}
+
+	if m.settings.ServerSideEncryption != "" {
+		input.ServerSideEncryption = aws.String(m.settings.ServerSideEncryption)
+	}
+
+	if _, err := s3client.PutObject(&input); err != nil {
+		return err
+	}
+
+	insecureClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+
+	for _, domain := range r.GetDomains() {
+		resp, err := insecureClient.Get("https://" + path.Join(domain, target))
+		if err != nil {
+			return err
+		}
+
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+
+		if string(body) != r.InstanceId {
+			return fmt.Errorf("Canary check failed for %s; expected %s, got %s", domain, r.InstanceId, string(body))
+		}
+	}
+
+	return nil
+}
+
 func (m *RouteManager) Renew(r *Route) error {
+	err := m.stillActive(r)
+	if err != nil {
+		return fmt.Errorf("Route is not active, skipping renewal: %v", err)
+	}
+
 	var certRow Certificate
-	err := m.db.Model(r).Related(&certRow, "Certificate").Error
+	err = m.db.Model(r).Related(&certRow, "Certificate").Error
 	if err != nil {
 		return err
 	}
 
-	certResource, errs := m.acmeClient.ObtainCertificate(r.GetDomains(), true, nil, false)
+	user, err := r.loadUser(m.db)
+	if err != nil {
+		return err
+	}
+
+	clients, err := m.getClients(&user, m.settings)
+	if err != nil {
+		return err
+	}
+
+	certResource, errs := clients[acme.HTTP01].ObtainCertificate(r.GetDomains(), true, nil, false)
 	if len(errs) > 0 {
 		return fmt.Errorf("Error(s) obtaining certificate: %v", errs)
 	}
@@ -378,13 +491,21 @@ func (m *RouteManager) DeleteOrphanedCerts() {
 func (m *RouteManager) RenewAll() {
 	routes := []Route{}
 
-	m.db.Where(
-		"state = ? and expires < now() + interval '30 days'", string(Provisioned),
+	m.logger.Info("Looking for routes that are expiring soon")
+
+	m.db.Having(
+		"max(expires) < now() + interval '30 days'",
+	).Group(
+		"routes.id",
+	).Where(
+		"state = ?", string(Provisioned),
 	).Joins(
 		"join certificates on routes.id = certificates.route_id",
-	).Preload(
-		"Certificate",
 	).Find(&routes)
+
+	m.logger.Info("Found routes that need renewal", lager.Data{
+		"num-routes": len(routes),
+	})
 
 	for _, route := range routes {
 		err := m.Renew(&route)
@@ -402,9 +523,37 @@ func (m *RouteManager) RenewAll() {
 	}
 }
 
+func (m *RouteManager) getClients(user *utils.User, settings config.Settings) (map[acme.Challenge]*acme.Client, error) {
+	session := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
+
+	var err error
+
+	clients := map[acme.Challenge]*acme.Client{}
+	clients[acme.HTTP01], err = utils.NewClient(settings, user, s3.New(session), []acme.Challenge{acme.TLSSNI01, acme.DNS01})
+	if err != nil {
+		return clients, err
+	}
+	clients[acme.DNS01], err = utils.NewClient(settings, user, s3.New(session), []acme.Challenge{acme.TLSSNI01, acme.HTTP01})
+	if err != nil {
+		return clients, err
+	}
+
+	return clients, nil
+}
+
 func (m *RouteManager) updateProvisioning(r *Route) error {
+	user, err := r.loadUser(m.db)
+	if err != nil {
+		return err
+	}
+
+	clients, err := m.getClients(&user, m.settings)
+	if err != nil {
+		return err
+	}
+
 	// Handle provisioning instances created before DNS challenge
-	if err := m.ensureChallenges(r, true); err != nil {
+	if err := m.ensureChallenges(r, clients[acme.HTTP01], true); err != nil {
 		return err
 	}
 
@@ -413,11 +562,11 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 		if err := json.Unmarshal(r.ChallengeJSON, &challenges); err != nil {
 			return err
 		}
-		if errs := m.solveChallenges(challenges); len(errs) > 0 {
+		if errs := m.solveChallenges(clients, challenges); len(errs) > 0 {
 			return fmt.Errorf("Error(s) solving challenges: %v", errs)
 		}
 
-		cert, err := m.acmeClient.RequestCertificate(challenges, true, nil, false)
+		cert, err := clients[acme.HTTP01].RequestCertificate(challenges, true, nil, false)
 		if err != nil {
 			return err
 		}
@@ -472,17 +621,17 @@ func (m *RouteManager) checkDistribution(r *Route) bool {
 	return *dist.Status == "Deployed" && *dist.DistributionConfig.Enabled
 }
 
-func (m *RouteManager) solveChallenges(challenges []acme.AuthorizationResource) map[string]error {
+func (m *RouteManager) solveChallenges(clients map[acme.Challenge]*acme.Client, challenges []acme.AuthorizationResource) map[string]error {
 	errs := make(chan map[string]error)
 
-	for _, client := range m.acmeClients {
+	for _, client := range clients {
 		go func(client *acme.Client) {
 			errs <- client.SolveChallenges(challenges)
 		}(client)
 	}
 
 	var failures map[string]error
-	for challenge, _ := range m.acmeClients {
+	for challenge, _ := range clients {
 		failures = <-errs
 		m.logger.Info("solve-challenges", lager.Data{
 			"challenge": challenge,
@@ -514,9 +663,9 @@ func (m *RouteManager) deployCertificate(instanceId, distId string, cert acme.Ce
 	return m.cloudFront.SetCertificate(distId, certId)
 }
 
-func (m *RouteManager) ensureChallenges(route *Route, update bool) error {
+func (m *RouteManager) ensureChallenges(route *Route, client *acme.Client, update bool) error {
 	if len(route.ChallengeJSON) == 0 {
-		challenges, errs := m.acmeClient.GetChallenges(route.GetDomains())
+		challenges, errs := client.GetChallenges(route.GetDomains())
 		if len(errs) > 0 {
 			return fmt.Errorf("Error(s) getting challenges: %v", errs)
 		}
@@ -536,16 +685,22 @@ func (m *RouteManager) ensureChallenges(route *Route, update bool) error {
 	return nil
 }
 
-func (m *RouteManager) GetDNSInstructions(data []byte) ([]string, error) {
+func (m *RouteManager) GetDNSInstructions(route *Route) ([]string, error) {
 	var instructions []string
 	var challenges []acme.AuthorizationResource
-	if err := json.Unmarshal(data, &challenges); err != nil {
+
+	user, err := route.loadUser(m.db)
+	if err != nil {
+		return instructions, err
+	}
+
+	if err := json.Unmarshal(route.ChallengeJSON, &challenges); err != nil {
 		return instructions, err
 	}
 	for _, auth := range challenges {
 		for _, challenge := range auth.Body.Challenges {
 			if challenge.Type == acme.DNS01 {
-				keyAuth, err := acme.GetKeyAuthorization(challenge.Token, m.acmeUser.GetPrivateKey())
+				keyAuth, err := acme.GetKeyAuthorization(challenge.Token, user.GetPrivateKey())
 				if err != nil {
 					return instructions, err
 				}

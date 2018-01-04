@@ -199,7 +199,7 @@ func (s *UpdateSuite) TestForwardedHeadersWhitelistAndWildcard() {
 	s.Contains(err.Error(), "must not pass whitelisted headers alongside wildcard")
 }
 
-func (s *UpdateSuite) TestForwardedHeadersMoreThanNine() {
+func (s *UpdateSuite) TestForwardedHeadersMoreThanTen() {
 	s.setupTestOfHeaderForwarding()
 	s.failOnUpdateWithExpectedHeaders(utils.Headers{"One": true, "Two": true, "Three": true, "Four": true, "Five": true, "Six": true, "Seven": true, "Eight": true, "Nine": true, "Ten": true, "Host": true})
 
@@ -213,5 +213,5 @@ func (s *UpdateSuite) TestForwardedHeadersMoreThanNine() {
 	}
 	_, err := s.Broker.Update(s.ctx, "", details, true)
 	s.NotNil(err)
-	s.Contains(err.Error(), "must pass no more than 9 custom headers to forward")
+	s.Contains(err.Error(), "must not set more than 10 headers; got 11")
 }

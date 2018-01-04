@@ -32,8 +32,8 @@ func (h *HeadersSuite) TestContains() {
 
 func (h *HeadersSuite) TestStrings() {
 	headers := Headers{"Abc-Def": true, "User-Agent": true}
-	header_strings := headers.Strings()
-	h.Contains(header_strings, "Abc-Def")
-	h.Contains(header_strings, "User-Agent")
-	h.Equal(len(header_strings), 2)
+	headerStrings := headers.Strings()
+	h.Contains(headerStrings, "Abc-Def")
+	h.Contains(headerStrings, "User-Agent")
+	h.Equal(len(headerStrings), 2)
 }

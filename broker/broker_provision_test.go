@@ -237,7 +237,7 @@ func (s *ProvisionSuite) TestForwardedHeadersWhitelistAndWildcard() {
 	s.Contains(err.Error(), "must not pass whitelisted headers alongside wildcard")
 }
 
-func (s *ProvisionSuite) TestForwardedHeadersMoreThanNine() {
+func (s *ProvisionSuite) TestForwardedHeadersMoreThanTen() {
 	s.setupTestOfHeaderForwarding()
 	s.failCreateWithExpectedHeaders(utils.Headers{"One": true, "Two": true, "Three": true, "Four": true, "Five": true, "Six": true, "Seven": true, "Eight": true, "Nine": true, "Ten": true, "Host": true})
 
@@ -246,5 +246,5 @@ func (s *ProvisionSuite) TestForwardedHeadersMoreThanNine() {
 	}
 	_, err := s.Broker.Provision(s.ctx, "123", details, true)
 	s.NotNil(err)
-	s.Contains(err.Error(), "must pass no more than 9 custom headers to forward")
+	s.Contains(err.Error(), "must not set more than 10 headers; got 11")
 }

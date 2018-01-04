@@ -7,14 +7,14 @@ import (
 type Headers map[string]bool
 
 func (h Headers) Add(header string) {
-	canonical_header := textproto.CanonicalMIMEHeaderKey(header)
-	h[canonical_header] = true
+	canonicalHeader := textproto.CanonicalMIMEHeaderKey(header)
+	h[canonicalHeader] = true
 }
 
 func (h Headers) Contains(header string) bool {
-	canonical_header := textproto.CanonicalMIMEHeaderKey(header)
-	_, is_present := h[canonical_header]
-	return is_present
+	canonicalHeader := textproto.CanonicalMIMEHeaderKey(header)
+	_, isPresent := h[canonicalHeader]
+	return isPresent
 }
 
 func (h Headers) Strings() []string {
