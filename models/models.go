@@ -112,6 +112,14 @@ func LoadUser(userData UserData) (utils.User, error) {
 	return user, nil
 }
 
+func Migrate(db *gorm.DB) error {
+	if err := db.AutoMigrate(&Route{}, &Certificate{}, &UserData{}).Error; err != nil {
+		return err
+	}
+	db.Model(&UserData{}).RemoveIndex("uix_user_data_email")
+	return nil
+}
+
 // loadPrivateKey loads a PEM-encoded ECC/RSA private key from an array of bytes.
 func loadPrivateKey(keyBytes []byte) (crypto.PrivateKey, error) {
 	keyBlock, _ := pem.Decode(keyBytes)
