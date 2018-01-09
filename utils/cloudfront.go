@@ -275,7 +275,7 @@ func (d *Distribution) SetCertificate(distId, certId string) error {
 	DistributionConfig.ViewerCertificate.IAMCertificateId = aws.String(certId)
 	DistributionConfig.ViewerCertificate.CertificateSource = aws.String("iam")
 	DistributionConfig.ViewerCertificate.SSLSupportMethod = aws.String("sni-only")
-	DistributionConfig.ViewerCertificate.MinimumProtocolVersion = aws.String("TLSv1_2016")
+	DistributionConfig.ViewerCertificate.MinimumProtocolVersion = aws.String("TLSv1")
 	DistributionConfig.ViewerCertificate.CloudFrontDefaultCertificate = aws.Bool(false)
 
 	_, err = d.Service.UpdateDistribution(&cloudfront.UpdateDistributionInput{
