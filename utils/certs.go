@@ -3,7 +3,6 @@ package utils
 import (
 	"crypto"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -56,12 +55,6 @@ func (u *User) SetPrivateKey(key crypto.PrivateKey) {
 	u.key = key
 }
 
-var insecureClient = &http.Client{
-	Transport: &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	},
-}
-
 type HTTPProvider struct {
 	Settings config.Settings
 	Service  *s3.S3
@@ -80,6 +73,12 @@ func (p *HTTPProvider) Present(domain, token, keyAuth string) error {
 		return err
 	}
 
+	insecureClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+
 	return acme.WaitFor(10*time.Second, 2*time.Second, func() (bool, error) {
 		resp, err := insecureClient.Get("https://" + path.Join(domain, ".well-known", "acme-challenge", token))
 		if err != nil {
@@ -93,7 +92,7 @@ func (p *HTTPProvider) Present(domain, token, keyAuth string) error {
 		if string(body) == keyAuth {
 			return true, nil
 		}
-		return false, errors.New("HTTP-01 token mismatch")
+		return false, fmt.Errorf("HTTP-01 token mismatch for %s: expected %s, got %s", token, keyAuth, string(body))
 	})
 }
 

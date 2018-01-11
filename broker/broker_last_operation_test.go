@@ -92,7 +92,7 @@ func (s *LastOperationSuite) TestLastOperationProvisioning() {
 		ChallengeJSON:  []byte("[]"),
 	}
 	manager.On("Get", "123").Return(route, nil)
-	manager.On("GetDNSInstructions", []byte("[]")).Return([]string{"token"}, nil)
+	manager.On("GetDNSInstructions", route).Return([]string{"token"}, nil)
 	manager.On("Poll", route).Return(nil)
 	b := broker.New(
 		&manager,
