@@ -27,18 +27,20 @@ cf create-domain "${CF_ORGANIZATION}" "${DOMAIN}"
 # Create service
 opts=$(jq -n --arg domain "${DOMAIN}" '{domain: $domain}')
 cf create-service "${SERVICE_NAME}" "${PLAN_NAME}" "${SERVICE_INSTANCE_NAME}" -c "${opts}"
+service_guid=$(cf service "${SERVICE_INSTANCE_NAME}" --guid)
 
 http_regex="CNAME or ALIAS domain (.*) to (.*) or"
 dns_regex="name: (.*), value: (.*), ttl: (.*)"
 
 elapsed=300
 until [ "${elapsed}" -le 0 ]; do
-  message=$(cf service "${SERVICE_INSTANCE_NAME}" | grep -e "^Message: " -e "^name: ")
-  if [[ "${message}" =~ ${http_regex} ]]; then
+  status=$(cf curl "/v2/service_instances/${service_guid}")
+  description=$(echo "${status}" | jq -r '.entity.last_operation.description')
+  if [[ "${description}" =~ ${http_regex} ]]; then
     domain_external="${BASH_REMATCH[1]}"
     domain_internal="${BASH_REMATCH[2]}"
   fi
-  if [[ "${message}" =~ ${dns_regex} ]]; then
+  if [[ "${description}" =~ ${dns_regex} ]]; then
     txt_name="${BASH_REMATCH[1]}"
     txt_value="${BASH_REMATCH[2]}"
     txt_ttl="${BASH_REMATCH[3]}"
@@ -50,7 +52,7 @@ until [ "${elapsed}" -le 0 ]; do
   sleep 5
 done
 if [ -z "${domain_internal:-}" ] || [ -z "${txt_name:-}" ]; then
-  echo "Failed to parse message: ${message}"
+  echo "Failed to parse description: ${description}"
   exit 1
 fi
 
@@ -106,11 +108,12 @@ fi
 # Wait for provision to complete
 elapsed="${CDN_TIMEOUT}"
 until [ "${elapsed}" -le 0 ]; do
-  status=$(cf service "${SERVICE_INSTANCE_NAME}" | grep "^Status: ")
-  if [[ "${status}" =~ "succeeded" ]]; then
+  status=$(cf curl "/v2/service_instances/${service_guid}")
+  state=$(echo "${status}" | jq -r '.entity.last_operation.state')
+  if [[ "${state}" == "succeeded" ]]; then
     updated="true"
     break
-  elif [[ "${status}" =~ "failed" ]]; then
+  elif [[ "${state}" == "failed" ]]; then
     echo "Failed to create service"
     exit 1
   fi
@@ -210,7 +213,7 @@ cf delete-service -f "${SERVICE_INSTANCE_NAME}"
 # Wait for deprovision to complete
 elapsed="${CDN_TIMEOUT}"
 until [ "${elapsed}" -le 0 ]; do
-  if cf service "${SERVICE_INSTANCE_NAME}" | grep "not found"; then
+  if ! cf service "${SERVICE_INSTANCE_NAME}"; then
     deleted="true"
     break
   fi
