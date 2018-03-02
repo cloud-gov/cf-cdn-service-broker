@@ -106,7 +106,7 @@ func TestDeleteOrphanedCerts(t *testing.T) {
 	fakecf.Handlers.Send.PushBack(func(r *request.Request) {
 		//t.Log(r.Operation.Name)
 		switch r.Operation.Name {
-		case "ListDistributions2016_11_25":
+		case "ListDistributions2017_03_25":
 			list := []*cloudfront.DistributionSummary{
 				&cloudfront.DistributionSummary{
 					ARN: aws.String("some-distribution"),
