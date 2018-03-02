@@ -36,6 +36,7 @@ type ProvisionSuite struct {
 func (s *ProvisionSuite) SetupTest() {
 	s.Manager = mocks.RouteManagerIface{}
 	s.cfclient = cfmock.Client{}
+	s.logger = lager.NewLogger("broker.provision.test")
 	s.settings = config.Settings{
 		DefaultOrigin: "origin.cloud.gov",
 	}

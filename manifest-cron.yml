@@ -6,4 +6,5 @@ applications:
   health-check-type: process
   no-route: true
   env:
-    GO_INSTALL_PACKAGE_SPEC: "github.com/18F/cf-cdn-service-broker/cmd/cdn-cron"
+    GO_INSTALL_PACKAGE_SPEC: "./cmd/cdn-cron"
+    GOPACKAGENAME: "github.com/18F/cf-cdn-service-broker"

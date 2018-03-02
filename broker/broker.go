@@ -51,17 +51,17 @@ var (
 	MAX_HEADER_COUNT = 10
 )
 
-func (*CdnServiceBroker) Services(context context.Context) []brokerapi.Service {
+func (*CdnServiceBroker) Services(context context.Context) ([]brokerapi.Service, error) {
 	var service brokerapi.Service
 	buf, err := ioutil.ReadFile("./catalog.json")
 	if err != nil {
-		return []brokerapi.Service{}
+		return []brokerapi.Service{}, err
 	}
 	err = json.Unmarshal(buf, &service)
 	if err != nil {
-		return []brokerapi.Service{}
+		return []brokerapi.Service{}, err
 	}
-	return []brokerapi.Service{service}
+	return []brokerapi.Service{service}, nil
 }
 
 func (b *CdnServiceBroker) Provision(
@@ -295,17 +295,19 @@ func (b *CdnServiceBroker) checkDomain(domain, orgGUID string) error {
 
 	orgName := "<organization>"
 
-	for i := range domains {
-		if _, err := b.cfclient.GetDomainByName(domains[i]); err != nil {
-
+	for _, domain := range domains {
+		if _, err := b.cfclient.GetDomainByName(domain); err != nil {
+			b.logger.Error("Error checking domain", err, lager.Data{
+				"domain":  domain,
+				"orgGUID": orgGUID,
+			})
 			if orgName == "<organization>" {
 				org, err := b.cfclient.GetOrgByGuid(orgGUID)
 				if err == nil {
 					orgName = org.Name
 				}
 			}
-
-			errorlist = append(errorlist, fmt.Sprintf("`cf create-domain %s %s`", orgName, domains[i]))
+			errorlist = append(errorlist, fmt.Sprintf("`cf create-domain %s %s`", orgName, domain))
 		}
 	}
 

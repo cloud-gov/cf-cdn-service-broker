@@ -4,4 +4,5 @@ applications:
 - name: cdn-broker
   command: cdn-broker
   env:
-    GO_INSTALL_PACKAGE_SPEC: "github.com/18F/cf-cdn-service-broker/cmd/cdn-broker"
+    GO_INSTALL_PACKAGE_SPEC: "./cmd/cdn-broker"
+    GOPACKAGENAME: "github.com/18F/cf-cdn-service-broker"
