@@ -37,11 +37,10 @@ func (i *Iam) UploadCertificate(name string, cert acme.CertificateResource) (str
 }
 
 func (i *Iam) ListCertificates(callback func(iam.ServerCertificateMetadata) bool) error {
-	params := &iam.ListServerCertificatesInput{
-		PathPrefix: aws.String(fmt.Sprintf("/cloudfront/%s/", i.Settings.IamPathPrefix)),
-	}
-
-	return i.Service.ListServerCertificatesPages(params,
+	return i.Service.ListServerCertificatesPages(
+		&iam.ListServerCertificatesInput{
+			PathPrefix: aws.String(fmt.Sprintf("/cloudfront/%s/", i.Settings.IamPathPrefix)),
+		},
 		func(page *iam.ListServerCertificatesOutput, lastPage bool) bool {
 			for _, v := range page.ServerCertificateMetadataList {
 				// stop iteration if the callback tells us to
@@ -51,7 +50,8 @@ func (i *Iam) ListCertificates(callback func(iam.ServerCertificateMetadata) bool
 			}
 
 			return true
-		})
+		},
+	)
 }
 
 func (i *Iam) DeleteCertificate(name string) error {

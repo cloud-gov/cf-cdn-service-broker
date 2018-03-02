@@ -3,7 +3,7 @@ inherit: manifest-base.yml
 applications:
 - name: cdn-cron
   command: cdn-cron
-  health-check-type: none
+  health-check-type: process
   no-route: true
   env:
     GO_INSTALL_PACKAGE_SPEC: "github.com/18F/cf-cdn-service-broker/cmd/cdn-cron"
