@@ -94,6 +94,7 @@ jobs:
         HOSTED_ZONE_ID: {{hosted-zone-id-staging}}
         DOMAIN: {{domain-url-staging}}
         CDN_TIMEOUT: {{cdn-timeout}}
+        CA_CERT: {{acceptance-test-ca-cert-staging}}
     - task: acceptance-tests-dns-01
       file: broker-src/ci/acceptance-tests.yml
       params:
@@ -187,6 +188,7 @@ jobs:
         HOSTED_ZONE_ID: {{hosted-zone-id-production}}
         DOMAIN: {{domain-url-production}}
         CDN_TIMEOUT: {{cdn-timeout}}
+        CA_CERT: {{acceptance-test-ca-cert-production}}
     - task: acceptance-tests-dns-01
       file: broker-src/ci/acceptance-tests.yml
       params:
