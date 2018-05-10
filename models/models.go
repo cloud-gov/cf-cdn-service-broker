@@ -467,26 +467,31 @@ func (m *RouteManager) DeleteOrphanedCerts() {
 	// iterate over all distributions and record all certificates in-use by these distributions
 	activeCerts := make(map[string]string)
 
-	m.cloudFront.ListDistributions(func(distro cloudfront.DistributionSummary) bool {
+	err := m.cloudFront.ListDistributions(func(distro cloudfront.DistributionSummary) bool {
 		if distro.ViewerCertificate.IAMCertificateId != nil {
 			activeCerts[*distro.ViewerCertificate.IAMCertificateId] = *distro.ARN
 		}
 		return true
 	})
 
+	if err != nil {
+		m.logger.Error("cloudfront_list_distributions", err)
+		return
+	}
+
 	// iterate over all certificates
-	m.iam.ListCertificates(func(cert iam.ServerCertificateMetadata) bool {
+	err = m.iam.ListCertificates(func(cert iam.ServerCertificateMetadata) bool {
 
 		// delete any certs not attached to a distribution that are older than 24 hours
 		_, active := activeCerts[*cert.ServerCertificateId]
 		if !active && time.Since(*cert.UploadDate).Hours() > 24 {
-			m.logger.Info("Deleting orphaned certificate", lager.Data{
+			m.logger.Info("delete_certificate", lager.Data{
 				"cert": cert,
 			})
 
 			err := m.iam.DeleteCertificate(*cert.ServerCertificateName)
 			if err != nil {
-				m.logger.Error("Error deleting certificate", err, lager.Data{
+				m.logger.Error("delete_certificate", err, lager.Data{
 					"cert": cert,
 				})
 			}
@@ -494,6 +499,9 @@ func (m *RouteManager) DeleteOrphanedCerts() {
 
 		return true
 	})
+	if err != nil {
+		m.logger.Error("iam_list_certificates", err)
+	}
 }
 
 func (m *RouteManager) RenewAll() {
