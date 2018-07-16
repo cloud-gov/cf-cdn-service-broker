@@ -372,7 +372,6 @@ func (m *RouteManager) stillActive(r *Route) error {
 
 	m.logger.Info("Starting canary check", lager.Data{
 		"route":    r,
-		"settings": m.settings,
 	})
 
 	session := session.New(aws.NewConfig().WithRegion(m.settings.AwsDefaultRegion))
