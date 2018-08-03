@@ -1,8 +1,6 @@
 #!/bin/bash
 
-set -e
-set -u
-set -x
+set -eux
 
 # Set defaults
 TTL="${TTL:-60}"
@@ -12,10 +10,10 @@ suffix="${RANDOM}"
 DOMAIN=$(printf "${DOMAIN}" "${suffix}")
 SERVICE_INSTANCE_NAME=$(printf "${SERVICE_INSTANCE_NAME}" "${suffix}")
 
-curl_args=()
+curl_args=""
 if [ -n "${CA_CERT:-}" ]; then
   echo "${CA_CERT}" > ca.pem
-  curl_args=("--cacert" "ca.pem")
+  curl_args="--cacert ca.pem"
 fi
 
 path="$(dirname $0)"
@@ -153,7 +151,7 @@ cf push -f "${path}/app/manifest.yml" -p "${path}/app"
 # Assert expected response from cdn
 elapsed="${CDN_TIMEOUT}"
 until [ "${elapsed}" -le 0 ]; do
-  if curl "${curl_args[@]}" "https://${DOMAIN}" | grep "CDN Broker Test"; then
+  if curl ${curl_args} "https://${DOMAIN}" | grep "CDN Broker Test"; then
     break
   fi
   let elapsed-=60
