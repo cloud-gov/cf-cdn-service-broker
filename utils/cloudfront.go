@@ -136,10 +136,8 @@ func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionCon
 					HTTPSPort:            aws.Int64(443),
 					OriginProtocolPolicy: getOriginProtocolPolicy(insecureOrigin),
 					OriginSslProtocols: &cloudfront.OriginSslProtocols{
-						Quantity: aws.Int64(3),
+						Quantity: aws.Int64(1),
 						Items: []*string{
-							aws.String("TLSv1"),
-							aws.String("TLSv1.1"),
 							aws.String("TLSv1.2"),
 						},
 					},
@@ -275,7 +273,7 @@ func (d *Distribution) SetCertificate(distId, certId string) error {
 	DistributionConfig.ViewerCertificate.IAMCertificateId = aws.String(certId)
 	DistributionConfig.ViewerCertificate.CertificateSource = aws.String("iam")
 	DistributionConfig.ViewerCertificate.SSLSupportMethod = aws.String("sni-only")
-	DistributionConfig.ViewerCertificate.MinimumProtocolVersion = aws.String("TLSv1")
+	DistributionConfig.ViewerCertificate.MinimumProtocolVersion = aws.String("TLSv1.2_2018")
 	DistributionConfig.ViewerCertificate.CloudFrontDefaultCertificate = aws.Bool(false)
 
 	_, err = d.Service.UpdateDistribution(&cloudfront.UpdateDistributionInput{
