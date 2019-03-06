@@ -28,7 +28,7 @@ cf create-domain "${CF_ORGANIZATION}" "${DOMAIN}"
 opts=$(jq -n --arg domain "${DOMAIN}" '{domain: $domain}')
 cf create-service "${SERVICE_NAME}" "${PLAN_NAME}" "${SERVICE_INSTANCE_NAME}" -c "${opts}"
 
-http_regex="CNAME or ALIAS domain (.*) to (.*) or"
+http_regex="CNAME or ALIAS domain (.*) to (.*) and"
 dns_regex="name: (.*), value: (.*), ttl: (.*)"
 
 elapsed=300
