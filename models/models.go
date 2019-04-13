@@ -162,7 +162,7 @@ type Route struct {
 	UserData       UserData
 	UserDataID     int
 	ForwardCookies bool
-	Headers	      []RouteHeader
+	Headers        []RouteHeader
 }
 
 func (r *Route) GetDomains() []string {
@@ -205,7 +205,7 @@ type Certificate struct {
 
 type RouteHeader struct {
 	gorm.Model
-	Header	string
+	Header  string
 	RouteId string
 }
 
