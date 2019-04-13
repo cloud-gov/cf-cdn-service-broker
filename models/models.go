@@ -161,6 +161,8 @@ type Route struct {
 	Certificate    Certificate
 	UserData       UserData
 	UserDataID     int
+	ForwardCookies bool
+	Headers		   []RouteHeader
 }
 
 func (r *Route) GetDomains() []string {
@@ -176,6 +178,22 @@ func (r *Route) loadUser(db *gorm.DB) (utils.User, error) {
 	return LoadUser(userData)
 }
 
+func (r *Route) GetHeaders() (headers utils.Headers) {
+	headers = utils.Headers{}
+	for _, header := range r.Headers {
+		headers.Add(header.Header)
+	}
+	return
+}
+
+func (r *Route) SetHeaders(headers utils.Headers) {
+	routeHeaders := []RouteHeader{}
+	for _, h := range headers.Strings() {
+		routeHeaders = append(routeHeaders, RouteHeader{Header: h, RouteId: r.InstanceId})
+	}
+	r.Headers = routeHeaders
+}
+
 type Certificate struct {
 	gorm.Model
 	RouteId     uint
@@ -183,6 +201,12 @@ type Certificate struct {
 	CertURL     string
 	Certificate []byte
 	Expires     time.Time `gorm:"index"`
+}
+
+type RouteHeader struct {
+	gorm.Model
+	Header	string
+	RouteId string
 }
 
 type RouteManagerIface interface {
@@ -229,7 +253,9 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 		Origin:         origin,
 		Path:           path,
 		InsecureOrigin: insecureOrigin,
+		ForwardCookies: forwardCookies,
 	}
+	route.SetHeaders(forwardedHeaders)
 
 	user, err := CreateUser(m.settings.Email)
 	if err != nil {
@@ -252,7 +278,7 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 		return nil, err
 	}
 
-	dist, err := m.cloudFront.Create(instanceId, route.GetDomains(), origin, path, insecureOrigin, forwardedHeaders, forwardCookies, tags)
+	dist, err := m.cloudFront.Create(instanceId, route.GetDomains(), origin, path, insecureOrigin, route.GetHeaders(), route.ForwardCookies, tags)
 	if err != nil {
 		return nil, err
 	}
@@ -299,10 +325,12 @@ func (m *RouteManager) Update(instanceId, domain, origin string, path string, in
 	if insecureOrigin != route.InsecureOrigin {
 		route.InsecureOrigin = insecureOrigin
 	}
+	route.SetHeaders(forwardedHeaders)
+	route.ForwardCookies = forwardCookies
 
 	// Update the distribution
 	dist, err := m.cloudFront.Update(route.DistId, route.GetDomains(),
-		route.Origin, route.Path, route.InsecureOrigin, forwardedHeaders, forwardCookies)
+		route.Origin, route.Path, route.InsecureOrigin, route.GetHeaders(), route.ForwardCookies)
 	if err != nil {
 		return err
 	}

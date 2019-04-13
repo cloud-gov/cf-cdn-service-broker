@@ -46,7 +46,7 @@ func main() {
 
 	session := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
 
-	if err := db.AutoMigrate(&models.Route{}, &models.Certificate{}, &models.UserData{}).Error; err != nil {
+	if err := db.AutoMigrate(&models.Route{}, &models.Certificate{}, &models.UserData{}, &models.RouteHeader{}).Error; err != nil {
 		logger.Fatal("migrate", err)
 	}
 
