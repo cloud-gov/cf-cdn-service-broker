@@ -162,7 +162,7 @@ type Route struct {
 	UserData       UserData
 	UserDataID     int
 	ForwardCookies bool
-	Headers		   []RouteHeader
+	Headers	      []RouteHeader
 }
 
 func (r *Route) GetDomains() []string {
