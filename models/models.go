@@ -187,7 +187,7 @@ func (r *Route) GetHeaders() (headers utils.Headers) {
 }
 
 func (r *Route) SetHeaders(headers utils.Headers) {
-	routeHeaders := []RouteHeader{}
+	var routeHeaders []RouteHeader
 	for _, h := range headers.Strings() {
 		routeHeaders = append(routeHeaders, RouteHeader{Header: h, RouteId: r.InstanceId})
 	}
