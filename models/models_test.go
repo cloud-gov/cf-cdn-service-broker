@@ -193,7 +193,7 @@ func routeHeadersEquivalent(rh, other []models.RouteHeader) bool {
 	for i, _ := range(rh) {
 		headerCount[rh[i].Header] += 1
 		headerCount[other[i].Header] -= 1
-		if rh[i].RouteId != other[i].RouteId{
+		if rh[i].RouteId != other[i].RouteId {
 			return false
 		}
 	}
