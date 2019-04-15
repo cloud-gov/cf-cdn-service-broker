@@ -179,19 +179,26 @@ func (r *Route) loadUser(db *gorm.DB) (utils.User, error) {
 }
 
 func (r *Route) GetHeaders() (headers utils.Headers) {
-	headers = utils.Headers{}
-	for _, header := range r.Headers {
-		headers.Add(header.Header)
-	}
-	return
+	return RouteHeadersToHeaders(r.Headers)
 }
 
 func (r *Route) SetHeaders(headers utils.Headers) {
+	r.Headers = HeadersToRouteHeaders(headers)
+}
+
+func HeadersToRouteHeaders(headers utils.Headers) routeHeaders []RouteHeader {
 	var routeHeaders []RouteHeader
 	for _, h := range headers.Strings() {
 		routeHeaders = append(routeHeaders, RouteHeader{Header: h, RouteId: r.InstanceId})
 	}
-	r.Headers = routeHeaders
+	return
+}
+
+func RouteHeadersToHeaders(routeHeaders []RouteHeader) headers utils.Headers {
+	headers = utils.Headers{}
+	for _, header := range routeHeaders {
+		headers.Add(header.Header)
+	}
 }
 
 type Certificate struct {
