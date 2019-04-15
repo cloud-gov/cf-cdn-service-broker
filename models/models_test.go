@@ -153,3 +153,54 @@ func TestDeleteOrphanedCerts(t *testing.T) {
 	mui.AssertExpectations(t)
 
 }
+
+func TestReflectiveHeaderConversion(t *testing.T) {
+	testTable := []struct {
+		HeaderNames []string
+		InstanceId string
+	} {
+		{[]string{"Host",}, "foo"},
+		{[]string{"*",}, "b"},
+		{[]string{"Host", "X-Forwarded-For",}, "2134-asdf-zxcv"},
+		{[]string{"",}, "adflkjlkjhvoun"},
+		{[]string{}, ""},
+	}
+	for _, table := range testTable {
+		var routeHeaders []models.RouteHeader
+		for _, header := range table.HeaderNames {
+			routeHeaders = append(routeHeaders, models.RouteHeader{Header: header, RouteId: table.InstanceId})
+		}
+		castHeaders := models.RouteHeadersToHeaders(routeHeaders)
+		doubleCastRouteHeaders := models.HeadersToRouteHeaders(castHeaders, table.InstanceId)
+		if ! routeHeadersEquivalent(routeHeaders, doubleCastRouteHeaders){
+			t.Log(table)
+			t.Log(routeHeaders)
+			t.Log(doubleCastRouteHeaders)
+			t.Fail()
+		}
+	}
+}
+
+func routeHeadersEquivalent(rh, other []models.RouteHeader) bool {
+	// test if two lists of RouteHeaders are equivalent
+	// equivalent here means that they have the same set of
+	// header names in any order and that they all (in both lists) have
+	// the same RouteId
+	if len(rh) != len(other) {
+		return false
+	}
+	headerCount := make(map[string]int)
+	for i, _ := range(rh) {
+		headerCount[rh[i].Header] += 1
+		headerCount[other[i].Header] -= 1
+		if rh[i].RouteId != other[i].RouteId{
+			return false
+		}
+	}
+	for _, v := range(headerCount) {
+		if v != 0 {
+			return false
+		}
+	}
+	return true
+}

@@ -183,22 +183,23 @@ func (r *Route) GetHeaders() (headers utils.Headers) {
 }
 
 func (r *Route) SetHeaders(headers utils.Headers) {
-	r.Headers = HeadersToRouteHeaders(headers)
+	r.Headers = HeadersToRouteHeaders(headers, r.InstanceId)
 }
 
-func HeadersToRouteHeaders(headers utils.Headers) routeHeaders []RouteHeader {
-	var routeHeaders []RouteHeader
+func HeadersToRouteHeaders(headers utils.Headers, instanceId string) (routeHeaders []RouteHeader) {
+	routeHeaders = make([]RouteHeader, 0)
 	for _, h := range headers.Strings() {
-		routeHeaders = append(routeHeaders, RouteHeader{Header: h, RouteId: r.InstanceId})
+		routeHeaders = append(routeHeaders, RouteHeader{Header: h, RouteId: instanceId})
 	}
 	return
 }
 
-func RouteHeadersToHeaders(routeHeaders []RouteHeader) headers utils.Headers {
+func RouteHeadersToHeaders(routeHeaders []RouteHeader) (headers utils.Headers) {
 	headers = utils.Headers{}
 	for _, header := range routeHeaders {
 		headers.Add(header.Header)
 	}
+	return
 }
 
 type Certificate struct {
