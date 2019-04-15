@@ -2,8 +2,9 @@ package healthchecks
 
 import (
 	"fmt"
-	"github.com/18F/cf-cdn-service-broker/config"
 	"net/http"
+
+	"github.com/18F/cf-cdn-service-broker/config"
 )
 
 var checks = map[string]func(config.Settings) error{

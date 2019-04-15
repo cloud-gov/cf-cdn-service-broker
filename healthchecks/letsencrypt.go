@@ -2,14 +2,16 @@ package healthchecks
 
 import (
 	"crypto"
-	"github.com/xenolf/lego/acme"
 
 	"github.com/18F/cf-cdn-service-broker/config"
+	"github.com/go-acme/lego/certcrypto"
+	"github.com/go-acme/lego/lego"
+	"github.com/go-acme/lego/registration"
 )
 
 type User struct {
 	Email        string
-	Registration *acme.RegistrationResource
+	Registration *registration.Resource
 	key          crypto.PrivateKey
 }
 
@@ -17,7 +19,7 @@ func (u *User) GetEmail() string {
 	return u.Email
 }
 
-func (u *User) GetRegistration() *acme.RegistrationResource {
+func (u *User) GetRegistration() *registration.Resource {
 	return u.Registration
 }
 
@@ -27,6 +29,12 @@ func (u *User) GetPrivateKey() crypto.PrivateKey {
 
 func LetsEncrypt(settings config.Settings) error {
 	user := &User{key: "cheese"}
-	_, err := acme.NewClient("https://acme-v01.api.letsencrypt.org/directory", user, acme.RSA2048)
+	_, err := lego.NewClient(&lego.Config{
+		CADirURL: "",
+		Certificate: lego.CertificateConfig{
+			KeyType: certcrypto.RSA2048,
+		},
+		User: user,
+	})
 	return err
 }

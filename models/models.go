@@ -1,3 +1,4 @@
+// todo (mxplusb): simplify this. EXTENSIVELY
 package models
 
 import (
@@ -19,9 +20,11 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/lager"
+	"github.com/go-acme/lego/certcrypto"
+	"github.com/go-acme/lego/certificate"
+	"github.com/go-acme/lego/lego"
 	"github.com/jinzhu/gorm"
 	"github.com/pivotal-cf/brokerapi"
-	"github.com/xenolf/lego/acme"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -151,7 +154,6 @@ type Route struct {
 	gorm.Model
 	InstanceId     string `gorm:"not null;unique_index"`
 	State          State  `gorm:"not null;index"`
-	ChallengeJSON  []byte
 	DomainExternal string
 	DomainInternal string
 	DistId         string
@@ -198,11 +200,12 @@ type RouteManagerIface interface {
 }
 
 type RouteManager struct {
-	logger     lager.Logger
-	iam        utils.IamIface
-	cloudFront utils.DistributionIface
-	settings   config.Settings
-	db         *gorm.DB
+	logger       lager.Logger
+	iam          utils.IamIface
+	cloudFront   utils.DistributionIface
+	settings     config.Settings
+	dnsPresenter chan string
+	db           *gorm.DB
 }
 
 func NewManager(
@@ -236,21 +239,12 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 		return nil, err
 	}
 
-	clients, err := m.getClients(&user, m.settings)
-	if err != nil {
-		return nil, err
-	}
-
 	userData, err := SaveUser(m.db, user)
 	if err != nil {
 		return nil, err
 	}
 
 	route.UserData = userData
-
-	if err := m.ensureChallenges(route, clients[acme.HTTP01], false); err != nil {
-		return nil, err
-	}
 
 	dist, err := m.cloudFront.Create(instanceId, make([]string, 0), origin, path, insecureOrigin, forwardedHeaders, forwardCookies, tags)
 	if err != nil {
@@ -295,6 +289,7 @@ func (m *RouteManager) Update(instanceId, domain, origin string, path string, in
 	if domain != "" {
 		route.DomainExternal = domain
 	}
+
 	if origin != "" {
 		route.Origin = origin
 	}
@@ -318,20 +313,7 @@ func (m *RouteManager) Update(instanceId, domain, origin string, path string, in
 	route.DistId = *dist.Id
 
 	if domain != "" {
-		user, err := route.loadUser(m.db)
-		if err != nil {
-			return err
-		}
-
-		clients, err := m.getClients(&user, m.settings)
-		if err != nil {
-			return err
-		}
-
-		route.ChallengeJSON = []byte("")
-		if err := m.ensureChallenges(route, clients[acme.HTTP01], false); err != nil {
-			return err
-		}
+		return errors.New("the domain cannot be empty")
 	}
 
 	// Save the database.
@@ -372,9 +354,12 @@ func (m *RouteManager) stillActive(r *Route) error {
 		"settings": m.settings,
 	})
 
-	session := session.New(aws.NewConfig().WithRegion(m.settings.AwsDefaultRegion))
+	localSession, err := session.NewSession(aws.NewConfig().WithRegion(m.settings.AwsDefaultRegion))
+	if err != nil {
+		return err
+	}
 
-	s3client := s3.New(session)
+	s3client := s3.New(localSession)
 
 	target := path.Join(".well-known", "acme-challenge", "canary", r.InstanceId)
 
@@ -399,20 +384,24 @@ func (m *RouteManager) stillActive(r *Route) error {
 	}
 
 	for _, domain := range r.GetDomains() {
-		resp, err := insecureClient.Get("https://" + path.Join(domain, target))
-		if err != nil {
-			return err
-		}
+		// because we're deferring in a loop, we need to have a lambda/anonymous func or there will be a deferral leak.
+		return func() error {
+			resp, err := insecureClient.Get("https://" + path.Join(domain, target))
+			if err != nil {
+				return err
+			}
 
-		defer resp.Body.Close()
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
+			defer resp.Body.Close()
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
 
-		if string(body) != r.InstanceId {
-			return fmt.Errorf("Canary check failed for %s; expected %s, got %s", domain, r.InstanceId, string(body))
-		}
+			if string(body) != r.InstanceId {
+				return fmt.Errorf("canary check failed for %s; expected %s, got %s", domain, r.InstanceId, string(body))
+			}
+			return nil
+		}()
 	}
 
 	return nil
@@ -421,7 +410,7 @@ func (m *RouteManager) stillActive(r *Route) error {
 func (m *RouteManager) Renew(r *Route) error {
 	err := m.stillActive(r)
 	if err != nil {
-		return fmt.Errorf("Route is not active, skipping renewal: %v", err)
+		return fmt.Errorf("route is not active, skipping renewal: %v", err)
 	}
 
 	var certRow Certificate
@@ -435,28 +424,34 @@ func (m *RouteManager) Renew(r *Route) error {
 		return err
 	}
 
-	clients, err := m.getClients(&user, m.settings)
+	client, err := m.getClient(&user, m.settings)
 	if err != nil {
 		return err
 	}
 
-	certResource, errs := clients[acme.HTTP01].ObtainCertificate(r.GetDomains(), true, nil, false)
-	if len(errs) > 0 {
-		return fmt.Errorf("Error(s) obtaining certificate: %v", errs)
+	certResource, err := client.Certificate.Obtain(certificate.ObtainRequest{
+		Domains:    r.GetDomains(),
+		Bundle:     true,
+		PrivateKey: nil,
+		MustStaple: false,
+	})
+	if err != nil {
+		return fmt.Errorf("error obtaining certificate: %v", err)
 	}
-	expires, err := acme.GetPEMCertExpiration(certResource.Certificate)
+
+	cert, err := certcrypto.ParsePEMCertificate(certResource.Certificate)
 	if err != nil {
 		return err
 	}
 
-	if err := m.deployCertificate(*r, certResource); err != nil {
+	if err := m.deployCertificate(*(r), *(certResource)); err != nil {
 		return err
 	}
 
 	certRow.Domain = certResource.Domain
 	certRow.CertURL = certResource.CertURL
 	certRow.Certificate = certResource.Certificate
-	certRow.Expires = expires
+	certRow.Expires = cert.NotAfter
 	return m.db.Save(&certRow).Error
 }
 
@@ -464,15 +459,17 @@ func (m *RouteManager) DeleteOrphanedCerts() {
 	// iterate over all distributions and record all certificates in-use by these distributions
 	activeCerts := make(map[string]string)
 
-	m.cloudFront.ListDistributions(func(distro cloudfront.DistributionSummary) bool {
+	if err := m.cloudFront.ListDistributions(func(distro cloudfront.DistributionSummary) bool {
 		if distro.ViewerCertificate.IAMCertificateId != nil {
 			activeCerts[*distro.ViewerCertificate.IAMCertificateId] = *distro.ARN
 		}
 		return true
-	})
+	}); err != nil {
+		fmt.Printf("error retrieving cloudfront distributions: %s", err)
+	}
 
 	// iterate over all certificates
-	m.iam.ListCertificates(func(cert iam.ServerCertificateMetadata) bool {
+	if err := m.iam.ListCertificates(func(cert iam.ServerCertificateMetadata) bool {
 
 		// delete any certs not attached to a distribution that are older than 24 hours
 		_, active := activeCerts[*cert.ServerCertificateId]
@@ -490,7 +487,9 @@ func (m *RouteManager) DeleteOrphanedCerts() {
 		}
 
 		return true
-	})
+	}); err != nil {
+		fmt.Printf("error deleting orphaned certificates: %s", err)
+	}
 }
 
 func (m *RouteManager) RenewAll() {
@@ -498,6 +497,7 @@ func (m *RouteManager) RenewAll() {
 
 	m.logger.Info("Looking for routes that are expiring soon")
 
+	// todo (mxplusb): this needs to use the orm, not raw sql
 	m.db.Having(
 		"max(expires) < now() + interval '30 days'",
 	).Group(
@@ -528,22 +528,19 @@ func (m *RouteManager) RenewAll() {
 	}
 }
 
-func (m *RouteManager) getClients(user *utils.User, settings config.Settings) (map[acme.Challenge]*acme.Client, error) {
-	session := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
-
-	var err error
-
-	clients := map[acme.Challenge]*acme.Client{}
-	clients[acme.HTTP01], err = utils.NewClient(settings, user, s3.New(session), []acme.Challenge{acme.TLSSNI01, acme.DNS01})
+func (m *RouteManager) getClient(user *utils.User, settings config.Settings) (*lego.Client, error) {
+	localSession, err := session.NewSession(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
 	if err != nil {
-		return clients, err
-	}
-	clients[acme.DNS01], err = utils.NewClient(settings, user, s3.New(session), []acme.Challenge{acme.TLSSNI01, acme.HTTP01})
-	if err != nil {
-		return clients, err
+		return &lego.Client{}, err
 	}
 
-	return clients, nil
+	client, presenter, err := utils.NewClient(settings, user, s3.New(localSession))
+	if err != nil {
+		return client, err
+	}
+	m.dnsPresenter = presenter
+
+	return client, nil
 }
 
 func (m *RouteManager) updateProvisioning(r *Route) error {
@@ -552,43 +549,36 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 		return err
 	}
 
-	clients, err := m.getClients(&user, m.settings)
+	client, err := m.getClient(&user, m.settings)
 	if err != nil {
 		return err
 	}
 
-	// Handle provisioning instances created before DNS challenge
-	if err := m.ensureChallenges(r, clients[acme.HTTP01], true); err != nil {
-		return err
-	}
-
 	if m.checkDistribution(r) {
-		var challenges []acme.AuthorizationResource
-		if err := json.Unmarshal(r.ChallengeJSON, &challenges); err != nil {
-			return err
-		}
-		if errs := m.solveChallenges(clients, challenges); len(errs) > 0 {
-			return fmt.Errorf("Error(s) solving challenges: %v", errs)
-		}
-
-		cert, err := clients[acme.HTTP01].RequestCertificate(challenges, true, nil, false)
+		certResource, err := client.Certificate.Obtain(certificate.ObtainRequest{
+			Domains:    r.GetDomains(),
+			Bundle:     true,
+			PrivateKey: nil,
+			MustStaple: false,
+		})
 		if err != nil {
 			return err
 		}
 
-		expires, err := acme.GetPEMCertExpiration(cert.Certificate)
+		cert, err := certcrypto.ParsePEMCertificate(certResource.Certificate)
 		if err != nil {
 			return err
 		}
-		if err := m.deployCertificate(*r, cert); err != nil {
+
+		// dereference
+		if err := m.deployCertificate(*(r), *(certResource)); err != nil {
 			return err
 		}
 
 		certRow := Certificate{
-			Domain:      cert.Domain,
-			CertURL:     cert.CertURL,
-			Certificate: cert.Certificate,
-			Expires:     expires,
+			Domain:      certResource.Domain,
+			Certificate: certResource.Certificate,
+			Expires:     cert.NotAfter,
 		}
 		if err := m.db.Create(&certRow).Error; err != nil {
 			return err
@@ -626,41 +616,18 @@ func (m *RouteManager) checkDistribution(r *Route) bool {
 	return *dist.Status == "Deployed" && *dist.DistributionConfig.Enabled
 }
 
-func (m *RouteManager) solveChallenges(clients map[acme.Challenge]*acme.Client, challenges []acme.AuthorizationResource) map[string]error {
-	errs := make(chan map[string]error)
-
-	for _, client := range clients {
-		go func(client *acme.Client) {
-			errs <- client.SolveChallenges(challenges)
-		}(client)
-	}
-
-	var failures map[string]error
-	for challenge, _ := range clients {
-		failures = <-errs
-		m.logger.Info("solve-challenges", lager.Data{
-			"challenge": challenge,
-			"failures":  failures,
-		})
-		if len(failures) == 0 {
-			return failures
-		}
-	}
-
-	return failures
-}
-
-func (m *RouteManager) deployCertificate(route Route, cert acme.CertificateResource) error {
-	expires, err := acme.GetPEMCertExpiration(cert.Certificate)
+func (m *RouteManager) deployCertificate(route Route, certResource certificate.Resource) error {
+	cert, err := certcrypto.ParsePEMCertificate(certResource.Certificate)
 	if err != nil {
 		return err
 	}
+	expires := cert.NotAfter
 
 	name := fmt.Sprintf("cdn-route-%s-%s", route.InstanceId, expires.Format("2006-01-02_15-04-05"))
 
 	m.logger.Info("Uploading certificate to IAM", lager.Data{"name": name})
 
-	certId, err := m.iam.UploadCertificate(name, cert)
+	certId, err := m.iam.UploadCertificate(name, certResource)
 	if err != nil {
 		return err
 	}
@@ -668,51 +635,21 @@ func (m *RouteManager) deployCertificate(route Route, cert acme.CertificateResou
 	return m.cloudFront.SetCertificateAndCname(route.DistId, certId, route.GetDomains())
 }
 
-func (m *RouteManager) ensureChallenges(route *Route, client *acme.Client, update bool) error {
-	if len(route.ChallengeJSON) == 0 {
-		challenges, errs := client.GetChallenges(route.GetDomains())
-		if len(errs) > 0 {
-			return fmt.Errorf("Error(s) getting challenges: %v", errs)
-		}
-
-		var err error
-		route.ChallengeJSON, err = json.Marshal(challenges)
-		if err != nil {
-			return err
-		}
-
-		if update {
-			return m.db.Save(route).Error
-		}
-		return nil
-	}
-
-	return nil
-}
-
+// todo (mxplusb): find a better way to do this.
 func (m *RouteManager) GetDNSInstructions(route *Route) ([]string, error) {
-	var instructions []string
-	var challenges []acme.AuthorizationResource
+	// we need to set this to a length of 3 so we can put the instructions in the proper place.
+	instructions := make([]string, 3)
 
-	user, err := route.loadUser(m.db)
-	if err != nil {
-		return instructions, err
-	}
-
-	if err := json.Unmarshal(route.ChallengeJSON, &challenges); err != nil {
-		return instructions, err
-	}
-	for _, auth := range challenges {
-		for _, challenge := range auth.Body.Challenges {
-			if challenge.Type == acme.DNS01 {
-				keyAuth, err := acme.GetKeyAuthorization(challenge.Token, user.GetPrivateKey())
-				if err != nil {
-					return instructions, err
-				}
-				fqdn, value, ttl := acme.DNS01Record(auth.Domain, keyAuth)
-				instructions = append(instructions, fmt.Sprintf("name: %s, value: %s, ttl: %d", fqdn, value, ttl))
-			}
+	for key := range m.dnsPresenter {
+		if strings.Contains(key, "domain") {
+			instructions[0] = fmt.Sprintf("name: %s", strings.Split(key, "domain")[0])
+		}
+		if strings.Contains(key, "keyauth") {
+			instructions[1] = fmt.Sprintf("value: %s", strings.Split(key, "keyauth")[0])
 		}
 	}
+
+	instructions[2] = fmt.Sprintf("ttl: 120")
+
 	return instructions, nil
 }

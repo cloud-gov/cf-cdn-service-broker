@@ -5,37 +5,23 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"path"
 	"strings"
 	"time"
 
+	"github.com/18F/cf-cdn-service-broker/config"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/xenolf/lego/acme"
-
-	"github.com/18F/cf-cdn-service-broker/config"
+	"github.com/go-acme/lego/certcrypto"
+	"github.com/go-acme/lego/lego"
+	"github.com/go-acme/lego/registration"
 )
 
-func preCheckDNS(fqdn, value string) (bool, error) {
-	record, err := net.LookupTXT(fqdn)
-	if err != nil {
-		return false, err
-	}
-	if len(record) == 1 && record[0] == value {
-		return true, nil
-	}
-	return false, fmt.Errorf("DNS precheck failed on name %s, value %s", fqdn, value)
-}
-
-func init() {
-	acme.PreCheckDNS = preCheckDNS
-}
-
 type User struct {
-	Email        string
-	Registration *acme.RegistrationResource
+	Email string
+	// todo (mxplusb): fix this soon, deprecated!
+	Registration *registration.Resource
 	key          crypto.PrivateKey
 }
 
@@ -43,7 +29,7 @@ func (u *User) GetEmail() string {
 	return u.Email
 }
 
-func (u *User) GetRegistration() *acme.RegistrationResource {
+func (u *User) GetRegistration() *registration.Resource {
 	return u.Registration
 }
 
@@ -79,7 +65,7 @@ func (p *HTTPProvider) Present(domain, token, keyAuth string) error {
 		},
 	}
 
-	return acme.WaitFor(10*time.Second, 2*time.Second, func() (bool, error) {
+	return waitFor(10*time.Second, 2*time.Second, func() (bool, error) {
 		resp, err := insecureClient.Get("https://" + path.Join(domain, ".well-known", "acme-challenge", token))
 		if err != nil {
 			return false, err
@@ -96,6 +82,29 @@ func (p *HTTPProvider) Present(domain, token, keyAuth string) error {
 	})
 }
 
+// inlining deprecated function from github.com/go-acme/lego@3252b0b
+func waitFor(timeout time.Duration, interval time.Duration, callback func() (bool, error)) error {
+	var lastErr string
+	timeup := time.After(timeout)
+	for {
+		select {
+		case <-timeup:
+			return fmt.Errorf("Time limit exceeded. Last error: %s", lastErr)
+		default:
+		}
+
+		stop, err := callback()
+		if stop {
+			return nil
+		}
+		if err != nil {
+			lastErr = err.Error()
+		}
+
+		time.Sleep(interval)
+	}
+}
+
 func (p *HTTPProvider) CleanUp(domain, token, keyAuth string) error {
 	_, err := p.Service.DeleteObject(&s3.DeleteObjectInput{
 		Bucket: aws.String(p.Settings.Bucket),
@@ -104,9 +113,17 @@ func (p *HTTPProvider) CleanUp(domain, token, keyAuth string) error {
 	return err
 }
 
-type DNSProvider struct{}
+type DNSProvider struct {
+	// We need to export the needed information for the customer to update their DNS records, and we cannot safely
+	// pass around a map, so this is the safest way to pass the information along while implementing the interface.
+	Presentation chan string
+}
 
+//
 func (p *DNSProvider) Present(domain, token, keyAuth string) error {
+	p.Presentation <- fmt.Sprintf("domain %s", domain)
+	p.Presentation <- fmt.Sprintf("token %s", token)
+	p.Presentation <- fmt.Sprintf("keyauth %s", keyAuth)
 	return nil
 }
 
@@ -118,30 +135,43 @@ func (p *DNSProvider) Timeout() (time.Duration, time.Duration) {
 	return 10 * time.Second, 2 * time.Second
 }
 
-func NewClient(settings config.Settings, user *User, s3Service *s3.S3, excludes []acme.Challenge) (*acme.Client, error) {
-	client, err := acme.NewClient(settings.AcmeUrl, user, acme.RSA2048)
+func NewClient(settings config.Settings, user *User, s3Service *s3.S3) (*lego.Client, chan string, error) {
+	// we set to 3 since we are sending 3 items, we don't want this to block.
+	presenter := make(chan string, 3)
+
+	client, err := lego.NewClient(&lego.Config{
+		CADirURL: "",
+		Certificate: lego.CertificateConfig{
+			KeyType: certcrypto.RSA2048,
+		},
+	})
 	if err != nil {
-		return &acme.Client{}, err
+		return &lego.Client{}, presenter, err
 	}
 
 	if user.GetRegistration() == nil {
-		reg, err := client.Register()
+		reg, err := client.Registration.Register(registration.RegisterOptions{
+			// todo (mxplusb): we need to document with our users they are agreeing to the Let's Encrypt TOS.
+			TermsOfServiceAgreed: true,
+		})
 		if err != nil {
-			return client, err
+			return client, presenter, err
 		}
 		user.Registration = reg
 	}
 
-	if err := client.AgreeToTOS(); err != nil {
-		return client, err
-	}
-
-	client.SetChallengeProvider(acme.HTTP01, &HTTPProvider{
+	if err = client.Challenge.SetHTTP01Provider(&HTTPProvider{
 		Settings: settings,
 		Service:  s3Service,
-	})
-	client.SetChallengeProvider(acme.DNS01, &DNSProvider{})
-	client.ExcludeChallenges(excludes)
+	}); err != nil {
+		return client, presenter, err
+	}
 
-	return client, nil
+	if err = client.Challenge.SetDNS01Provider(&DNSProvider{
+		Presentation: presenter,
+	}, nil); err != nil {
+		return client, presenter, err
+	}
+
+	return client, presenter, nil
 }
