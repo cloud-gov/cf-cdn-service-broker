@@ -163,6 +163,7 @@ type Route struct {
 	UserDataID     int
 	ForwardCookies bool
 	Headers        []RouteHeader
+	Tags           []Tag
 }
 
 func (r *Route) GetDomains() []string {
@@ -215,6 +216,26 @@ type RouteHeader struct {
 	gorm.Model
 	Header  string
 	RouteId string
+}
+
+type Tag struct {
+	gorm.Model
+	Name  string
+	Value string
+}
+
+func (r *Route) SetTags(tags map[string]string) {
+	for name, value := range tags {
+		r.Tags = append(r.Tags, Tag{Name: name, Value: value})
+	}
+}
+
+func (r *Route) GetTags() map[string]string {
+	tags := make(map[string]string)
+	for _, tag := range r.Tags {
+		tags[tag.Name] = tag.Value
+	}
+	return tags
 }
 
 type RouteManagerIface interface {
@@ -281,18 +302,11 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 	}
 
 	route.UserData = userData
+	route.SetTags(tags)
 
 	if err := m.ensureChallenges(route, clients[acme.HTTP01], false); err != nil {
 		return nil, err
 	}
-
-	dist, err := m.cloudFront.Create(instanceId, route.GetDomains(), origin, path, insecureOrigin, route.GetHeaders(), route.ForwardCookies, tags)
-	if err != nil {
-		return nil, err
-	}
-
-	route.DomainInternal = *dist.DomainName
-	route.DistId = *dist.Id
 
 	if err := m.db.Create(route).Error; err != nil {
 		return nil, err
@@ -588,12 +602,11 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 		return err
 	}
 
-	// Handle provisioning instances created before DNS challenge
-	if err := m.ensureChallenges(r, clients[acme.HTTP01], true); err != nil {
-		return err
-	}
+	if len(r.Certificate.Certificate) == 0 {
+		if err := m.ensureChallenges(r, clients[acme.HTTP01], true); err != nil {
+			return err
+		}
 
-	if m.checkDistribution(r) {
 		var challenges []acme.AuthorizationResource
 		if err := json.Unmarshal(r.ChallengeJSON, &challenges); err != nil {
 			return err
@@ -611,7 +624,9 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 		if err != nil {
 			return err
 		}
-		if err := m.deployCertificate(r.InstanceId, r.DistId, cert); err != nil {
+
+		certId, err := m.saveCertificate(r.InstanceId, cert)
+		if err != nil {
 			return err
 		}
 
@@ -624,9 +639,19 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 		if err := m.db.Create(&certRow).Error; err != nil {
 			return err
 		}
-
-		r.State = Provisioned
 		r.Certificate = certRow
+		dist, err := m.cloudFront.Create(r.InstanceId, r.GetDomains(), r.Origin, r.Path, r.InsecureOrigin, r.GetHeaders(), r.ForwardCookies, r.GetTags(), certId)
+		if err != nil {
+			return err
+		}
+
+		r.DomainInternal = *dist.DomainName
+		r.DistId = *dist.Id
+		return m.db.Save(r).Error
+	}
+
+	if m.checkDistribution(r) {
+		r.State = Provisioned
 		return m.db.Save(r).Error
 	}
 
@@ -682,21 +707,25 @@ func (m *RouteManager) solveChallenges(clients map[acme.Challenge]*acme.Client, 
 }
 
 func (m *RouteManager) deployCertificate(instanceId, distId string, cert acme.CertificateResource) error {
-	expires, err := acme.GetPEMCertExpiration(cert.Certificate)
+	certId, err := m.saveCertificate(instanceId, cert)
 	if err != nil {
 		return err
+	}
+	return m.cloudFront.SetCertificate(distId, certId)
+}
+
+func (m *RouteManager) saveCertificate(instanceId string, cert acme.CertificateResource) (certId string, err error) {
+	// upload a cert to IAM, get its cert id
+	expires, err := acme.GetPEMCertExpiration(cert.Certificate)
+	if err != nil {
+		return "", err
 	}
 
 	name := fmt.Sprintf("cdn-route-%s-%s", instanceId, expires.Format("2006-01-02_15-04-05"))
 
 	m.logger.Info("Uploading certificate to IAM", lager.Data{"name": name})
 
-	certId, err := m.iam.UploadCertificate(name, cert)
-	if err != nil {
-		return err
-	}
-
-	return m.cloudFront.SetCertificate(distId, certId)
+	return m.iam.UploadCertificate(name, cert)
 }
 
 func (m *RouteManager) ensureChallenges(route *Route, client *acme.Client, update bool) error {

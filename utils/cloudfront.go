@@ -10,7 +10,7 @@ import (
 )
 
 type DistributionIface interface {
-	Create(callerReference string, domains []string, origin, path string, insecureOrigin bool, forwardedHeaders Headers, forwardCookies bool, tags map[string]string) (*cloudfront.Distribution, error)
+	Create(callerReference string, domains []string, origin, path string, insecureOrigin bool, forwardedHeaders Headers, forwardCookies bool, tags map[string]string, certId string) (*cloudfront.Distribution, error)
 	Update(distId string, domains []string, origin, path string, insecureOrigin bool, forwardedHeaders Headers, forwardCookies bool) (*cloudfront.Distribution, error)
 	Get(distId string) (*cloudfront.Distribution, error)
 	SetCertificate(distId, certId string) error
@@ -65,7 +65,7 @@ func (d *Distribution) getHeaders(headers []string) *cloudfront.Headers {
 // it can't be changed like the domains and instead the callerReference which was composed of the original domains must
 // be passed in.
 func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionConfig, origin, path string,
-	insecureOrigin bool, callerReference *string, domains []string, forwardedHeaders []string, forwardCookies bool) {
+	insecureOrigin bool, callerReference *string, domains []string, forwardedHeaders []string, forwardCookies bool, certId string) {
 	config.CallerReference = callerReference
 	config.Comment = aws.String("cdn route service")
 	config.Enabled = aws.Bool(true)
@@ -208,12 +208,17 @@ func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionCon
 	}
 	config.Aliases = d.getAliases(domains)
 	config.PriceClass = aws.String("PriceClass_100")
+	config.ViewerCertificate.IAMCertificateId = aws.String(certId)
+	config.ViewerCertificate.CertificateSource = aws.String("iam")
+	config.ViewerCertificate.SSLSupportMethod = aws.String("sni-only")
+	config.ViewerCertificate.MinimumProtocolVersion = aws.String("TLSv1.2_2018")
+	config.ViewerCertificate.CloudFrontDefaultCertificate = aws.Bool(false)
 }
 
-func (d *Distribution) Create(callerReference string, domains []string, origin, path string, insecureOrigin bool, forwardedHeaders Headers, forwardCookies bool, tags map[string]string) (*cloudfront.Distribution, error) {
+func (d *Distribution) Create(callerReference string, domains []string, origin, path string, insecureOrigin bool, forwardedHeaders Headers, forwardCookies bool, tags map[string]string, certId string) (*cloudfront.Distribution, error) {
 	distConfig := new(cloudfront.DistributionConfig)
 	d.fillDistributionConfig(distConfig, origin, path, insecureOrigin,
-		aws.String(callerReference), domains, forwardedHeaders.Strings(), forwardCookies)
+		aws.String(callerReference), domains, forwardedHeaders.Strings(), forwardCookies, certId)
 	resp, err := d.Service.CreateDistributionWithTags(&cloudfront.CreateDistributionWithTagsInput{
 		DistributionConfigWithTags: &cloudfront.DistributionConfigWithTags{
 			DistributionConfig: distConfig,
@@ -237,7 +242,7 @@ func (d *Distribution) Update(distId string, domains []string, origin, path stri
 		return nil, err
 	}
 	d.fillDistributionConfig(dist.DistributionConfig, origin, path, insecureOrigin,
-		dist.DistributionConfig.CallerReference, domains, forwardedHeaders.Strings(), forwardCookies)
+		dist.DistributionConfig.CallerReference, domains, forwardedHeaders.Strings(), forwardCookies, *dist.DistributionConfig.ViewerCertificate.IAMCertificateId)
 
 	// Call the UpdateDistribution function
 	resp, err := d.Service.UpdateDistribution(&cloudfront.UpdateDistributionInput{
