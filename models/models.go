@@ -260,7 +260,7 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 		return nil, err
 	}
 
-	dist, err := m.cloudFront.Create(instanceId, route.GetDomains(), origin, path, insecureOrigin, forwardedHeaders, forwardCookies, tags)
+	dist, err := m.cloudFront.Create(instanceId, make([]string, 0), origin, path, insecureOrigin, forwardedHeaders, forwardCookies, tags)
 	if err != nil {
 		return nil, err
 	}
@@ -294,6 +294,11 @@ func (m *RouteManager) Update(instanceId, domain, origin string, path string, in
 		return err
 	}
 
+	// When we update the CloudFront distribution we should use the old domains
+	// until we have a valid certificate in IAM.
+	// CloudFront gets updated when we receive new certificates during Poll
+	oldDomainsForCloudFront := route.GetDomains()
+
 	// Override any settings that are new or different.
 	if domain != "" {
 		route.DomainExternal = domain
@@ -309,7 +314,7 @@ func (m *RouteManager) Update(instanceId, domain, origin string, path string, in
 	}
 
 	// Update the distribution
-	dist, err := m.cloudFront.Update(route.DistId, route.GetDomains(),
+	dist, err := m.cloudFront.Update(route.DistId, oldDomainsForCloudFront,
 		route.Origin, route.Path, route.InsecureOrigin, forwardedHeaders, forwardCookies)
 	if err != nil {
 		return err
@@ -371,7 +376,7 @@ func (m *RouteManager) Disable(r *Route) error {
 func (m *RouteManager) stillActive(r *Route) error {
 
 	m.logger.Info("Starting canary check", lager.Data{
-		"route":    r,
+		"route": r,
 	})
 
 	session := session.New(aws.NewConfig().WithRegion(m.settings.AwsDefaultRegion))
@@ -451,7 +456,7 @@ func (m *RouteManager) Renew(r *Route) error {
 		return err
 	}
 
-	if err := m.deployCertificate(r.InstanceId, r.DistId, certResource); err != nil {
+	if err := m.deployCertificate(*r, certResource); err != nil {
 		return err
 	}
 
@@ -590,7 +595,7 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 		if err != nil {
 			return err
 		}
-		if err := m.deployCertificate(r.InstanceId, r.DistId, cert); err != nil {
+		if err := m.deployCertificate(*r, cert); err != nil {
 			return err
 		}
 
@@ -660,13 +665,13 @@ func (m *RouteManager) solveChallenges(clients map[acme.Challenge]*acme.Client, 
 	return failures
 }
 
-func (m *RouteManager) deployCertificate(instanceId, distId string, cert acme.CertificateResource) error {
+func (m *RouteManager) deployCertificate(route Route, cert acme.CertificateResource) error {
 	expires, err := acme.GetPEMCertExpiration(cert.Certificate)
 	if err != nil {
 		return err
 	}
 
-	name := fmt.Sprintf("cdn-route-%s-%s", instanceId, expires.Format("2006-01-02_15-04-05"))
+	name := fmt.Sprintf("cdn-route-%s-%s", route.InstanceId, expires.Format("2006-01-02_15-04-05"))
 
 	m.logger.Info("Uploading certificate to IAM", lager.Data{"name": name})
 
@@ -675,7 +680,7 @@ func (m *RouteManager) deployCertificate(instanceId, distId string, cert acme.Ce
 		return err
 	}
 
-	return m.cloudFront.SetCertificate(distId, certId)
+	return m.cloudFront.SetCertificateAndCname(route.DistId, certId, route.GetDomains())
 }
 
 func (m *RouteManager) ensureChallenges(route *Route, client *acme.Client, update bool) error {
