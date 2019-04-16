@@ -5,11 +5,11 @@ image_resource:
   type: docker-image
   source:
     repository: golang
-    tag: "1.10"
+    tag: "1.12"
 
 inputs:
 - name: broker-src
-  path: gopath/src/github.com/18F/cf-cdn-service-broker
+  path: cf-cdn-service-broker
 
 run:
-  path: gopath/src/github.com/18F/cf-cdn-service-broker/ci/run-tests.sh
+  path: cf-cdn-service-broker/ci/run-tests.sh
