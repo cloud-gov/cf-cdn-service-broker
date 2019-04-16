@@ -294,6 +294,11 @@ func (m *RouteManager) Update(instanceId, domain, origin string, path string, in
 		return err
 	}
 
+	// When we update the CloudFront distribution we should use the old domains
+	// until we have a valid certificate in IAM.
+	// CloudFront gets updated when we receive new certificates during Poll
+	oldDomainsForCloudFront := route.GetDomains()
+
 	// Override any settings that are new or different.
 	if domain != "" {
 		route.DomainExternal = domain
@@ -309,7 +314,7 @@ func (m *RouteManager) Update(instanceId, domain, origin string, path string, in
 	}
 
 	// Update the distribution
-	dist, err := m.cloudFront.Update(route.DistId, route.GetDomains(),
+	dist, err := m.cloudFront.Update(route.DistId, oldDomainsForCloudFront,
 		route.Origin, route.Path, route.InsecureOrigin, forwardedHeaders, forwardCookies)
 	if err != nil {
 		return err
@@ -371,7 +376,7 @@ func (m *RouteManager) Disable(r *Route) error {
 func (m *RouteManager) stillActive(r *Route) error {
 
 	m.logger.Info("Starting canary check", lager.Data{
-		"route":    r,
+		"route": r,
 	})
 
 	session := session.New(aws.NewConfig().WithRegion(m.settings.AwsDefaultRegion))
