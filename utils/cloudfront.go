@@ -13,7 +13,6 @@ type DistributionIface interface {
 	Create(callerReference string, domains []string, origin, path string, insecureOrigin bool, forwardedHeaders Headers, forwardCookies bool, tags map[string]string) (*cloudfront.Distribution, error)
 	Update(distId string, domains []string, origin, path string, insecureOrigin bool, forwardedHeaders Headers, forwardCookies bool) (*cloudfront.Distribution, error)
 	Get(distId string) (*cloudfront.Distribution, error)
-	SetCertificate(distId, certId string) error
 	SetCertificateAndCname(distId, certId string, domains []string) error
 	Disable(distId string) error
 	Delete(distId string) (bool, error)
@@ -271,31 +270,6 @@ func (d *Distribution) SetCertificateAndCname(distId, certId string, domains []s
 	aliases := d.getAliases(domains)
 	DistributionConfig, ETag := resp.DistributionConfig, resp.ETag
 	DistributionConfig.Aliases = aliases
-
-	DistributionConfig.ViewerCertificate.Certificate = aws.String(certId)
-	DistributionConfig.ViewerCertificate.IAMCertificateId = aws.String(certId)
-	DistributionConfig.ViewerCertificate.CertificateSource = aws.String("iam")
-	DistributionConfig.ViewerCertificate.SSLSupportMethod = aws.String("sni-only")
-	DistributionConfig.ViewerCertificate.MinimumProtocolVersion = aws.String("TLSv1.2_2018")
-	DistributionConfig.ViewerCertificate.CloudFrontDefaultCertificate = aws.Bool(false)
-
-	_, err = d.Service.UpdateDistribution(&cloudfront.UpdateDistributionInput{
-		Id:                 aws.String(distId),
-		IfMatch:            ETag,
-		DistributionConfig: DistributionConfig,
-	})
-
-	return err
-}
-func (d *Distribution) SetCertificate(distId, certId string) error {
-	resp, err := d.Service.GetDistributionConfig(&cloudfront.GetDistributionConfigInput{
-		Id: aws.String(distId),
-	})
-	if err != nil {
-		return err
-	}
-
-	DistributionConfig, ETag := resp.DistributionConfig, resp.ETag
 
 	DistributionConfig.ViewerCertificate.Certificate = aws.String(certId)
 	DistributionConfig.ViewerCertificate.IAMCertificateId = aws.String(certId)
