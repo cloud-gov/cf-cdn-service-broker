@@ -312,10 +312,6 @@ func (m *RouteManager) Update(instanceId, domain, origin string, path string, in
 	route.DomainInternal = *dist.DomainName
 	route.DistId = *dist.Id
 
-	if domain != "" {
-		return errors.New("the domain cannot be empty")
-	}
-
 	// Save the database.
 	result := m.db.Save(route)
 	if result.Error != nil {
