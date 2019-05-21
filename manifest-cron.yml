@@ -5,6 +5,7 @@ applications:
   command: cdn-cron
   health-check-type: process
   no-route: true
+  stack: cflinuxfs3
   env:
     GO_INSTALL_PACKAGE_SPEC: "./cmd/cdn-cron"
     GOPACKAGENAME: "github.com/18F/cf-cdn-service-broker"
