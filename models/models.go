@@ -239,29 +239,36 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 		InsecureOrigin: insecureOrigin,
 	}
 
+	lsession := m.logger.Session("route-manager-create-route")
+
 	user, err := CreateUser(m.settings.Email)
 	if err != nil {
+		lsession.Error("create-user", err)
 		return nil, err
 	}
 
 	clients, err := m.getClients(&user, m.settings)
 	if err != nil {
+		lsession.Error("get-clients", err)
 		return nil, err
 	}
 
 	userData, err := SaveUser(m.db, user)
 	if err != nil {
+		lsession.Error("save-user", err)
 		return nil, err
 	}
 
 	route.UserData = userData
 
 	if err := m.ensureChallenges(route, clients[acme.HTTP01], false); err != nil {
+		lsession.Error("ensure-challenges-http-01", err)
 		return nil, err
 	}
 
 	dist, err := m.cloudFront.Create(instanceId, make([]string, 0), origin, path, insecureOrigin, forwardedHeaders, forwardCookies, tags)
 	if err != nil {
+		lsession.Error("create-cloudfront-instance", err)
 		return nil, err
 	}
 
@@ -269,6 +276,7 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 	route.DistId = *dist.Id
 
 	if err := m.db.Create(route).Error; err != nil {
+		lsession.Error("db-create-route", err)
 		return nil, err
 	}
 
@@ -277,20 +285,28 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 
 func (m *RouteManager) Get(instanceId string) (*Route, error) {
 	route := Route{}
+
+	lsession := m.logger.Session("route-manager-get")
+
 	result := m.db.First(&route, Route{InstanceId: instanceId})
 	if result.Error == nil {
+		lsession.Error("db-get-first-route", result.Error)
 		return &route, nil
 	} else if result.RecordNotFound() {
+		lsession.Error("db-record-not-found", brokerapi.ErrInstanceDoesNotExist)
 		return nil, brokerapi.ErrInstanceDoesNotExist
 	} else {
+		lsession.Error("db-generic-error", result.Error)
 		return nil, result.Error
 	}
 }
 
 func (m *RouteManager) Update(instanceId, domain, origin string, path string, insecureOrigin bool, forwardedHeaders utils.Headers, forwardCookies bool) error {
+	lsession := m.logger.Session("route-manager-update")
 	// Get current route
 	route, err := m.Get(instanceId)
 	if err != nil {
+		lsession.Error("get-route", err)
 		return err
 	}
 
@@ -317,6 +333,7 @@ func (m *RouteManager) Update(instanceId, domain, origin string, path string, in
 	dist, err := m.cloudFront.Update(route.DistId, oldDomainsForCloudFront,
 		route.Origin, route.Path, route.InsecureOrigin, forwardedHeaders, forwardCookies)
 	if err != nil {
+		lsession.Error("cloudfront-update", err)
 		return err
 	}
 	route.State = Provisioning
@@ -328,16 +345,19 @@ func (m *RouteManager) Update(instanceId, domain, origin string, path string, in
 	if domain != "" {
 		user, err := route.loadUser(m.db)
 		if err != nil {
+			lsession.Error("load-user", err)
 			return err
 		}
 
 		clients, err := m.getClients(&user, m.settings)
 		if err != nil {
+			lsession.Error("get-clients", err)
 			return err
 		}
 
 		route.ChallengeJSON = []byte("")
 		if err := m.ensureChallenges(route, clients[acme.HTTP01], false); err != nil {
+			lsession.Error("ensure-challenges", err)
 			return err
 		}
 	}
@@ -345,6 +365,7 @@ func (m *RouteManager) Update(instanceId, domain, origin string, path string, in
 	// Save the database.
 	result := m.db.Save(route)
 	if result.Error != nil {
+		lsession.Error("db-save-route", err)
 		return result.Error
 	}
 	return nil
@@ -362,8 +383,10 @@ func (m *RouteManager) Poll(r *Route) error {
 }
 
 func (m *RouteManager) Disable(r *Route) error {
+	lsession := m.logger.Session("route-manager-disable")
 	err := m.cloudFront.Disable(r.DistId)
 	if err != nil {
+		lsession.Error("cloudfront-disable", err)
 		return err
 	}
 
@@ -377,6 +400,15 @@ func (m *RouteManager) stillActive(r *Route) error {
 
 	m.logger.Info("Starting canary check", lager.Data{
 		"route": r,
+	})
+
+	lsession := m.logger.Session("route-manager-still-active", lager.Data{
+		"instance-id": r.InstanceId,
+	})
+
+	lsession.Info("starting-canary-check", lager.Data{
+		"route":    r,
+		"settings": m.settings,
 	})
 
 	session := session.New(aws.NewConfig().WithRegion(m.settings.AwsDefaultRegion))
@@ -396,6 +428,7 @@ func (m *RouteManager) stillActive(r *Route) error {
 	}
 
 	if _, err := s3client.PutObject(&input); err != nil {
+		lsession.Error("s3-put-object", err)
 		return err
 	}
 
@@ -408,17 +441,21 @@ func (m *RouteManager) stillActive(r *Route) error {
 	for _, domain := range r.GetDomains() {
 		resp, err := insecureClient.Get("https://" + path.Join(domain, target))
 		if err != nil {
+			lsession.Error("insecure-client-get", err)
 			return err
 		}
 
 		defer resp.Body.Close()
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
+			lsession.Error("read-response-body", err)
 			return err
 		}
 
 		if string(body) != r.InstanceId {
-			return fmt.Errorf("Canary check failed for %s; expected %s, got %s", domain, r.InstanceId, string(body))
+			err := fmt.Errorf("Canary check failed for %s; expected %s, got %s", domain, r.InstanceId, string(body))
+			lsession.Error("", err)
+			return err
 		}
 	}
 
@@ -426,37 +463,51 @@ func (m *RouteManager) stillActive(r *Route) error {
 }
 
 func (m *RouteManager) Renew(r *Route) error {
+	lsession := m.logger.Session("route-manager-renew", lager.Data{
+		"instance-id": r.InstanceId,
+	})
+
 	err := m.stillActive(r)
 	if err != nil {
-		return fmt.Errorf("Route is not active, skipping renewal: %v", err)
+		err := fmt.Errorf("Route is not active, skipping renewal: %v", err)
+		lsession.Error("still-active", err)
+		return err
 	}
 
 	var certRow Certificate
 	err = m.db.Model(r).Related(&certRow, "Certificate").Error
 	if err != nil {
+		lsession.Error("db-find-related-cert", err)
 		return err
 	}
 
 	user, err := r.loadUser(m.db)
 	if err != nil {
+		lsession.Error("db-load-user", err)
 		return err
 	}
 
 	clients, err := m.getClients(&user, m.settings)
 	if err != nil {
+		lsession.Error("get-clients", err)
 		return err
 	}
 
 	certResource, errs := clients[acme.HTTP01].ObtainCertificate(r.GetDomains(), true, nil, false)
 	if len(errs) > 0 {
-		return fmt.Errorf("Error(s) obtaining certificate: %v", errs)
+		err := fmt.Errorf("Error(s) obtaining certificate: %v", errs)
+		lsession.Error("obtain-certificate", err)
+		return err
 	}
+
 	expires, err := acme.GetPEMCertExpiration(certResource.Certificate)
 	if err != nil {
+		lsession.Error("get-pem-cert-expiry", err)
 		return err
 	}
 
 	if err := m.deployCertificate(*r, certResource); err != nil {
+		lsession.Error("deploy-certificate", err)
 		return err
 	}
 
@@ -464,7 +515,11 @@ func (m *RouteManager) Renew(r *Route) error {
 	certRow.CertURL = certResource.CertURL
 	certRow.Certificate = certResource.Certificate
 	certRow.Expires = expires
-	return m.db.Save(&certRow).Error
+	if err := m.db.Save(&certRow).Error; err != nil {
+		lsession.Error("db-save-cert", err)
+		return err
+	}
+	return nil
 }
 
 func (m *RouteManager) DeleteOrphanedCerts() {
@@ -562,7 +617,9 @@ func (m *RouteManager) getClients(user *utils.User, settings config.Settings) (m
 }
 
 func (m *RouteManager) updateProvisioning(r *Route) error {
-	lsession := m.logger.Session("route-manager-update-provisioning")
+	lsession := m.logger.Session("route-manager-update-provisioning", lager.Data{
+		"instance-id": r.InstanceId,
+	})
 
 	user, err := r.loadUser(m.db)
 	if err != nil {
@@ -630,19 +687,24 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 		return nil
 	}
 
-	m.logger.Info("distribution-provisioning", lager.Data{"instance_id": r.InstanceId})
+	lsession.Info("distribution-provisioning")
 	return nil
 }
 
 func (m *RouteManager) updateDeprovisioning(r *Route) error {
+	lsession := m.logger.Session("route-manager-update-deprovisioning")
+
 	deleted, err := m.cloudFront.Delete(r.DistId)
 	if err != nil {
+		lsession.Error("cloudfront-delete", err)
 		return err
 	}
 
 	if deleted {
 		r.State = Deprovisioned
-		m.db.Save(r)
+		if err := m.db.Save(r).Error; err != nil {
+			lsession.Error("db-save-delete-state", err)
+		}
 	}
 
 	return nil
