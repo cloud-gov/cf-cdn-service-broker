@@ -562,40 +562,51 @@ func (m *RouteManager) getClients(user *utils.User, settings config.Settings) (m
 }
 
 func (m *RouteManager) updateProvisioning(r *Route) error {
+	lsession := m.logger.Session("route-manager-update-provisioning")
+
 	user, err := r.loadUser(m.db)
 	if err != nil {
+		lsession.Error("load-user", err)
 		return err
 	}
 
 	clients, err := m.getClients(&user, m.settings)
 	if err != nil {
+		lsession.Error("get-clients", err)
 		return err
 	}
 
 	// Handle provisioning instances created before DNS challenge
 	if err := m.ensureChallenges(r, clients[acme.HTTP01], true); err != nil {
+		lsession.Error("ensure-challenges", err)
 		return err
 	}
 
 	if m.checkDistribution(r) {
 		var challenges []acme.AuthorizationResource
 		if err := json.Unmarshal(r.ChallengeJSON, &challenges); err != nil {
+			lsession.Error("challenge-unmarshall", err)
 			return err
 		}
 		if errs := m.solveChallenges(clients, challenges); len(errs) > 0 {
-			return fmt.Errorf("Error(s) solving challenges: %v", errs)
+			errstr := fmt.Errorf("Error(s) solving challenges: %v", errs)
+			lsession.Error("solve-challenges", errstr)
+			return errstr
 		}
 
 		cert, err := clients[acme.HTTP01].RequestCertificate(challenges, true, nil, false)
 		if err != nil {
+			lsession.Error("request-certificate-http-01", err)
 			return err
 		}
 
 		expires, err := acme.GetPEMCertExpiration(cert.Certificate)
 		if err != nil {
+			lsession.Error("get-cert-expiry", err)
 			return err
 		}
 		if err := m.deployCertificate(*r, cert); err != nil {
+			lsession.Error("deploy-certificate", err)
 			return err
 		}
 
@@ -606,12 +617,17 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 			Expires:     expires,
 		}
 		if err := m.db.Create(&certRow).Error; err != nil {
+			lsession.Error("db-create-cert", err)
 			return err
 		}
 
 		r.State = Provisioned
 		r.Certificate = certRow
-		return m.db.Save(r).Error
+		if err := m.db.Save(r).Error; err != nil {
+			lsession.Error("db-save-cert", err)
+			return err
+		}
+		return nil
 	}
 
 	m.logger.Info("distribution-provisioning", lager.Data{"instance_id": r.InstanceId})
