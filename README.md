@@ -140,7 +140,7 @@ $ cf create-service cdn-route cdn-route my-cdn-route \
 Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
 ```
 
-CloudFront can forward up to 10 custom headers. Because this broker automatically forwards the `Host` header when not using a [custom origin](#custom-origins), you can whitelist up to nin headers by default; if using a custom origin, you can whitelist up to 10 headers. If you want to exceed this limit or forward all headers, you can use a wildcard:
+CloudFront can forward up to 10 custom headers. Because this broker automatically forwards the `Host` header when not using a [custom origin](#custom-origins), you can whitelist up to nine headers by default; if using a custom origin, you can whitelist up to 10 headers. If you want to exceed this limit or forward all headers, you can use a wildcard:
 
 ```bash
 $ cf create-service cdn-route cdn-route my-cdn-route \
