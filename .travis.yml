@@ -1,7 +1,7 @@
 language: go
 
 go:
-- "1.7"
+- "1.12"
 - tip
 
 # Only applicable to our fork
@@ -13,4 +13,4 @@ install: |
   cd cf-cdn-service-broker
 
 # Skip vendor tests
-script: go test -v $(go list ./... | grep -v /vendor/)
+script: env GO111MODULE=on go test -v $(go list ./... | grep -v /vendor/)
