@@ -574,18 +574,12 @@ func (m *RouteManager) DeleteOrphanedCerts() {
 		// delete any certs not attached to a distribution that are older than 24 hours
 		_, active := activeCerts[*cert.ServerCertificateId]
 		if !active && time.Since(*cert.UploadDate).Hours() > 24 {
-			m.logger.Info("delete_certificate", lager.Data{
-				"cert": cert,
-			})
 			m.logger.Info("cleaning-orphaned-certificate", lager.Data{
 				"cert": cert,
 			})
 
 			err := m.iam.DeleteCertificate(*cert.ServerCertificateName)
 			if err != nil {
-				m.logger.Error("delete_certificate", err, lager.Data{
-					"cert": cert,
-				})
 				m.logger.Error("iam-delete-certificate", err, lager.Data{
 					"cert": cert,
 				})
