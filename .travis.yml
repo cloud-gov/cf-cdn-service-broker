@@ -2,15 +2,17 @@ language: go
 
 go:
 - "1.12"
-- tip
 
-# Only applicable to our fork
 install: |
   cd ../.. && \
   mv alphagov 18F && \
   cd 18F && \
   mv paas-cdn-broker cf-cdn-service-broker && \
   cd cf-cdn-service-broker
+env:
+  - GO111MODULE=on
 
-# Skip vendor tests
-script: env GO111MODULE=on go test -v $(go list ./... | grep -v /vendor/)
+script: >-
+  go install github.com/onsi/ginkgo/ginkgo &&
+  go get &&
+  ginkgo -r
