@@ -19,9 +19,9 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/lager"
+	"github.com/18F/cf-cdn-service-broker/lego/acme"
 	"github.com/jinzhu/gorm"
 	"github.com/pivotal-cf/brokerapi"
-	"github.com/18F/cf-cdn-service-broker/lego/acme"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -807,31 +807,41 @@ func (m *RouteManager) deployCertificate(route Route, cert acme.CertificateResou
 func (m *RouteManager) ensureChallenges(route *Route, client *acme.Client, update bool) error {
 	lsession := m.logger.Session("ensure-challenges", lager.Data{
 		"instance-id": route.InstanceId,
+		"domains":     route.GetDomains(),
 	})
 
-	if len(route.ChallengeJSON) == 0 {
-		challenges, errs := client.GetChallenges(route.GetDomains())
-		if len(errs) > 0 {
-			err := fmt.Errorf("Error(s) getting challenges: %v", errs)
-			lsession.Error("get-challenges", err)
-			return err
-		}
-
-		var err error
-		route.ChallengeJSON, err = json.Marshal(challenges)
-		if err != nil {
-			lsession.Error("json-marshal-challenge", err)
-			return err
-		}
-
-		if update {
-			err := m.db.Save(route).Error
-			lsession.Error("db-save-route-challenge", err)
-			return err
-		}
+	if len(route.ChallengeJSON) > 0 {
+		lsession.Info("challenge-json-was-already-present")
 		return nil
 	}
 
+	lsession.Info("get-challenges")
+	challenges, errs := client.GetChallenges(route.GetDomains())
+	if len(errs) > 0 {
+		err := fmt.Errorf("Error(s) getting challenges: %v", errs)
+		lsession.Error("get-challenges-err", err)
+		return err
+	}
+
+	var err error
+	route.ChallengeJSON, err = json.Marshal(challenges)
+	if err != nil {
+		lsession.Error("json-marshal-challenge-err", err)
+		return err
+	}
+
+	if !update {
+		lsession.Info("not-updating")
+		return nil
+	}
+
+	lsession.Info("db-save-route-challenge")
+	err = m.db.Save(route).Error
+	if err != nil {
+		lsession.Error("db-save-route-challenge-err", err)
+	}
+
+	lsession.Info("updated")
 	return nil
 }
 
