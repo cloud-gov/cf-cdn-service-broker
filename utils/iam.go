@@ -6,7 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/iam"
 
-	"github.com/xenolf/lego/acme"
+	"github.com/18F/cf-cdn-service-broker/lego/acme"
 
 	"github.com/18F/cf-cdn-service-broker/config"
 )

@@ -2,7 +2,7 @@ package healthchecks
 
 import (
 	"crypto"
-	"github.com/xenolf/lego/acme"
+	"github.com/18F/cf-cdn-service-broker/lego/acme"
 
 	"github.com/18F/cf-cdn-service-broker/config"
 )
