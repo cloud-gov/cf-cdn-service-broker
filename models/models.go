@@ -757,6 +757,12 @@ func (m *RouteManager) checkDistribution(r *Route) bool {
 }
 
 func (m *RouteManager) solveChallenges(clients map[acme.Challenge]*acme.Client, challenges []acme.AuthorizationResource) map[string]error {
+	startTime := time.Now()
+	lsession := m.logger.Session("solve-challenges", lager.Data{
+		"start_time": startTime.String(),
+	})
+	lsession.Info("solve-challenges-start")
+
 	errs := make(chan map[string]error)
 
 	for _, client := range clients {
@@ -768,9 +774,12 @@ func (m *RouteManager) solveChallenges(clients map[acme.Challenge]*acme.Client, 
 	var failures map[string]error
 	for challenge := range clients {
 		failures = <-errs
-		m.logger.Info("solve-challenges", lager.Data{
+		endTime := time.Now()
+		lsession.Info("solve-challenges-results", lager.Data{
 			"challenge": challenge,
 			"failures":  failures,
+			"end_time":  endTime.String(),
+			"duration":  endTime.Sub(startTime).String(),
 		})
 		if len(failures) == 0 {
 			return failures
@@ -783,25 +792,41 @@ func (m *RouteManager) solveChallenges(clients map[acme.Challenge]*acme.Client, 
 func (m *RouteManager) deployCertificate(route Route, cert acme.CertificateResource) error {
 	lsession := m.logger.Session("deploy-certificate", lager.Data{
 		"instance-id": route.InstanceId,
+		"domains":     route.GetDomains(),
+		"dist":        route.DistId,
 	})
 
+	lsession.Info("get-cert-expiry")
 	expires, err := acme.GetPEMCertExpiration(cert.Certificate)
 	if err != nil {
-		lsession.Error("get-cert-expiry", err)
+		lsession.Error("get-cert-expiry-err", err)
 		return err
 	}
 
 	name := fmt.Sprintf("cdn-route-%s-%s", route.InstanceId, expires.Format("2006-01-02_15-04-05"))
-
-	m.logger.Info("Uploading certificate to IAM", lager.Data{"name": name})
-
+	lsession.Info("iam-upload-certificate", lager.Data{"name": name})
 	certId, err := m.iam.UploadCertificate(name, cert)
 	if err != nil {
-		lsession.Error("iam-upload-certificate", err)
+		lsession.Error("iam-upload-certificate-err", err, lager.Data{
+			"name": name,
+		})
 		return err
 	}
 
-	return m.cloudFront.SetCertificateAndCname(route.DistId, certId, route.GetDomains())
+	lsession.Info("iam-set-certificate-and-cname", lager.Data{
+		"name":    name,
+		"cert_id": certId,
+	})
+	err = m.cloudFront.SetCertificateAndCname(route.DistId, certId, route.GetDomains())
+	if err != nil {
+		lsession.Info("iam-set-certificate-and-cname-err", lager.Data{
+			"name":    name,
+			"cert_id": certId,
+			"err":     err,
+		})
+		return err
+	}
+	return nil
 }
 
 func (m *RouteManager) ensureChallenges(route *Route, client *acme.Client, update bool) error {
@@ -851,7 +876,7 @@ func (m *RouteManager) GetDNSInstructions(route *Route) ([]string, error) {
 
 	lsession := m.logger.Session("get-dns-instructions", lager.Data{
 		"instance-id": route.InstanceId,
-		"domains": route.GetDomains(),
+		"domains":     route.GetDomains(),
 	})
 
 	lsession.Info("load-user")
