@@ -36,6 +36,7 @@ type UpdateSuite struct {
 func (s *UpdateSuite) SetupTest() {
 	s.Manager = mocks.RouteManagerIface{}
 	s.cfclient = cfmock.Client{}
+	s.logger = lager.NewLogger("test")
 	s.settings = config.Settings{
 		DefaultOrigin: "origin.cloud.gov",
 	}
