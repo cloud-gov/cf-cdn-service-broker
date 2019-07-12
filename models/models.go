@@ -851,11 +851,13 @@ func (m *RouteManager) GetDNSInstructions(route *Route) ([]string, error) {
 
 	lsession := m.logger.Session("get-dns-instructions", lager.Data{
 		"instance-id": route.InstanceId,
+		"domains": route.GetDomains(),
 	})
 
+	lsession.Info("load-user")
 	user, err := route.loadUser(m.db)
 	if err != nil {
-		lsession.Error("load-user", err)
+		lsession.Error("load-user-err", err)
 		return instructions, err
 	}
 
@@ -863,12 +865,15 @@ func (m *RouteManager) GetDNSInstructions(route *Route) ([]string, error) {
 		lsession.Error("json-unmarshal-challenge", err)
 		return instructions, err
 	}
+
+	lsession.Info("get-key-authorization")
 	for _, auth := range challenges {
 		for _, challenge := range auth.Body.Challenges {
 			if challenge.Type == acme.DNS01 {
+				lsession.Info("get-key-authorization-for-a-dns-challenge", lager.Data{"domain": auth.Domain})
 				keyAuth, err := acme.GetKeyAuthorization(challenge.Token, user.GetPrivateKey())
 				if err != nil {
-					lsession.Error("get-key-authorization", err)
+					lsession.Error("get-key-authorization-err", err)
 					return instructions, err
 				}
 				fqdn, value, ttl := acme.DNS01Record(auth.Domain, keyAuth)
