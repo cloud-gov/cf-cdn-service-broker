@@ -17,15 +17,15 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/private/protocol"
 )
+
+// RFC822 returns an RFC822 formatted timestamp for AWS protocols
+const RFC822 = "Mon, 2 Jan 2006 15:04:05 GMT"
 
 // Whether the byte value can be sent without escaping in AWS URLs
 var noEscape [256]bool
 
 var errValueNotSet = fmt.Errorf("value not set")
-
-var byteSliceType = reflect.TypeOf([]byte{})
 
 func init() {
 	for i := 0; i < len(noEscape); i++ {
@@ -82,12 +82,8 @@ func buildLocationElements(r *request.Request, v reflect.Value, buildGETQuery bo
 			if name == "" {
 				name = field.Name
 			}
-			if kind := m.Kind(); kind == reflect.Ptr {
+			if m.Kind() == reflect.Ptr {
 				m = m.Elem()
-			} else if kind == reflect.Interface {
-				if !m.Elem().IsValid() {
-					continue
-				}
 			}
 			if !m.IsValid() {
 				continue
@@ -96,27 +92,19 @@ func buildLocationElements(r *request.Request, v reflect.Value, buildGETQuery bo
 				continue
 			}
 
-			// Support the ability to customize values to be marshaled as a
-			// blob even though they were modeled as a string. Required for S3
-			// API operations like SSECustomerKey is modeled as stirng but
-			// required to be base64 encoded in request.
-			if field.Tag.Get("marshal-as") == "blob" {
-				m = m.Convert(byteSliceType)
-			}
-
 			var err error
 			switch field.Tag.Get("location") {
 			case "headers": // header maps
-				err = buildHeaderMap(&r.HTTPRequest.Header, m, field.Tag)
+				err = buildHeaderMap(&r.HTTPRequest.Header, m, field.Tag.Get("locationName"))
 			case "header":
-				err = buildHeader(&r.HTTPRequest.Header, m, name, field.Tag)
+				err = buildHeader(&r.HTTPRequest.Header, m, name)
 			case "uri":
-				err = buildURI(r.HTTPRequest.URL, m, name, field.Tag)
+				err = buildURI(r.HTTPRequest.URL, m, name)
 			case "querystring":
-				err = buildQueryString(query, m, name, field.Tag)
+				err = buildQueryString(query, m, name)
 			default:
 				if buildGETQuery {
-					err = buildQueryString(query, m, name, field.Tag)
+					err = buildQueryString(query, m, name)
 				}
 			}
 			r.Error = err
@@ -147,7 +135,7 @@ func buildBody(r *request.Request, v reflect.Value) {
 					case string:
 						r.SetStringBody(reader)
 					default:
-						r.Error = awserr.New(request.ErrCodeSerialization,
+						r.Error = awserr.New("SerializationError",
 							"failed to encode REST request",
 							fmt.Errorf("unknown payload type %s", payload.Type()))
 					}
@@ -157,46 +145,40 @@ func buildBody(r *request.Request, v reflect.Value) {
 	}
 }
 
-func buildHeader(header *http.Header, v reflect.Value, name string, tag reflect.StructTag) error {
-	str, err := convertType(v, tag)
+func buildHeader(header *http.Header, v reflect.Value, name string) error {
+	str, err := convertType(v)
 	if err == errValueNotSet {
 		return nil
 	} else if err != nil {
-		return awserr.New(request.ErrCodeSerialization, "failed to encode REST request", err)
+		return awserr.New("SerializationError", "failed to encode REST request", err)
 	}
-
-	name = strings.TrimSpace(name)
-	str = strings.TrimSpace(str)
 
 	header.Add(name, str)
 
 	return nil
 }
 
-func buildHeaderMap(header *http.Header, v reflect.Value, tag reflect.StructTag) error {
-	prefix := tag.Get("locationName")
+func buildHeaderMap(header *http.Header, v reflect.Value, prefix string) error {
 	for _, key := range v.MapKeys() {
-		str, err := convertType(v.MapIndex(key), tag)
+		str, err := convertType(v.MapIndex(key))
 		if err == errValueNotSet {
 			continue
 		} else if err != nil {
-			return awserr.New(request.ErrCodeSerialization, "failed to encode REST request", err)
+			return awserr.New("SerializationError", "failed to encode REST request", err)
 
 		}
-		keyStr := strings.TrimSpace(key.String())
-		str = strings.TrimSpace(str)
 
-		header.Add(prefix+keyStr, str)
+		header.Add(prefix+key.String(), str)
 	}
 	return nil
 }
 
-func buildURI(u *url.URL, v reflect.Value, name string, tag reflect.StructTag) error {
-	value, err := convertType(v, tag)
+func buildURI(u *url.URL, v reflect.Value, name string) error {
+	value, err := convertType(v)
 	if err == errValueNotSet {
 		return nil
 	} else if err != nil {
-		return awserr.New(request.ErrCodeSerialization, "failed to encode REST request", err)
+		return awserr.New("SerializationError", "failed to encode REST request", err)
 	}
 
 	u.Path = strings.Replace(u.Path, "{"+name+"}", value, -1)
@@ -208,7 +190,7 @@ func buildURI(u *url.URL, v reflect.Value, name string, tag reflect.StructTag) e
 	return nil
 }
 
-func buildQueryString(query url.Values, v reflect.Value, name string, tag reflect.StructTag) error {
+func buildQueryString(query url.Values, v reflect.Value, name string) error {
 	switch value := v.Interface().(type) {
 	case []*string:
 		for _, item := range value {
@@ -225,11 +207,11 @@ func buildQueryString(query url.Values, v reflect.Value, name string, tag reflec
 			}
 		}
 	default:
-		str, err := convertType(v, tag)
+		str, err := convertType(v)
 		if err == errValueNotSet {
 			return nil
 		} else if err != nil {
-			return awserr.New(request.ErrCodeSerialization, "failed to encode REST request", err)
+			return awserr.New("SerializationError", "failed to encode REST request", err)
 		}
 		query.Set(name, str)
 	}
@@ -264,12 +246,13 @@ func EscapePath(path string, encodeSep bool) string {
 	return buf.String()
 }
 
-func convertType(v reflect.Value, tag reflect.StructTag) (str string, err error) {
+func convertType(v reflect.Value) (string, error) {
 	v = reflect.Indirect(v)
 	if !v.IsValid() {
 		return "", errValueNotSet
 	}
 
+	var str string
 	switch value := v.Interface().(type) {
 	case string:
 		str = value
@@ -282,28 +265,9 @@ func convertType(v reflect.Value, tag reflect.StructTag) (str string, err error)
 	case float64:
 		str = strconv.FormatFloat(value, 'f', -1, 64)
 	case time.Time:
-		format := tag.Get("timestampFormat")
-		if len(format) == 0 {
-			format = protocol.RFC822TimeFormatName
-			if tag.Get("location") == "querystring" {
-				format = protocol.ISO8601TimeFormatName
-			}
-		}
-		str = protocol.FormatTime(format, value)
-	case aws.JSONValue:
-		if len(value) == 0 {
-			return "", errValueNotSet
-		}
-		escaping := protocol.NoEscape
-		if tag.Get("location") == "header" {
-			escaping = protocol.Base64Escape
-		}
-		str, err = protocol.EncodeJSONValue(value, escaping)
-		if err != nil {
-			return "", fmt.Errorf("unable to encode JSONValue, %v", err)
-		}
+		str = value.UTC().Format(RFC822)
 	default:
-		err := fmt.Errorf("unsupported value for param %v (%s)", v.Interface(), v.Type())
+		err := fmt.Errorf("Unsupported value for param %v (%s)", v.Interface(), v.Type())
 		return "", err
 	}
 	return str, nil

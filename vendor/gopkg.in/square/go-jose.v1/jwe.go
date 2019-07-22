@@ -85,12 +85,10 @@ func (obj JsonWebEncryption) mergedHeaders(recipient *recipientInfo) rawHeader {
 func (obj JsonWebEncryption) computeAuthData() []byte {
 	var protected string
 
-	if obj.original != nil && obj.original.Protected != nil {
+	if obj.original != nil {
 		protected = obj.original.Protected.base64()
-	} else if obj.protected != nil {
-		protected = base64URLEncode(mustSerializeJSON((obj.protected)))
 	} else {
-		protected = ""
+		protected = base64URLEncode(mustSerializeJSON((obj.protected)))
 	}
 
 	output := []byte(protected)

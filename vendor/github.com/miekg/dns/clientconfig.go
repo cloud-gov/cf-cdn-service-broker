@@ -2,7 +2,6 @@ package dns
 
 import (
 	"bufio"
-	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -26,13 +25,8 @@ func ClientConfigFromFile(resolvconf string) (*ClientConfig, error) {
 		return nil, err
 	}
 	defer file.Close()
-	return ClientConfigFromReader(file)
-}
-
-// ClientConfigFromReader works like ClientConfigFromFile but takes an io.Reader as argument
-func ClientConfigFromReader(resolvconf io.Reader) (*ClientConfig, error) {
 	c := new(ClientConfig)
-	scanner := bufio.NewScanner(resolvconf)
+	scanner := bufio.NewScanner(file)
 	c.Servers = make([]string, 0)
 	c.Search = make([]string, 0)
 	c.Port = "53"
@@ -68,17 +62,19 @@ func ClientConfigFromReader(resolvconf io.Reader) (*ClientConfig, error) {
 			}
 
 		case "search": // set search path to given servers
-			c.Search = append([]string(nil), f[1:]...)
+			c.Search = make([]string, len(f)-1)
+			for i := 0; i < len(c.Search); i++ {
+				c.Search[i] = f[i+1]
+			}
 
 		case "options": // magic options
-			for _, s := range f[1:] {
+			for i := 1; i < len(f); i++ {
+				s := f[i]
 				switch {
 				case len(s) >= 6 && s[:6] == "ndots:":
 					n, _ := strconv.Atoi(s[6:])
-					if n < 0 {
-						n = 0
-					} else if n > 15 {
-						n = 15
+					if n < 1 {
+						n = 1
 					}
 					c.Ndots = n
 				case len(s) >= 8 && s[:8] == "timeout:":
@@ -87,7 +83,7 @@ func ClientConfigFromReader(resolvconf io.Reader) (*ClientConfig, error) {
 						n = 1
 					}
 					c.Timeout = n
-				case len(s) >= 9 && s[:9] == "attempts:":
+				case len(s) >= 8 && s[:9] == "attempts:":
 					n, _ := strconv.Atoi(s[9:])
 					if n < 1 {
 						n = 1

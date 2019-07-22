@@ -5,12 +5,8 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
-	"strings"
-
-	"time"
 
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -20,7 +16,7 @@ import (
 
 //Client used to communicate with Cloud Foundry
 type Client struct {
-	Config   Config
+	config   Config
 	Endpoint Endpoint
 }
 
@@ -33,21 +29,20 @@ type Endpoint struct {
 
 //Config is used to configure the creation of a client
 type Config struct {
-	ApiAddress          string `json:"api_url"`
-	Username            string `json:"user"`
-	Password            string `json:"password"`
-	ClientID            string `json:"client_id"`
-	ClientSecret        string `json:"client_secret"`
-	SkipSslValidation   bool   `json:"skip_ssl_validation"`
-	HttpClient          *http.Client
-	Token               string `json:"auth_token"`
-	TokenSource         oauth2.TokenSource
-	tokenSourceDeadline *time.Time
-	UserAgent           string `json:"user_agent"`
+	ApiAddress        string `json:"api_url"`
+	Username          string `json:"user"`
+	Password          string `json:"password"`
+	ClientID          string `json:"client_id"`
+	ClientSecret      string `json:"client_secret"`
+	SkipSslValidation bool   `json:"skip_ssl_validation"`
+	HttpClient        *http.Client
+	Token             string `json:"auth_token"`
+	TokenSource       oauth2.TokenSource
+	UserAgent         string `json:"user_agent"`
 }
 
-// Request is used to help build up a request
-type Request struct {
+// request is used to help build up a request
+type request struct {
 	method string
 	url    string
 	params url.Values
@@ -112,34 +107,44 @@ func NewClient(config *Config) (client *Client, err error) {
 		config.HttpClient.Transport = shallowDefaultTransport()
 	}
 
-	var tp *http.Transport
-
-	switch t := config.HttpClient.Transport.(type) {
-	case *http.Transport:
-		tp = t
-	case *oauth2.Transport:
-		if bt, ok := t.Base.(*http.Transport); ok {
-			tp = bt
-		}
+	tp := config.HttpClient.Transport.(*http.Transport)
+	if tp.TLSClientConfig == nil {
+		tp.TLSClientConfig = &tls.Config{}
 	}
 
-	if tp != nil {
-		if tp.TLSClientConfig == nil {
-			tp.TLSClientConfig = &tls.Config{}
-		}
-		tp.TLSClientConfig.InsecureSkipVerify = config.SkipSslValidation
+	// we want to keep the Timeout value from config.HttpClient
+	timeout := config.HttpClient.Timeout
+
+	ctx := context.Background()
+
+	tp.TLSClientConfig.InsecureSkipVerify = config.SkipSslValidation
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, config.HttpClient)
+
+	endpoint, err := getInfo(config.ApiAddress, oauth2.NewClient(ctx, nil))
+
+	if err != nil {
+		return nil, errors.Wrap(err, "Could not get api /v2/info")
 	}
 
-	config.ApiAddress = strings.TrimRight(config.ApiAddress, "/")
-
+	switch {
+	case config.Token != "":
+		config = getUserTokenAuth(config, endpoint, ctx)
+	case config.ClientID != "":
+		config = getClientAuth(config, endpoint, ctx)
+	default:
+		config, err = getUserAuth(config, endpoint, ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+	// make sure original Timeout value will be used
+	if config.HttpClient.Timeout != timeout {
+		config.HttpClient.Timeout = timeout
+	}
 	client = &Client{
-		Config: *config,
+		config:   *config,
+		Endpoint: *endpoint,
 	}
-
-	if err := client.refreshEndpoint(); err != nil {
-		return nil, err
-	}
-
 	return client, nil
 }
 
@@ -152,7 +157,7 @@ func shallowDefaultTransport() *http.Transport {
 	}
 }
 
-func getUserAuth(ctx context.Context, config Config, endpoint *Endpoint) (Config, error) {
+func getUserAuth(config *Config, endpoint *Endpoint, ctx context.Context) (*Config, error) {
 	authConfig := &oauth2.Config{
 		ClientID: "cf",
 		Scopes:   []string{""},
@@ -163,18 +168,18 @@ func getUserAuth(ctx context.Context, config Config, endpoint *Endpoint) (Config
 	}
 
 	token, err := authConfig.PasswordCredentialsToken(ctx, config.Username, config.Password)
+
 	if err != nil {
-		return config, errors.Wrap(err, "Error getting token")
+		return nil, errors.Wrap(err, "Error getting token")
 	}
 
-	config.tokenSourceDeadline = &token.Expiry
 	config.TokenSource = authConfig.TokenSource(ctx, token)
 	config.HttpClient = oauth2.NewClient(ctx, config.TokenSource)
 
 	return config, err
 }
 
-func getClientAuth(ctx context.Context, config Config, endpoint *Endpoint) Config {
+func getClientAuth(config *Config, endpoint *Endpoint, ctx context.Context) *Config {
 	authConfig := &clientcredentials.Config{
 		ClientID:     config.ClientID,
 		ClientSecret: config.ClientSecret,
@@ -186,8 +191,8 @@ func getClientAuth(ctx context.Context, config Config, endpoint *Endpoint) Confi
 	return config
 }
 
-// getUserTokenAuth initializes client credentials from existing bearer token.
-func getUserTokenAuth(ctx context.Context, config Config, endpoint *Endpoint) Config {
+// Initialize client credentials from existing bearer token
+func getUserTokenAuth(config *Config, endpoint *Endpoint, ctx context.Context) *Config {
 	authConfig := &oauth2.Config{
 		ClientID: "cf",
 		Scopes:   []string{""},
@@ -229,11 +234,11 @@ func getInfo(api string, httpClient *http.Client) (*Endpoint, error) {
 	return &endpoint, err
 }
 
-// NewRequest is used to create a new Request
-func (c *Client) NewRequest(method, path string) *Request {
-	r := &Request{
+// NewRequest is used to create a new request
+func (c *Client) NewRequest(method, path string) *request {
+	r := &request{
 		method: method,
-		url:    c.Config.ApiAddress + path,
+		url:    c.config.ApiAddress + path,
 		params: make(map[string][]string),
 	}
 	return r
@@ -241,7 +246,7 @@ func (c *Client) NewRequest(method, path string) *Request {
 
 // NewRequestWithBody is used to create a new request with
 // arbigtrary body io.Reader.
-func (c *Client) NewRequestWithBody(method, path string, body io.Reader) *Request {
+func (c *Client) NewRequestWithBody(method, path string, body io.Reader) *request {
 	r := c.NewRequest(method, path)
 
 	// Set request body
@@ -251,116 +256,34 @@ func (c *Client) NewRequestWithBody(method, path string, body io.Reader) *Reques
 }
 
 // DoRequest runs a request with our client
-func (c *Client) DoRequest(r *Request) (*http.Response, error) {
+func (c *Client) DoRequest(r *request) (*http.Response, error) {
 	req, err := r.toHTTP()
 	if err != nil {
 		return nil, err
 	}
-	return c.Do(req)
-}
-
-// DoRequestWithoutRedirects executes the request without following redirects
-func (c *Client) DoRequestWithoutRedirects(r *Request) (*http.Response, error) {
-	prevCheckRedirect := c.Config.HttpClient.CheckRedirect
-	c.Config.HttpClient.CheckRedirect = func(httpReq *http.Request, via []*http.Request) error {
-		return http.ErrUseLastResponse
-	}
-	defer func() {
-		c.Config.HttpClient.CheckRedirect = prevCheckRedirect
-	}()
-	return c.DoRequest(r)
-}
-
-func (c *Client) Do(req *http.Request) (*http.Response, error) {
-	req.Header.Set("User-Agent", c.Config.UserAgent)
-	if req.Body != nil && req.Header.Get("Content-type") == "" {
+	req.Header.Set("User-Agent", c.config.UserAgent)
+	if r.body != nil {
 		req.Header.Set("Content-type", "application/json")
 	}
 
-	resp, err := c.Config.HttpClient.Do(req)
+	resp, err := c.config.HttpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 
 	if resp.StatusCode >= http.StatusBadRequest {
-		return c.handleError(resp)
+		cfErr := &CloudFoundryErrors{}
+		if err := decodeBody(resp, cfErr); err != nil {
+			return resp, errors.Wrap(err, "Unable to decode body")
+		}
+		return nil, cfErr
 	}
 
 	return resp, nil
 }
 
-func (c *Client) handleError(resp *http.Response) (*http.Response, error) {
-	body, err := ioutil.ReadAll(resp.Body)
-
-	if err != nil {
-		return resp, CloudFoundryHTTPError{
-			StatusCode: resp.StatusCode,
-			Status:     resp.Status,
-			Body:       body,
-		}
-	}
-	defer resp.Body.Close()
-
-	// Unmarshal V2 error response
-	if strings.HasPrefix(resp.Request.URL.Path, "/v2/") {
-		var cfErr CloudFoundryError
-		if err := json.Unmarshal(body, &cfErr); err != nil {
-			return resp, CloudFoundryHTTPError{
-				StatusCode: resp.StatusCode,
-				Status:     resp.Status,
-				Body:       body,
-			}
-		}
-		return nil, cfErr
-	}
-
-	// Unmarshal a V3 error response and convert it into a V2 model
-	var cfErrorsV3 CloudFoundryErrorsV3
-	if err := json.Unmarshal(body, &cfErrorsV3); err != nil {
-		return resp, CloudFoundryHTTPError{
-			StatusCode: resp.StatusCode,
-			Status:     resp.Status,
-			Body:       body,
-		}
-	}
-	return nil, NewCloudFoundryErrorFromV3Errors(cfErrorsV3)
-}
-
-func (c *Client) refreshEndpoint() error {
-	// we want to keep the Timeout value from config.HttpClient
-	timeout := c.Config.HttpClient.Timeout
-
-	ctx := context.Background()
-	ctx = context.WithValue(ctx, oauth2.HTTPClient, c.Config.HttpClient)
-
-	endpoint, err := getInfo(c.Config.ApiAddress, oauth2.NewClient(ctx, nil))
-
-	if err != nil {
-		return errors.Wrap(err, "Could not get api /v2/info")
-	}
-
-	switch {
-	case c.Config.Token != "":
-		c.Config = getUserTokenAuth(ctx, c.Config, endpoint)
-	case c.Config.ClientID != "":
-		c.Config = getClientAuth(ctx, c.Config, endpoint)
-	default:
-		c.Config, err = getUserAuth(ctx, c.Config, endpoint)
-		if err != nil {
-			return err
-		}
-	}
-	// make sure original Timeout value will be used
-	if c.Config.HttpClient.Timeout != timeout {
-		c.Config.HttpClient.Timeout = timeout
-	}
-
-	c.Endpoint = *endpoint
-	return nil
-}
-
-// toHTTP converts the request to an HTTP Request
-func (r *Request) toHTTP() (*http.Request, error) {
+// toHTTP converts the request to an HTTP request
+func (r *request) toHTTP() (*http.Request, error) {
 
 	// Check if we should encode the body
 	if r.body == nil && r.obj != nil {
@@ -371,7 +294,7 @@ func (r *Request) toHTTP() (*http.Request, error) {
 		r.body = b
 	}
 
-	// Create the HTTP Request
+	// Create the HTTP request
 	return http.NewRequest(r.method, r.url, r.body)
 }
 
@@ -393,13 +316,7 @@ func encodeBody(obj interface{}) (io.Reader, error) {
 }
 
 func (c *Client) GetToken() (string, error) {
-	if c.Config.tokenSourceDeadline != nil && c.Config.tokenSourceDeadline.Before(time.Now()) {
-		if err := c.refreshEndpoint(); err != nil {
-			return "", err
-		}
-	}
-
-	token, err := c.Config.TokenSource.Token()
+	token, err := c.config.TokenSource.Token()
 	if err != nil {
 		return "", errors.Wrap(err, "Error getting bearer token")
 	}

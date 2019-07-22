@@ -15,16 +15,7 @@ func init() {
 
 // queryCallback used to query data from database
 func queryCallback(scope *Scope) {
-	if _, skip := scope.InstanceGet("gorm:skip_query_callback"); skip {
-		return
-	}
-
-	//we are only preloading relations, dont touch base model
-	if _, skip := scope.InstanceGet("gorm:only_preload"); skip {
-		return
-	}
-
-	defer scope.trace(scope.db.nowFunc())
+	defer scope.trace(NowFunc())
 
 	var (
 		isSlice, isPtr bool
@@ -39,7 +30,7 @@ func queryCallback(scope *Scope) {
 	}
 
 	if value, ok := scope.Get("gorm:query_destination"); ok {
-		results = indirect(reflect.ValueOf(value))
+		results = reflect.Indirect(reflect.ValueOf(value))
 	}
 
 	if kind := results.Kind(); kind == reflect.Slice {
@@ -87,9 +78,7 @@ func queryCallback(scope *Scope) {
 				}
 			}
 
-			if err := rows.Err(); err != nil {
-				scope.Err(err)
-			} else if scope.db.RowsAffected == 0 && !isSlice {
+			if scope.db.RowsAffected == 0 && !isSlice {
 				scope.Err(ErrRecordNotFound)
 			}
 		}

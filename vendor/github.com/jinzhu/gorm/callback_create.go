@@ -31,26 +31,16 @@ func beforeCreateCallback(scope *Scope) {
 // updateTimeStampForCreateCallback will set `CreatedAt`, `UpdatedAt` when creating
 func updateTimeStampForCreateCallback(scope *Scope) {
 	if !scope.HasError() {
-		now := scope.db.nowFunc()
-
-		if createdAtField, ok := scope.FieldByName("CreatedAt"); ok {
-			if createdAtField.IsBlank {
-				createdAtField.Set(now)
-			}
-		}
-
-		if updatedAtField, ok := scope.FieldByName("UpdatedAt"); ok {
-			if updatedAtField.IsBlank {
-				updatedAtField.Set(now)
-			}
-		}
+		now := NowFunc()
+		scope.SetColumn("CreatedAt", now)
+		scope.SetColumn("UpdatedAt", now)
 	}
 }
 
 // createCallback the callback used to insert data into database
 func createCallback(scope *Scope) {
 	if !scope.HasError() {
-		defer scope.trace(scope.db.nowFunc())
+		defer scope.trace(NowFunc())
 
 		var (
 			columns, placeholders        []string
@@ -59,13 +49,15 @@ func createCallback(scope *Scope) {
 
 		for _, field := range scope.Fields() {
 			if scope.changeableField(field) {
-				if field.IsNormal && !field.IsIgnored {
-					if field.IsBlank && field.HasDefaultValue {
-						blankColumnsWithDefaultValue = append(blankColumnsWithDefaultValue, scope.Quote(field.DBName))
-						scope.InstanceSet("gorm:blank_columns_with_default_value", blankColumnsWithDefaultValue)
-					} else if !field.IsPrimaryKey || !field.IsBlank {
-						columns = append(columns, scope.Quote(field.DBName))
-						placeholders = append(placeholders, scope.AddToVars(field.Field.Interface()))
+				if field.IsNormal {
+					if !field.IsPrimaryKey || !field.IsBlank {
+						if field.IsBlank && field.HasDefaultValue {
+							blankColumnsWithDefaultValue = append(blankColumnsWithDefaultValue, field.DBName)
+							scope.InstanceSet("gorm:blank_columns_with_default_value", blankColumnsWithDefaultValue)
+						} else {
+							columns = append(columns, scope.Quote(field.DBName))
+							placeholders = append(placeholders, scope.AddToVars(field.Field.Interface()))
+						}
 					}
 				} else if field.Relationship != nil && field.Relationship.Kind == "belongs_to" {
 					for _, foreignKey := range field.Relationship.ForeignDBNames {
@@ -83,17 +75,10 @@ func createCallback(scope *Scope) {
 			quotedTableName = scope.QuotedTableName()
 			primaryField    = scope.PrimaryField()
 			extraOption     string
-			insertModifier  string
 		)
 
 		if str, ok := scope.Get("gorm:insert_option"); ok {
 			extraOption = fmt.Sprint(str)
-		}
-		if str, ok := scope.Get("gorm:insert_modifier"); ok {
-			insertModifier = strings.ToUpper(fmt.Sprint(str))
-			if insertModifier == "INTO" {
-				insertModifier = ""
-			}
 		}
 
 		if primaryField != nil {
@@ -104,17 +89,14 @@ func createCallback(scope *Scope) {
 
 		if len(columns) == 0 {
 			scope.Raw(fmt.Sprintf(
-				"INSERT %v INTO %v %v%v%v",
-				addExtraSpaceIfExist(insertModifier),
+				"INSERT INTO %v DEFAULT VALUES%v%v",
 				quotedTableName,
-				scope.Dialect().DefaultValueStr(),
 				addExtraSpaceIfExist(extraOption),
 				addExtraSpaceIfExist(lastInsertIDReturningSuffix),
 			))
 		} else {
 			scope.Raw(fmt.Sprintf(
-				"INSERT %v INTO %v (%v) VALUES (%v)%v%v",
-				addExtraSpaceIfExist(insertModifier),
+				"INSERT INTO %v (%v) VALUES (%v)%v%v",
 				scope.QuotedTableName(),
 				strings.Join(columns, ","),
 				strings.Join(placeholders, ","),
@@ -137,13 +119,8 @@ func createCallback(scope *Scope) {
 				}
 			}
 		} else {
-			if primaryField.Field.CanAddr() {
-				if err := scope.SQLDB().QueryRow(scope.SQL, scope.SQLVars...).Scan(primaryField.Field.Addr().Interface()); scope.Err(err) == nil {
-					primaryField.IsBlank = false
-					scope.db.RowsAffected = 1
-				}
-			} else {
-				scope.Err(ErrUnaddressable)
+			if err := scope.SQLDB().QueryRow(scope.SQL, scope.SQLVars...).Scan(primaryField.Field.Addr().Interface()); scope.Err(err) == nil {
+				scope.db.RowsAffected = 1
 			}
 		}
 	}
@@ -152,13 +129,7 @@ func createCallback(scope *Scope) {
 // forceReloadAfterCreateCallback will reload columns that having default value, and set it back to current object
 func forceReloadAfterCreateCallback(scope *Scope) {
 	if blankColumnsWithDefaultValue, ok := scope.InstanceGet("gorm:blank_columns_with_default_value"); ok {
-		db := scope.DB().New().Table(scope.TableName()).Select(blankColumnsWithDefaultValue.([]string))
-		for _, field := range scope.Fields() {
-			if field.IsPrimaryKey && !field.IsBlank {
-				db = db.Where(fmt.Sprintf("%v = ?", field.DBName), field.Field.Interface())
-			}
-		}
-		db.Scan(scope.Value)
+		scope.DB().New().Select(blankColumnsWithDefaultValue.([]string)).First(scope.Value)
 	}
 }
 
