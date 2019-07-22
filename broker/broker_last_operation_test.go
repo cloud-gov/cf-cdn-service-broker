@@ -35,6 +35,7 @@ type LastOperationSuite struct {
 func (s *LastOperationSuite) SetupTest() {
 	s.Manager = mocks.RouteManagerIface{}
 	s.cfclient = cfmock.Client{}
+	s.logger = lager.NewLogger("test")
 	s.Broker = broker.New(
 		&s.Manager,
 		&s.cfclient,
