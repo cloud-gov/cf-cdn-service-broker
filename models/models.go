@@ -19,9 +19,9 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/lager"
+	"github.com/18F/cf-cdn-service-broker/lego/acme"
 	"github.com/jinzhu/gorm"
 	"github.com/pivotal-cf/brokerapi"
-	"github.com/18F/cf-cdn-service-broker/lego/acme"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -757,6 +757,12 @@ func (m *RouteManager) checkDistribution(r *Route) bool {
 }
 
 func (m *RouteManager) solveChallenges(clients map[acme.Challenge]*acme.Client, challenges []acme.AuthorizationResource) map[string]error {
+	startTime := time.Now()
+	lsession := m.logger.Session("solve-challenges", lager.Data{
+		"start_time": startTime.String(),
+	})
+	lsession.Info("solve-challenges-start")
+
 	errs := make(chan map[string]error)
 
 	for _, client := range clients {
@@ -768,9 +774,12 @@ func (m *RouteManager) solveChallenges(clients map[acme.Challenge]*acme.Client, 
 	var failures map[string]error
 	for challenge := range clients {
 		failures = <-errs
-		m.logger.Info("solve-challenges", lager.Data{
+		endTime := time.Now()
+		lsession.Info("solve-challenges-results", lager.Data{
 			"challenge": challenge,
 			"failures":  failures,
+			"end_time":  endTime.String(),
+			"duration":  endTime.Sub(startTime).String(),
 		})
 		if len(failures) == 0 {
 			return failures
@@ -783,55 +792,81 @@ func (m *RouteManager) solveChallenges(clients map[acme.Challenge]*acme.Client, 
 func (m *RouteManager) deployCertificate(route Route, cert acme.CertificateResource) error {
 	lsession := m.logger.Session("deploy-certificate", lager.Data{
 		"instance-id": route.InstanceId,
+		"domains":     route.GetDomains(),
+		"dist":        route.DistId,
 	})
 
+	lsession.Info("get-cert-expiry")
 	expires, err := acme.GetPEMCertExpiration(cert.Certificate)
 	if err != nil {
-		lsession.Error("get-cert-expiry", err)
+		lsession.Error("get-cert-expiry-err", err)
 		return err
 	}
 
 	name := fmt.Sprintf("cdn-route-%s-%s", route.InstanceId, expires.Format("2006-01-02_15-04-05"))
-
-	m.logger.Info("Uploading certificate to IAM", lager.Data{"name": name})
-
+	lsession.Info("iam-upload-certificate", lager.Data{"name": name})
 	certId, err := m.iam.UploadCertificate(name, cert)
 	if err != nil {
-		lsession.Error("iam-upload-certificate", err)
+		lsession.Error("iam-upload-certificate-err", err, lager.Data{
+			"name": name,
+		})
 		return err
 	}
 
-	return m.cloudFront.SetCertificateAndCname(route.DistId, certId, route.GetDomains())
+	lsession.Info("iam-set-certificate-and-cname", lager.Data{
+		"name":    name,
+		"cert_id": certId,
+	})
+	err = m.cloudFront.SetCertificateAndCname(route.DistId, certId, route.GetDomains())
+	if err != nil {
+		lsession.Info("iam-set-certificate-and-cname-err", lager.Data{
+			"name":    name,
+			"cert_id": certId,
+			"err":     err,
+		})
+		return err
+	}
+	return nil
 }
 
 func (m *RouteManager) ensureChallenges(route *Route, client *acme.Client, update bool) error {
 	lsession := m.logger.Session("ensure-challenges", lager.Data{
 		"instance-id": route.InstanceId,
+		"domains":     route.GetDomains(),
 	})
 
-	if len(route.ChallengeJSON) == 0 {
-		challenges, errs := client.GetChallenges(route.GetDomains())
-		if len(errs) > 0 {
-			err := fmt.Errorf("Error(s) getting challenges: %v", errs)
-			lsession.Error("get-challenges", err)
-			return err
-		}
-
-		var err error
-		route.ChallengeJSON, err = json.Marshal(challenges)
-		if err != nil {
-			lsession.Error("json-marshal-challenge", err)
-			return err
-		}
-
-		if update {
-			err := m.db.Save(route).Error
-			lsession.Error("db-save-route-challenge", err)
-			return err
-		}
+	if len(route.ChallengeJSON) > 0 {
+		lsession.Info("challenge-json-was-already-present")
 		return nil
 	}
 
+	lsession.Info("get-challenges")
+	challenges, errs := client.GetChallenges(route.GetDomains())
+	if len(errs) > 0 {
+		err := fmt.Errorf("Error(s) getting challenges: %v", errs)
+		lsession.Error("get-challenges-err", err)
+		return err
+	}
+
+	var err error
+	route.ChallengeJSON, err = json.Marshal(challenges)
+	if err != nil {
+		lsession.Error("json-marshal-challenge-err", err)
+		return err
+	}
+
+	if !update {
+		lsession.Info("not-updating")
+		return nil
+	}
+
+	lsession.Info("db-save-route-challenge")
+	err = m.db.Save(route).Error
+	if err != nil {
+		lsession.Error("db-save-route-challenge-err", err)
+	}
+
+	lsession.Info("updated")
 	return nil
 }
 
@@ -841,11 +876,13 @@ func (m *RouteManager) GetDNSInstructions(route *Route) ([]string, error) {
 
 	lsession := m.logger.Session("get-dns-instructions", lager.Data{
 		"instance-id": route.InstanceId,
+		"domains":     route.GetDomains(),
 	})
 
+	lsession.Info("load-user")
 	user, err := route.loadUser(m.db)
 	if err != nil {
-		lsession.Error("load-user", err)
+		lsession.Error("load-user-err", err)
 		return instructions, err
 	}
 
@@ -853,12 +890,15 @@ func (m *RouteManager) GetDNSInstructions(route *Route) ([]string, error) {
 		lsession.Error("json-unmarshal-challenge", err)
 		return instructions, err
 	}
+
+	lsession.Info("get-key-authorization")
 	for _, auth := range challenges {
 		for _, challenge := range auth.Body.Challenges {
 			if challenge.Type == acme.DNS01 {
+				lsession.Info("get-key-authorization-for-a-dns-challenge", lager.Data{"domain": auth.Domain})
 				keyAuth, err := acme.GetKeyAuthorization(challenge.Token, user.GetPrivateKey())
 				if err != nil {
-					lsession.Error("get-key-authorization", err)
+					lsession.Error("get-key-authorization-err", err)
 					return instructions, err
 				}
 				fqdn, value, ttl := acme.DNS01Record(auth.Domain, keyAuth)
