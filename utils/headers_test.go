@@ -1,23 +1,25 @@
-package utils
+package utils_test
 
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"github.com/18F/cf-cdn-service-broker/utils"
 )
 
 var _ = Describe("Headers", func() {
 	Context("Add", func() {
 		It("adds", func() {
-			headers := Headers{}
+			headers := utils.Headers{}
 			headers.Add("abc-def")
 
-			Expect(headers).To(Equal(Headers{"Abc-Def": true}))
+			Expect(headers).To(Equal(utils.Headers{"Abc-Def": true}))
 		})
 	})
 
 	Context("Contains", func() {
 		It("contains", func() {
-			headers := Headers{"Abc-Def": true}
+			headers := utils.Headers{"Abc-Def": true}
 
 			Expect(headers.Contains("Abc-Def")).To(Equal(true))
 			Expect(headers.Contains("Ghi-Jkl")).To(Equal(false))
@@ -26,7 +28,7 @@ var _ = Describe("Headers", func() {
 
 	Context("Strings", func() {
 		It("strings", func() {
-			headers := Headers{"Abc-Def": true, "User-Agent": true}
+			headers := utils.Headers{"Abc-Def": true, "User-Agent": true}
 			headerStrings := headers.Strings()
 
 			Expect(headerStrings).To(ContainElement("Abc-Def"))
