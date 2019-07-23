@@ -3,8 +3,6 @@ package broker_test
 import (
 	"context"
 	"errors"
-	"strings"
-	"testing"
 
 	"github.com/stretchr/testify/suite"
 
@@ -16,11 +14,10 @@ import (
 	"github.com/18F/cf-cdn-service-broker/config"
 	"github.com/18F/cf-cdn-service-broker/models"
 	"github.com/18F/cf-cdn-service-broker/models/mocks"
-)
 
-func TestLastOperation(t *testing.T) {
-	suite.Run(t, new(LastOperationSuite))
-}
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+)
 
 type LastOperationSuite struct {
 	suite.Suite
@@ -32,101 +29,107 @@ type LastOperationSuite struct {
 	ctx      context.Context
 }
 
-func (s *LastOperationSuite) SetupTest() {
-	s.Manager = mocks.RouteManagerIface{}
-	s.cfclient = cfmock.Client{}
-	s.logger = lager.NewLogger("test")
-	s.Broker = broker.New(
-		&s.Manager,
-		&s.cfclient,
-		s.settings,
-		s.logger,
-	)
-	s.ctx = context.Background()
-}
+var _ = Describe("Last operation", func() {
+	var s *LastOperationSuite = &LastOperationSuite{}
 
-func (s *LastOperationSuite) TestLastOperationMissing() {
-	manager := mocks.RouteManagerIface{}
-	manager.On("Get", "").Return(&models.Route{}, errors.New("not found"))
-	b := broker.New(
-		&manager,
-		&s.cfclient,
-		s.settings,
-		s.logger,
-	)
+	BeforeEach(func() {
+		s.Manager = mocks.RouteManagerIface{}
+		s.cfclient = cfmock.Client{}
+		s.logger = lager.NewLogger("test")
+		s.Broker = broker.New(
+			&s.Manager,
+			&s.cfclient,
+			s.settings,
+			s.logger,
+		)
+		s.ctx = context.Background()
+	})
 
-	operation, err := b.LastOperation(s.ctx, "", "")
-	s.Equal(operation.State, brokerapi.Failed)
-	s.Equal(operation.Description, "Service instance not found")
-	s.Nil(err)
-}
+	It("Should fail when the routes are missing", func() {
+		manager := mocks.RouteManagerIface{}
+		manager.On("Get", "").Return(&models.Route{}, errors.New("not found"))
+		b := broker.New(
+			&manager,
+			&s.cfclient,
+			s.settings,
+			s.logger,
+		)
 
-func (s *LastOperationSuite) TestLastOperationSucceeded() {
-	manager := mocks.RouteManagerIface{}
-	route := &models.Route{
-		State:          models.Provisioned,
-		DomainExternal: "cdn.cloud.gov",
-		DomainInternal: "abc.cloudfront.net",
-		Origin:         "cdn.apps.cloud.gov",
-	}
-	manager.On("Get", "123").Return(route, nil)
-	manager.On("Poll", route).Return(nil)
-	b := broker.New(
-		&manager,
-		&s.cfclient,
-		s.settings,
-		s.logger,
-	)
+		operation, err := b.LastOperation(s.ctx, "", "")
+		Expect(operation.State).To(Equal(brokerapi.Failed))
+		Expect(operation.Description).To(Equal("Service instance not found"))
+		Expect(err).NotTo(HaveOccurred())
+	})
 
-	operation, err := b.LastOperation(s.ctx, "123", "")
-	s.Equal(operation.State, brokerapi.Succeeded)
-	s.Equal(operation.Description, "Service instance provisioned [cdn.cloud.gov => cdn.apps.cloud.gov]; CDN domain abc.cloudfront.net")
-	s.Nil(err)
-}
+	It("Should succeed when provisioned", func() {
+		manager := mocks.RouteManagerIface{}
+		route := &models.Route{
+			State:          models.Provisioned,
+			DomainExternal: "cdn.cloud.gov",
+			DomainInternal: "abc.cloudfront.net",
+			Origin:         "cdn.apps.cloud.gov",
+		}
+		manager.On("Get", "123").Return(route, nil)
+		manager.On("Poll", route).Return(nil)
+		b := broker.New(
+			&manager,
+			&s.cfclient,
+			s.settings,
+			s.logger,
+		)
 
-func (s *LastOperationSuite) TestLastOperationProvisioning() {
-	manager := mocks.RouteManagerIface{}
-	route := &models.Route{
-		State:          models.Provisioning,
-		DomainExternal: "cdn.cloud.gov",
-		Origin:         "cdn.apps.cloud.gov",
-		ChallengeJSON:  []byte("[]"),
-	}
-	manager.On("Get", "123").Return(route, nil)
-	manager.On("GetDNSInstructions", route).Return([]string{"token"}, nil)
-	manager.On("Poll", route).Return(nil)
-	b := broker.New(
-		&manager,
-		&s.cfclient,
-		s.settings,
-		s.logger,
-	)
+		operation, err := b.LastOperation(s.ctx, "123", "")
+		Expect(operation.State).To(Equal(brokerapi.Succeeded))
+		Expect(operation.Description).To(Equal("Service instance provisioned [cdn.cloud.gov => cdn.apps.cloud.gov]; CDN domain abc.cloudfront.net"))
+		Expect(err).NotTo(HaveOccurred())
+	})
 
-	operation, err := b.LastOperation(s.ctx, "123", "")
-	s.Equal(operation.State, brokerapi.InProgress)
-	s.True(strings.Contains(operation.Description, "Provisioning in progress [cdn.cloud.gov => cdn.apps.cloud.gov]"))
-	s.Nil(err)
-}
+	It("Should be in progress when provisioning", func() {
+		manager := mocks.RouteManagerIface{}
+		route := &models.Route{
+			State:          models.Provisioning,
+			DomainExternal: "cdn.cloud.gov",
+			Origin:         "cdn.apps.cloud.gov",
+			ChallengeJSON:  []byte("[]"),
+		}
+		manager.On("Get", "123").Return(route, nil)
+		manager.On("GetDNSInstructions", route).Return([]string{"token"}, nil)
+		manager.On("Poll", route).Return(nil)
+		b := broker.New(
+			&manager,
+			&s.cfclient,
+			s.settings,
+			s.logger,
+		)
 
-func (s *LastOperationSuite) TestLastOperationDeprovisioning() {
-	manager := mocks.RouteManagerIface{}
-	route := &models.Route{
-		State:          models.Deprovisioning,
-		DomainExternal: "cdn.cloud.gov",
-		DomainInternal: "abc.cloudfront.net",
-		Origin:         "cdn.apps.cloud.gov",
-	}
-	manager.On("Get", "123").Return(route, nil)
-	manager.On("Poll", route).Return(nil)
-	b := broker.New(
-		&manager,
-		&s.cfclient,
-		s.settings,
-		s.logger,
-	)
+		operation, err := b.LastOperation(s.ctx, "123", "")
+		Expect(operation.State).To(Equal(brokerapi.InProgress))
+		Expect(operation.Description).To(ContainSubstring(operation.Description))
+		Expect(operation.Description).To(ContainSubstring("Provisioning in progress [cdn.cloud.gov => cdn.apps.cloud.gov]"))
+		Expect(err).NotTo(HaveOccurred())
+	})
 
-	operation, err := b.LastOperation(s.ctx, "123", "")
-	s.Equal(operation.State, brokerapi.InProgress)
-	s.Equal(operation.Description, "Deprovisioning in progress [cdn.cloud.gov => cdn.apps.cloud.gov]; CDN domain abc.cloudfront.net")
-	s.Nil(err)
-}
+	It("Should be in progress when deprovisioning", func() {
+		manager := mocks.RouteManagerIface{}
+		route := &models.Route{
+			State:          models.Deprovisioning,
+			DomainExternal: "cdn.cloud.gov",
+			DomainInternal: "abc.cloudfront.net",
+			Origin:         "cdn.apps.cloud.gov",
+		}
+		manager.On("Get", "123").Return(route, nil)
+		manager.On("Poll", route).Return(nil)
+		b := broker.New(
+			&manager,
+			&s.cfclient,
+			s.settings,
+			s.logger,
+		)
+
+		operation, err := b.LastOperation(s.ctx, "123", "")
+		Expect(operation.State).To(Equal(brokerapi.InProgress))
+		Expect(operation.Description).To(Equal("Deprovisioning in progress [cdn.cloud.gov => cdn.apps.cloud.gov]; CDN domain abc.cloudfront.net"))
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+})
