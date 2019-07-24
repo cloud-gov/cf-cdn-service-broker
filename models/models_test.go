@@ -209,7 +209,7 @@ var _ = Describe("Models", func() {
 		mui.Settings = settings
 		mui.Service = fakeiam
 
-		// expect the orphaned certs to be deleted
+		// expect the orphaned certs to fail to be deleted
 		mui.On("DeleteCertificate", "some-orphaned-cert").Return(errors.New("DeleteCertificate error"))
 
 		m := models.NewManager(
