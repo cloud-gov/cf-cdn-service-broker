@@ -1,39 +1,39 @@
 package utils_test
 
 import (
-	"testing"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 
-	"github.com/stretchr/testify/suite"
-
-	. "github.com/18F/cf-cdn-service-broker/utils"
+	"github.com/18F/cf-cdn-service-broker/utils"
 )
 
-func TestHeaders(t *testing.T) {
-	suite.Run(t, new(HeadersSuite))
-}
+var _ = Describe("Headers", func() {
+	Context("Add", func() {
+		It("adds", func() {
+			headers := utils.Headers{}
+			headers.Add("abc-def")
 
-type HeadersSuite struct {
-	suite.Suite
-}
+			Expect(headers).To(Equal(utils.Headers{"Abc-Def": true}))
+		})
+	})
 
-func (h *HeadersSuite) SetupTest() {}
+	Context("Contains", func() {
+		It("contains", func() {
+			headers := utils.Headers{"Abc-Def": true}
 
-func (h *HeadersSuite) TestAdd() {
-	headers := Headers{}
-	headers.Add("abc-def")
-	h.Equal(headers, Headers{"Abc-Def": true})
-}
+			Expect(headers.Contains("Abc-Def")).To(Equal(true))
+			Expect(headers.Contains("Ghi-Jkl")).To(Equal(false))
+		})
+	})
 
-func (h *HeadersSuite) TestContains() {
-	headers := Headers{"Abc-Def": true}
-	h.True(headers.Contains("Abc-Def"))
-	h.False(headers.Contains("Ghi-Jkl"))
-}
+	Context("Strings", func() {
+		It("strings", func() {
+			headers := utils.Headers{"Abc-Def": true, "User-Agent": true}
+			headerStrings := headers.Strings()
 
-func (h *HeadersSuite) TestStrings() {
-	headers := Headers{"Abc-Def": true, "User-Agent": true}
-	headerStrings := headers.Strings()
-	h.Contains(headerStrings, "Abc-Def")
-	h.Contains(headerStrings, "User-Agent")
-	h.Equal(len(headerStrings), 2)
-}
+			Expect(headerStrings).To(ContainElement("Abc-Def"))
+			Expect(headerStrings).To(ContainElement("User-Agent"))
+			Expect(headerStrings).To(HaveLen(2))
+		})
+	})
+})

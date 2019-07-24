@@ -3,7 +3,6 @@ package broker_test
 import (
 	"context"
 	"errors"
-	"testing"
 
 	"github.com/stretchr/testify/suite"
 
@@ -17,11 +16,10 @@ import (
 	"github.com/18F/cf-cdn-service-broker/models"
 	"github.com/18F/cf-cdn-service-broker/models/mocks"
 	"github.com/18F/cf-cdn-service-broker/utils"
-)
 
-func TestProvisioning(t *testing.T) {
-	suite.Run(t, new(ProvisionSuite))
-}
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+)
 
 type ProvisionSuite struct {
 	suite.Suite
@@ -31,132 +29,6 @@ type ProvisionSuite struct {
 	settings config.Settings
 	logger   lager.Logger
 	ctx      context.Context
-}
-
-func (s *ProvisionSuite) SetupTest() {
-	s.Manager = mocks.RouteManagerIface{}
-	s.cfclient = cfmock.Client{}
-	s.logger = lager.NewLogger("test")
-	s.settings = config.Settings{
-		DefaultOrigin: "origin.cloud.gov",
-	}
-	s.Broker = broker.New(
-		&s.Manager,
-		&s.cfclient,
-		s.settings,
-		s.logger,
-	)
-	s.ctx = context.Background()
-
-	s.cfclient.On("GetOrgByGuid", "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5").Return(cfclient.Org{Name: "my-org"}, nil)
-
-}
-
-func (s *ProvisionSuite) TestSync() {
-	_, err := s.Broker.Provision(s.ctx, "", brokerapi.ProvisionDetails{}, false)
-	s.Equal(err, brokerapi.ErrAsyncRequired)
-}
-
-func (s *ProvisionSuite) TestWithoutDetails() {
-	_, err := s.Broker.Provision(s.ctx, "", brokerapi.ProvisionDetails{}, true)
-	s.NotNil(err)
-	s.Equal(err.Error(), "must be invoked with configuration parameters")
-}
-
-func (s *ProvisionSuite) TestWithoutOptions() {
-	details := brokerapi.ProvisionDetails{
-		RawParameters: []byte(`{}`),
-	}
-	_, err := s.Broker.Provision(s.ctx, "", details, true)
-	s.NotNil(err)
-	s.Equal(err.Error(), "must pass non-empty `domain`")
-}
-
-func (s *ProvisionSuite) TestInstanceExists() {
-	route := &models.Route{
-		State: models.Provisioned,
-	}
-	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
-	s.Manager.On("Get", "123").Return(route, nil)
-
-	details := brokerapi.ProvisionDetails{
-		RawParameters: []byte(`{"domain": "domain.gov"}`),
-	}
-	_, err := s.Broker.Provision(s.ctx, "123", details, true)
-	s.Equal(err, brokerapi.ErrInstanceAlreadyExists)
-}
-
-func (s *ProvisionSuite) TestSuccess() {
-	s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
-	route := &models.Route{State: models.Provisioning}
-	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
-	s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", "", false, utils.Headers{"Host": true}, true,
-		map[string]string{"Organization": "", "Space": "", "Service": "", "Plan": ""}).Return(route, nil)
-
-	details := brokerapi.ProvisionDetails{
-		RawParameters: []byte(`{"domain": "domain.gov"}`),
-	}
-	_, err := s.Broker.Provision(s.ctx, "123", details, true)
-	s.Nil(err)
-}
-
-func (s *ProvisionSuite) TestSuccessCustomOrigin() {
-	s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
-	route := &models.Route{State: models.Provisioning}
-	s.Manager.On("Create", "123", "domain.gov", "custom.cloud.gov", "", false, utils.Headers{}, true,
-		map[string]string{"Organization": "", "Space": "", "Service": "", "Plan": ""}).Return(route, nil)
-
-	details := brokerapi.ProvisionDetails{
-		RawParameters: []byte(`{"domain": "domain.gov", "origin": "custom.cloud.gov"}`),
-	}
-	_, err := s.Broker.Provision(s.ctx, "123", details, true)
-	s.Nil(err)
-}
-
-func (s *ProvisionSuite) TestDomainNotExists() {
-	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, errors.New("fail"))
-	details := brokerapi.ProvisionDetails{
-		OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-		RawParameters:    []byte(`{"domain": "domain.gov"}`),
-	}
-	_, err := s.Broker.Provision(s.ctx, "123", details, true)
-	s.NotNil(err)
-	s.Contains(err.Error(), "cf create-domain")
-}
-
-func (s *ProvisionSuite) TestMultipleDomainsOneNotExists() {
-	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
-	s.cfclient.On("GetDomainByName", "domain2.gov").Return(cfclient.Domain{}, errors.New("fail"))
-	details := brokerapi.ProvisionDetails{
-		OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-		RawParameters:    []byte(`{"domain": "domain.gov,domain2.gov"}`),
-	}
-	_, err := s.Broker.Provision(s.ctx, "123", details, true)
-	s.NotNil(err)
-	s.Contains(err.Error(), "Domain does not exist")
-	s.NotContains(err.Error(), "domain.gov")
-	s.Contains(err.Error(), "domain2.gov")
-}
-
-func (s *ProvisionSuite) TestMultipleDomainsMoreThanOneNotExists() {
-	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
-	s.cfclient.On("GetDomainByName", "domain2.gov").Return(cfclient.Domain{}, errors.New("fail"))
-	s.cfclient.On("GetDomainByName", "domain3.gov").Return(cfclient.Domain{}, errors.New("fail"))
-	details := brokerapi.ProvisionDetails{
-		OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-		RawParameters:    []byte(`{"domain": "domain.gov,domain2.gov,domain3.gov"}`),
-	}
-	_, err := s.Broker.Provision(s.ctx, "123", details, true)
-	s.NotNil(err)
-	s.Contains(err.Error(), "Multiple domains do not exist")
-	s.NotContains(err.Error(), "domain.gov")
-	s.Contains(err.Error(), "domain2.gov")
-	s.Contains(err.Error(), "domain3.gov")
-}
-
-func (s *ProvisionSuite) setupTestOfHeaderForwarding() {
-	s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
-	s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 }
 
 func (s *ProvisionSuite) allowCreateWithExpectedHeaders(expectedHeaders utils.Headers) {
@@ -170,82 +42,224 @@ func (s *ProvisionSuite) failCreateWithExpectedHeaders(expectedHeaders utils.Hea
 		map[string]string{"Organization": "", "Space": "", "Service": "", "Plan": ""}).Return(nil, errors.New("fail"))
 }
 
-func (s *ProvisionSuite) TestSuccessForwardingDuplicatedHostHeader() {
-	s.setupTestOfHeaderForwarding()
-	s.allowCreateWithExpectedHeaders(utils.Headers{"Host": true})
+var _ = Describe("Last operation", func() {
+	var s *ProvisionSuite = &ProvisionSuite{}
 
-	details := brokerapi.ProvisionDetails{
-		RawParameters: []byte(`{"domain": "domain.gov", "headers": ["Host"]}`),
-	}
-	_, err := s.Broker.Provision(s.ctx, "123", details, true)
-	s.Nil(err)
-}
+	BeforeEach(func() {
+		s.Manager = mocks.RouteManagerIface{}
+		s.cfclient = cfmock.Client{}
+		s.logger = lager.NewLogger("test")
+		s.settings = config.Settings{
+			DefaultOrigin: "origin.cloud.gov",
+		}
+		s.Broker = broker.New(
+			&s.Manager,
+			&s.cfclient,
+			s.settings,
+			s.logger,
+		)
+		s.ctx = context.Background()
 
-func (s *ProvisionSuite) TestSuccessForwardedSingleHeader() {
-	s.setupTestOfHeaderForwarding()
-	s.allowCreateWithExpectedHeaders(utils.Headers{"User-Agent": true, "Host": true})
+		s.cfclient.On("GetOrgByGuid", "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5").Return(cfclient.Org{Name: "my-org"}, nil)
+	})
 
-	details := brokerapi.ProvisionDetails{
-		RawParameters: []byte(`{"domain": "domain.gov", "headers": ["User-Agent"]}`),
-	}
-	_, err := s.Broker.Provision(s.ctx, "123", details, true)
-	s.Nil(err)
-}
+	It("Should error when the broker is called synchronously", func() {
+		_, err := s.Broker.Provision(s.ctx, "", brokerapi.ProvisionDetails{}, false)
 
-func (s *ProvisionSuite) TestSuccessForwardingWildcardHeader() {
-	s.setupTestOfHeaderForwarding()
-	s.allowCreateWithExpectedHeaders(utils.Headers{"*": true})
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(brokerapi.ErrAsyncRequired))
+	})
 
-	details := brokerapi.ProvisionDetails{
-		RawParameters: []byte(`{"domain": "domain.gov", "headers": ["*"]}`),
-	}
-	_, err := s.Broker.Provision(s.ctx, "123", details, true)
-	s.Nil(err)
-}
+	It("Should error when the broker is called without config", func() {
+		_, err := s.Broker.Provision(s.ctx, "", brokerapi.ProvisionDetails{}, true)
 
-func (s *ProvisionSuite) TestSuccessNineForwardedHeaders() {
-	s.setupTestOfHeaderForwarding()
-	s.allowCreateWithExpectedHeaders(utils.Headers{"One": true, "Two": true, "Three": true, "Four": true, "Five": true, "Six": true, "Seven": true, "Eight": true, "Nine": true, "Host": true})
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(ContainSubstring("must be invoked with configuration parameters")))
+	})
 
-	details := brokerapi.ProvisionDetails{
-		RawParameters: []byte(`{"domain": "domain.gov", "headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"]}`),
-	}
-	_, err := s.Broker.Provision(s.ctx, "123", details, true)
-	s.Nil(err)
-}
+	It("Should error when the broker is called without a domain", func() {
+		details := brokerapi.ProvisionDetails{
+			RawParameters: []byte(`{}`),
+		}
+		_, err := s.Broker.Provision(s.ctx, "", details, true)
 
-func (s *ProvisionSuite) TestForwardedHeadersDuplicates() {
-	s.setupTestOfHeaderForwarding()
-	s.failCreateWithExpectedHeaders(utils.Headers{"User-Agent": true, "Host": true})
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(ContainSubstring("must pass non-empty `domain`")))
+	})
 
-	details := brokerapi.ProvisionDetails{
-		RawParameters: []byte(`{"domain": "domain.gov", "headers": ["User-Agent", "Host", "User-Agent"]}`),
-	}
-	_, err := s.Broker.Provision(s.ctx, "123", details, true)
-	s.NotNil(err)
-	s.Contains(err.Error(), "must not pass duplicated header 'User-Agent'")
-}
+	It("Should error when the broker is called with an already existing domain", func() {
+		route := &models.Route{
+			State: models.Provisioned,
+		}
+		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
+		s.Manager.On("Get", "123").Return(route, nil)
 
-func (s *ProvisionSuite) TestForwardedHeadersWhitelistAndWildcard() {
-	s.setupTestOfHeaderForwarding()
-	s.failCreateWithExpectedHeaders(utils.Headers{"*": true})
+		details := brokerapi.ProvisionDetails{
+			RawParameters: []byte(`{"domain": "domain.gov"}`),
+		}
+		_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
-	details := brokerapi.ProvisionDetails{
-		RawParameters: []byte(`{"domain": "domain.gov", "headers": ["*", "User-Agent"]}`),
-	}
-	_, err := s.Broker.Provision(s.ctx, "123", details, true)
-	s.NotNil(err)
-	s.Contains(err.Error(), "must not pass whitelisted headers alongside wildcard")
-}
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(brokerapi.ErrInstanceAlreadyExists))
+	})
 
-func (s *ProvisionSuite) TestForwardedHeadersMoreThanTen() {
-	s.setupTestOfHeaderForwarding()
-	s.failCreateWithExpectedHeaders(utils.Headers{"One": true, "Two": true, "Three": true, "Four": true, "Five": true, "Six": true, "Seven": true, "Eight": true, "Nine": true, "Ten": true, "Host": true})
+	It("Should succeed", func() {
+		s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
+		route := &models.Route{State: models.Provisioning}
+		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
+		s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", "", false, utils.Headers{"Host": true}, true,
+			map[string]string{"Organization": "", "Space": "", "Service": "", "Plan": ""}).Return(route, nil)
 
-	details := brokerapi.ProvisionDetails{
-		RawParameters: []byte(`{"domain": "domain.gov", "headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"]}`),
-	}
-	_, err := s.Broker.Provision(s.ctx, "123", details, true)
-	s.NotNil(err)
-	s.Contains(err.Error(), "must not set more than 10 headers; got 11")
-}
+		details := brokerapi.ProvisionDetails{
+			RawParameters: []byte(`{"domain": "domain.gov"}`),
+		}
+		_, err := s.Broker.Provision(s.ctx, "123", details, true)
+
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("Should succeed with a custom origin", func() {
+		s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
+		route := &models.Route{State: models.Provisioning}
+		s.Manager.On("Create", "123", "domain.gov", "custom.cloud.gov", "", false, utils.Headers{}, true,
+			map[string]string{"Organization": "", "Space": "", "Service": "", "Plan": ""}).Return(route, nil)
+
+		details := brokerapi.ProvisionDetails{
+			RawParameters: []byte(`{"domain": "domain.gov", "origin": "custom.cloud.gov"}`),
+		}
+		_, err := s.Broker.Provision(s.ctx, "123", details, true)
+
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("Should error when Cloud Foundry does not have the domain registered", func() {
+		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, errors.New("fail"))
+		details := brokerapi.ProvisionDetails{
+			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+			RawParameters:    []byte(`{"domain": "domain.gov"}`),
+		}
+		_, err := s.Broker.Provision(s.ctx, "123", details, true)
+
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(ContainSubstring("cf create-domain")))
+	})
+
+	It("Should error when given multiple domains one of which Cloud Foundry does not have registered", func() {
+		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
+		s.cfclient.On("GetDomainByName", "domain2.gov").Return(cfclient.Domain{}, errors.New("fail"))
+		details := brokerapi.ProvisionDetails{
+			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+			RawParameters:    []byte(`{"domain": "domain.gov,domain2.gov"}`),
+		}
+		_, err := s.Broker.Provision(s.ctx, "123", details, true)
+
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(ContainSubstring("Domain does not exist")))
+		Expect(err).NotTo(MatchError(ContainSubstring("domain.gov")))
+		Expect(err).To(MatchError(ContainSubstring("domain2.gov")))
+	})
+
+	It("Should error when given multiple domains many of which Cloud Foundry does not have registered", func() {
+		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
+		s.cfclient.On("GetDomainByName", "domain2.gov").Return(cfclient.Domain{}, errors.New("fail"))
+		s.cfclient.On("GetDomainByName", "domain3.gov").Return(cfclient.Domain{}, errors.New("fail"))
+		details := brokerapi.ProvisionDetails{
+			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+			RawParameters:    []byte(`{"domain": "domain.gov,domain2.gov,domain3.gov"}`),
+		}
+		_, err := s.Broker.Provision(s.ctx, "123", details, true)
+
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(ContainSubstring("Multiple domains do not exist")))
+		Expect(err).NotTo(MatchError(ContainSubstring("domain.gov")))
+		Expect(err).To(MatchError(ContainSubstring("domain2.gov")))
+		Expect(err).To(MatchError(ContainSubstring("domain3.gov")))
+	})
+
+	Context("Headers", func() {
+		BeforeEach(func() {
+			s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
+			s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
+		})
+
+		It("Should succeed forwarding duplicate host header", func() {
+			s.allowCreateWithExpectedHeaders(utils.Headers{"Host": true})
+
+			details := brokerapi.ProvisionDetails{
+				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["Host"]}`),
+			}
+			_, err := s.Broker.Provision(s.ctx, "123", details, true)
+
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("Should succeed forwarding a single header", func() {
+			s.allowCreateWithExpectedHeaders(utils.Headers{"User-Agent": true, "Host": true})
+
+			details := brokerapi.ProvisionDetails{
+				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["User-Agent"]}`),
+			}
+			_, err := s.Broker.Provision(s.ctx, "123", details, true)
+
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("Should succeed forwarding wildcard headers", func() {
+			s.allowCreateWithExpectedHeaders(utils.Headers{"*": true})
+
+			details := brokerapi.ProvisionDetails{
+				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["*"]}`),
+			}
+			_, err := s.Broker.Provision(s.ctx, "123", details, true)
+
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("Should succeed forwarding nine headers", func() {
+			s.allowCreateWithExpectedHeaders(utils.Headers{"One": true, "Two": true, "Three": true, "Four": true, "Five": true, "Six": true, "Seven": true, "Eight": true, "Nine": true, "Host": true})
+
+			details := brokerapi.ProvisionDetails{
+				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"]}`),
+			}
+			_, err := s.Broker.Provision(s.ctx, "123", details, true)
+
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("Should error when forwarding duplicate headers", func() {
+			s.failCreateWithExpectedHeaders(utils.Headers{"User-Agent": true, "Host": true})
+
+			details := brokerapi.ProvisionDetails{
+				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["User-Agent", "Host", "User-Agent"]}`),
+			}
+			_, err := s.Broker.Provision(s.ctx, "123", details, true)
+
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(ContainSubstring("must not pass duplicated header 'User-Agent'")))
+		})
+
+		It("Should error when forwarding wildcard headers and normal headers", func() {
+			s.failCreateWithExpectedHeaders(utils.Headers{"*": true})
+
+			details := brokerapi.ProvisionDetails{
+				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["*", "User-Agent"]}`),
+			}
+			_, err := s.Broker.Provision(s.ctx, "123", details, true)
+
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(ContainSubstring("must not pass whitelisted headers alongside wildcard")))
+		})
+
+		It("Should error when forwarding ten or more", func() {
+			s.failCreateWithExpectedHeaders(utils.Headers{"One": true, "Two": true, "Three": true, "Four": true, "Five": true, "Six": true, "Seven": true, "Eight": true, "Nine": true, "Ten": true, "Host": true})
+
+			details := brokerapi.ProvisionDetails{
+				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"]}`),
+			}
+			_, err := s.Broker.Provision(s.ctx, "123", details, true)
+
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(ContainSubstring("must not set more than 10 headers; got 11")))
+		})
+	})
+})

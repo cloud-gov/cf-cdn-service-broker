@@ -3,30 +3,31 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
-	"testing"
 
 	"code.cloudfoundry.org/lager"
 	"github.com/18F/cf-cdn-service-broker/broker"
 	"github.com/18F/cf-cdn-service-broker/config"
 	"github.com/pivotal-cf/brokerapi"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
-func TestHTTPHandler(t *testing.T) {
-	brokerAPI := brokerapi.New(
-		&broker.CdnServiceBroker{},
-		lager.NewLogger("main.test"),
-		brokerapi.BrokerCredentials{},
-	)
-	handler := bindHTTPHandlers(brokerAPI, config.Settings{})
-	req, err := http.NewRequest("GET", "http://example.com/healthcheck/http", nil)
-	if err != nil {
-		t.Error("Building new HTTP request: error should not have occurred")
-	}
+var _ = Describe("HTTPHandler", func() {
+	It("should handle HTTP correctly", func() {
+		brokerAPI := brokerapi.New(
+			&broker.CdnServiceBroker{},
+			lager.NewLogger("main.test"),
+			brokerapi.BrokerCredentials{},
+		)
+		handler := bindHTTPHandlers(brokerAPI, config.Settings{})
+		req, err := http.NewRequest("GET", "http://example.com/healthcheck/http", nil)
 
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, req)
+		Expect(err).NotTo(HaveOccurred())
 
-	if w.Code != 200 {
-		t.Errorf("HTTP response: response code was %d, expecting 200", w.Code)
-	}
-}
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		Expect(w.Code).To(Equal(200))
+	})
+})
