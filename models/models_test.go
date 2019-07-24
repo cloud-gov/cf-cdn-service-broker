@@ -158,7 +158,7 @@ var _ = Describe("Models", func() {
 		mui.AssertExpectations(GinkgoT())
 	})
 
-	It("should fail to delete orphaned certs", func() {
+	It("should handle AWS certificate deletion failure gracefully", func() {
 		logger := lager.NewLogger("cdn-cron-test")
 		logOutput := bytes.NewBuffer([]byte{})
 		logger.RegisterSink(lager.NewWriterSink(logOutput, lager.ERROR))
@@ -232,7 +232,7 @@ var _ = Describe("Models", func() {
 		)
 	})
 
-	It("should fail to delete orphaned certs when listing certificates fails", func() {
+	It("should handle AWS certificate deletion failure gracefully when listing certificates fails", func() {
 		logger := lager.NewLogger("cdn-cron-test")
 		logOutput := bytes.NewBuffer([]byte{})
 		logger.RegisterSink(lager.NewWriterSink(logOutput, lager.ERROR))
@@ -303,7 +303,7 @@ var _ = Describe("Models", func() {
 		)
 	})
 
-	It("should fail to delete orphaned certs when listing cloudfront distributions fails", func() {
+	It("should handle AWS certificate deletion failure gracefully when listing cloudfront distributions fails", func() {
 		logger := lager.NewLogger("cdn-cron-test")
 		logOutput := bytes.NewBuffer([]byte{})
 		logger.RegisterSink(lager.NewWriterSink(logOutput, lager.ERROR))
