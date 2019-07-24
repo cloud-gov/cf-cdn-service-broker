@@ -3,6 +3,7 @@ package models_test
 import (
 	"bytes"
 	"errors"
+	"github.com/18F/cf-cdn-service-broker/models/mocks"
 	"time"
 
 	"code.cloudfoundry.org/lager"
@@ -366,4 +367,73 @@ var _ = Describe("Models", func() {
 			"was expecting ListDistributions error to be logged",
 		)
 	})
+
+	Context("Poll", func() {
+
+		It("should perform only DNS01 challenges when domains are being created or updated", func() {
+			logger := lager.NewLogger("dns-01-test-only")
+			logger.RegisterSink(lager.NewWriterSink(GinkgoWriter, lager.ERROR))
+
+			settings, _ := config.NewSettings()
+			awsSession := session.New(nil)
+
+			fakecf := cloudfront.New(awsSession)
+			fakecf.Handlers.Clear()
+			fakecf.Handlers.Send.PushBack(func(r *request.Request) {
+				switch r.Operation.Name {
+				case "ListDistributions2016_11_25":
+					list := []*cloudfront.DistributionSummary{
+						{
+							Aliases: &cloudfront.Aliases{
+								Items: []*string{
+									aws.String("bar.paas.gov.uk"),
+									aws.String("baz.paas.gov.uk"),
+								},
+							},
+							DomainName: aws.String("foo.paas.gov.uk"),
+							Id:         aws.String("some-cloudfront-id"),
+						},
+					}
+					data := r.Data.(*cloudfront.ListDistributionsOutput)
+					data.DistributionList = &cloudfront.DistributionList{
+						IsTruncated: aws.Bool(false),
+						Items:       list,
+					}
+				}
+			})
+
+			fakeiam := iam.New(awsSession)
+			mui := new(MockUtilsIam)
+			mui.Settings = settings
+			mui.Service = fakeiam
+
+			acmeProviderMock := mocks.FakeAcmeClientProvider{}
+			dns01Client := mocks.FakeAcmeClient{}
+			http01Client := mocks.FakeAcmeClient{}
+
+			acmeProviderMock.GetDNS01ClientCalls(
+				func (user *utils.User, settings config.Settings) (*acme.ClientInterface, error){
+					return &dns01Client, nil
+				},
+			)
+			acmeProviderMock.GetHTTP01ClientReturns(http01Client, nil)
+
+			route := models.Route{
+				DomainInternal: "foo.pass.gov.uk,bar.paas.gov.uk,baz.paas.gov.ukß",
+				DistId:         "some-cloudfront-id",
+			}
+
+			manager := models.NewManager(
+				logger,
+				mui,
+				&utils.Distribution{settings, fakecf},
+				settings,
+				&gorm.DB{},
+			)
+
+			err := manager.Poll(&route)
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
 })

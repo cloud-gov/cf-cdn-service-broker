@@ -22,6 +22,7 @@ require (
 	github.com/lib/pq v0.0.0-20170324204654-2704adc878c2
 	github.com/martini-contrib/render v0.0.0-20150707142108-ec18f8345a11 // indirect
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
+	github.com/maxbrunsfeld/counterfeiter/v6 v6.2.2 // indirect
 	github.com/miekg/dns v0.0.0-20170412184748-6ebcb714d369
 	github.com/onsi/ginkgo v1.8.0
 	github.com/onsi/gomega v1.5.0
@@ -32,8 +33,7 @@ require (
 	github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a // indirect
 	github.com/stretchr/testify v1.3.0
 	golang.org/x/crypto v0.0.0-20190325154230-a5d413f7728c
-	golang.org/x/net v0.0.0-20190311183353-d8887717615a
+	golang.org/x/net v0.0.0-20190628185345-da137c7871d7
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45 // indirect
-	golang.org/x/sync v0.0.0-20190423024810-112230192c58 // indirect
 	gopkg.in/square/go-jose.v1 v1.1.0
 )
