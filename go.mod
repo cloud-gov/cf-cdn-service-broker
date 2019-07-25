@@ -4,6 +4,7 @@ go 1.12
 
 require (
 	code.cloudfoundry.org/lager v0.0.0-20170223024724-de8e9c6c6e47
+	github.com/DATA-DOG/go-sqlmock v1.3.3
 	github.com/aws/aws-sdk-go v1.6.27
 	github.com/cloudfoundry-community/go-cfclient v0.0.0-20170502130034-23156ed0e73b
 	github.com/codegangsta/inject v0.0.0-20150114235600-33e0aa1cb7c0 // indirect

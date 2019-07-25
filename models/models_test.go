@@ -2,6 +2,7 @@ package models_test
 
 import (
 	"bytes"
+	"database/sql"
 	"errors"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/18F/cf-cdn-service-broker/models/mocks"
 	"github.com/18F/cf-cdn-service-broker/utils"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/mock"
 
 	. "github.com/onsi/ginkgo"
@@ -57,6 +59,25 @@ func StubAcmeClientProvider() *mocks.FakeAcmeClientProvider {
 }
 
 var _ = Describe("Models", func() {
+	var gormDB *gorm.DB
+	var mockDB sqlmock.Sqlmock
+	var mockDBDB *sql.DB
+
+	BeforeEach(func() {
+		var err error
+
+		mockDBDB, mockDB, err = sqlmock.NewWithDSN("sqlmock_db_0")
+		Expect(err).NotTo(HaveOccurred(), "Could not sqlmock")
+
+		gormDB, err = gorm.Open("sqlmock", "sqlmock_db_0")
+		Expect(err).NotTo(HaveOccurred(), "Could not open sqlmock")
+	})
+
+	AfterEach(func() {
+		gormDB.Close()
+		mockDBDB.Close()
+	})
+
 	It("should delete orphaned certs", func() {
 		logger := lager.NewLogger("cdn-cron-test")
 		logOutput := bytes.NewBuffer([]byte{})
@@ -388,7 +409,6 @@ var _ = Describe("Models", func() {
 	})
 
 	Context("Create", func() {
-
 		It("should perform only DNS01 challenges", func() {
 			logger := lager.NewLogger("dns-01-test-only")
 			logger.RegisterSink(lager.NewWriterSink(GinkgoWriter, lager.ERROR))
@@ -409,23 +429,11 @@ var _ = Describe("Models", func() {
 			fakecf.Handlers.Clear()
 			fakecf.Handlers.Send.PushBack(func(r *request.Request) {
 				switch r.Operation.Name {
-				case "ListDistributions2016_11_25":
-					list := []*cloudfront.DistributionSummary{
-						{
-							Aliases: &cloudfront.Aliases{
-								Items: []*string{
-									aws.String("bar.paas.gov.uk"),
-									aws.String("baz.paas.gov.uk"),
-								},
-							},
-							DomainName: aws.String("foo.paas.gov.uk"),
-							Id:         aws.String("some-cloudfront-id"),
-						},
-					}
-					data := r.Data.(*cloudfront.ListDistributionsOutput)
-					data.DistributionList = &cloudfront.DistributionList{
-						IsTruncated: aws.Bool(false),
-						Items:       list,
+				case "CreateDistributionWithTags2016_11_25":
+					data := r.Data.(*cloudfront.CreateDistributionWithTagsOutput)
+					data.Distribution = &cloudfront.Distribution{
+						DomainName: aws.String("foo.paas.gov.uk"),
+						Id:         aws.String("cloudfront-distribution-id"),
 					}
 				}
 			})
@@ -437,12 +445,22 @@ var _ = Describe("Models", func() {
 
 			acmeProviderMock := StubAcmeClientProvider()
 
+			mockDB.ExpectExec(
+				`INSERT INTO "user_data"`,
+			).WillReturnResult(sqlmock.NewResult(1, 1))
+			mockDB.ExpectExec(
+				`UPDATE "user_data"`,
+			).WillReturnResult(sqlmock.NewResult(1, 1))
+			mockDB.ExpectExec(
+				`INSERT INTO "routes"`,
+			).WillReturnResult(sqlmock.NewResult(1, 1))
+
 			manager := models.NewManager(
 				logger,
 				mui,
 				&utils.Distribution{settings, fakecf},
 				settings,
-				&gorm.DB{},
+				gormDB,
 				acmeProviderMock,
 			)
 
