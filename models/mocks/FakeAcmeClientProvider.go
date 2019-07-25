@@ -11,39 +11,39 @@ import (
 )
 
 type FakeAcmeClientProvider struct {
-	GetDNS01ClientStub        func(*utils.User, config.Settings) (*acme.ClientInterface, error)
+	GetDNS01ClientStub        func(*utils.User, config.Settings) (acme.ClientInterface, error)
 	getDNS01ClientMutex       sync.RWMutex
 	getDNS01ClientArgsForCall []struct {
 		arg1 *utils.User
 		arg2 config.Settings
 	}
 	getDNS01ClientReturns struct {
-		result1 *acme.ClientInterface
+		result1 acme.ClientInterface
 		result2 error
 	}
 	getDNS01ClientReturnsOnCall map[int]struct {
-		result1 *acme.ClientInterface
+		result1 acme.ClientInterface
 		result2 error
 	}
-	GetHTTP01ClientStub        func(*utils.User, config.Settings) (*acme.ClientInterface, error)
+	GetHTTP01ClientStub        func(*utils.User, config.Settings) (acme.ClientInterface, error)
 	getHTTP01ClientMutex       sync.RWMutex
 	getHTTP01ClientArgsForCall []struct {
 		arg1 *utils.User
 		arg2 config.Settings
 	}
 	getHTTP01ClientReturns struct {
-		result1 *acme.ClientInterface
+		result1 acme.ClientInterface
 		result2 error
 	}
 	getHTTP01ClientReturnsOnCall map[int]struct {
-		result1 *acme.ClientInterface
+		result1 acme.ClientInterface
 		result2 error
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeAcmeClientProvider) GetDNS01Client(arg1 *utils.User, arg2 config.Settings) (*acme.ClientInterface, error) {
+func (fake *FakeAcmeClientProvider) GetDNS01Client(arg1 *utils.User, arg2 config.Settings) (acme.ClientInterface, error) {
 	fake.getDNS01ClientMutex.Lock()
 	ret, specificReturn := fake.getDNS01ClientReturnsOnCall[len(fake.getDNS01ClientArgsForCall)]
 	fake.getDNS01ClientArgsForCall = append(fake.getDNS01ClientArgsForCall, struct {
@@ -68,7 +68,7 @@ func (fake *FakeAcmeClientProvider) GetDNS01ClientCallCount() int {
 	return len(fake.getDNS01ClientArgsForCall)
 }
 
-func (fake *FakeAcmeClientProvider) GetDNS01ClientCalls(stub func(*utils.User, config.Settings) (*acme.ClientInterface, error)) {
+func (fake *FakeAcmeClientProvider) GetDNS01ClientCalls(stub func(*utils.User, config.Settings) (acme.ClientInterface, error)) {
 	fake.getDNS01ClientMutex.Lock()
 	defer fake.getDNS01ClientMutex.Unlock()
 	fake.GetDNS01ClientStub = stub
@@ -81,33 +81,33 @@ func (fake *FakeAcmeClientProvider) GetDNS01ClientArgsForCall(i int) (*utils.Use
 	return argsForCall.arg1, argsForCall.arg2
 }
 
-func (fake *FakeAcmeClientProvider) GetDNS01ClientReturns(result1 *acme.ClientInterface, result2 error) {
+func (fake *FakeAcmeClientProvider) GetDNS01ClientReturns(result1 acme.ClientInterface, result2 error) {
 	fake.getDNS01ClientMutex.Lock()
 	defer fake.getDNS01ClientMutex.Unlock()
 	fake.GetDNS01ClientStub = nil
 	fake.getDNS01ClientReturns = struct {
-		result1 *acme.ClientInterface
+		result1 acme.ClientInterface
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeAcmeClientProvider) GetDNS01ClientReturnsOnCall(i int, result1 *acme.ClientInterface, result2 error) {
+func (fake *FakeAcmeClientProvider) GetDNS01ClientReturnsOnCall(i int, result1 acme.ClientInterface, result2 error) {
 	fake.getDNS01ClientMutex.Lock()
 	defer fake.getDNS01ClientMutex.Unlock()
 	fake.GetDNS01ClientStub = nil
 	if fake.getDNS01ClientReturnsOnCall == nil {
 		fake.getDNS01ClientReturnsOnCall = make(map[int]struct {
-			result1 *acme.ClientInterface
+			result1 acme.ClientInterface
 			result2 error
 		})
 	}
 	fake.getDNS01ClientReturnsOnCall[i] = struct {
-		result1 *acme.ClientInterface
+		result1 acme.ClientInterface
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeAcmeClientProvider) GetHTTP01Client(arg1 *utils.User, arg2 config.Settings) (*acme.ClientInterface, error) {
+func (fake *FakeAcmeClientProvider) GetHTTP01Client(arg1 *utils.User, arg2 config.Settings) (acme.ClientInterface, error) {
 	fake.getHTTP01ClientMutex.Lock()
 	ret, specificReturn := fake.getHTTP01ClientReturnsOnCall[len(fake.getHTTP01ClientArgsForCall)]
 	fake.getHTTP01ClientArgsForCall = append(fake.getHTTP01ClientArgsForCall, struct {
@@ -132,7 +132,7 @@ func (fake *FakeAcmeClientProvider) GetHTTP01ClientCallCount() int {
 	return len(fake.getHTTP01ClientArgsForCall)
 }
 
-func (fake *FakeAcmeClientProvider) GetHTTP01ClientCalls(stub func(*utils.User, config.Settings) (*acme.ClientInterface, error)) {
+func (fake *FakeAcmeClientProvider) GetHTTP01ClientCalls(stub func(*utils.User, config.Settings) (acme.ClientInterface, error)) {
 	fake.getHTTP01ClientMutex.Lock()
 	defer fake.getHTTP01ClientMutex.Unlock()
 	fake.GetHTTP01ClientStub = stub
@@ -145,28 +145,28 @@ func (fake *FakeAcmeClientProvider) GetHTTP01ClientArgsForCall(i int) (*utils.Us
 	return argsForCall.arg1, argsForCall.arg2
 }
 
-func (fake *FakeAcmeClientProvider) GetHTTP01ClientReturns(result1 *acme.ClientInterface, result2 error) {
+func (fake *FakeAcmeClientProvider) GetHTTP01ClientReturns(result1 acme.ClientInterface, result2 error) {
 	fake.getHTTP01ClientMutex.Lock()
 	defer fake.getHTTP01ClientMutex.Unlock()
 	fake.GetHTTP01ClientStub = nil
 	fake.getHTTP01ClientReturns = struct {
-		result1 *acme.ClientInterface
+		result1 acme.ClientInterface
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeAcmeClientProvider) GetHTTP01ClientReturnsOnCall(i int, result1 *acme.ClientInterface, result2 error) {
+func (fake *FakeAcmeClientProvider) GetHTTP01ClientReturnsOnCall(i int, result1 acme.ClientInterface, result2 error) {
 	fake.getHTTP01ClientMutex.Lock()
 	defer fake.getHTTP01ClientMutex.Unlock()
 	fake.GetHTTP01ClientStub = nil
 	if fake.getHTTP01ClientReturnsOnCall == nil {
 		fake.getHTTP01ClientReturnsOnCall = make(map[int]struct {
-			result1 *acme.ClientInterface
+			result1 acme.ClientInterface
 			result2 error
 		})
 	}
 	fake.getHTTP01ClientReturnsOnCall[i] = struct {
-		result1 *acme.ClientInterface
+		result1 acme.ClientInterface
 		result2 error
 	}{result1, result2}
 }

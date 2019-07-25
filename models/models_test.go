@@ -3,7 +3,6 @@ package models_test
 import (
 	"bytes"
 	"errors"
-	"github.com/18F/cf-cdn-service-broker/models/mocks"
 	"time"
 
 	"code.cloudfoundry.org/lager"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/18F/cf-cdn-service-broker/config"
 	"github.com/18F/cf-cdn-service-broker/models"
+	"github.com/18F/cf-cdn-service-broker/models/mocks"
 	"github.com/18F/cf-cdn-service-broker/utils"
 
 	"github.com/stretchr/testify/mock"
@@ -408,15 +408,13 @@ var _ = Describe("Models", func() {
 			mui.Service = fakeiam
 
 			acmeProviderMock := mocks.FakeAcmeClientProvider{}
-			dns01Client := mocks.FakeAcmeClient{}
-			http01Client := mocks.FakeAcmeClient{}
 
 			acmeProviderMock.GetDNS01ClientCalls(
-				func (user *utils.User, settings config.Settings) (*acme.ClientInterface, error){
-					return &dns01Client, nil
+				func(user *utils.User, settings config.Settings) (acme.ClientInterface, error) {
+					return &mocks.FakeAcmeClient{}, nil
 				},
 			)
-			acmeProviderMock.GetHTTP01ClientReturns(http01Client, nil)
+			acmeProviderMock.GetHTTP01ClientReturns(&mocks.FakeAcmeClient{}, nil)
 
 			route := models.Route{
 				DomainInternal: "foo.pass.gov.uk,bar.paas.gov.uk,baz.paas.gov.ukß",
