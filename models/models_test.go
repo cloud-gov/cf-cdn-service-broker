@@ -370,7 +370,7 @@ var _ = Describe("Models", func() {
 
 	Context("Poll", func() {
 
-		It("should perform only DNS01 challenges when domains are being created or updated", func() {
+		It("should perform only DNS01 challenges when domains are being created", func() {
 			logger := lager.NewLogger("dns-01-test-only")
 			logger.RegisterSink(lager.NewWriterSink(GinkgoWriter, lager.ERROR))
 
@@ -408,16 +408,11 @@ var _ = Describe("Models", func() {
 			mui.Service = fakeiam
 
 			acmeProviderMock := mocks.FakeAcmeClientProvider{}
-
-			acmeProviderMock.GetDNS01ClientCalls(
-				func(user *utils.User, settings config.Settings) (acme.ClientInterface, error) {
-					return &mocks.FakeAcmeClient{}, nil
-				},
-			)
+			acmeProviderMock.GetDNS01ClientReturns(&mocks.FakeAcmeClient{}, nil)
 			acmeProviderMock.GetHTTP01ClientReturns(&mocks.FakeAcmeClient{}, nil)
 
 			route := models.Route{
-				DomainInternal: "foo.pass.gov.uk,bar.paas.gov.uk,baz.paas.gov.ukß",
+				DomainInternal: "",
 				DistId:         "some-cloudfront-id",
 			}
 
@@ -431,6 +426,12 @@ var _ = Describe("Models", func() {
 
 			err := manager.Poll(&route)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(acmeProviderMock.GetHTTP01ClientCallCount()).To(
+				Equal(0), "Creating a CDN service should never use HTTP challenges",
+			)
+			Expect(acmeProviderMock.GetDNS01ClientCallCount()).To(
+				Equal(1), "Creating a CDN service should use only DNS challenges",
+			)
 		})
 	})
 
