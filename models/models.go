@@ -370,20 +370,25 @@ func (m *RouteManager) Update(instanceId, domain, origin string, path string, in
 	route.DistId = *dist.Id
 
 	if domain != "" {
+		// We need to ensure there is a challenge in the database when provisioning
+		// It does not matter which client HTTP01 or DNS01 we use because it is the
+		// responsibility of the ACME server to give us what challenges are
+		// supported. I.e. LetsEncrypt will return ALPN01, HTTP01, DNS01 regardless
+		// of which client is used
 		user, err := route.loadUser(m.db)
 		if err != nil {
 			lsession.Error("load-user", err)
 			return err
 		}
 
-		clients, err := m.getClients(&user, m.settings)
+		client, err := m.getHTTP01Client(&user, m.settings)
 		if err != nil {
 			lsession.Error("get-clients", err)
 			return err
 		}
 
 		route.ChallengeJSON = []byte("")
-		if err := m.ensureChallenges(route, clients[acme.HTTP01], false); err != nil {
+		if err := m.ensureChallenges(route, client, false); err != nil {
 			lsession.Error("ensure-challenges", err)
 			return err
 		}
