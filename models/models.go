@@ -653,13 +653,9 @@ func (m *RouteManager) getDNS01Client(user *utils.User, settings config.Settings
 }
 
 func (m *RouteManager) getHTTP01Client(user *utils.User, settings config.Settings) (acme.ClientInterface, error) {
-	session := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
 	lsession := m.logger.Session("route-manager-get-http01-client")
 
-	client, err := newAcmeClient(
-		settings, user, s3.New(session),
-		[]acme.Challenge{acme.TLSSNI01, acme.DNS01},
-	)
+	client, err := m.acmeClientProvider.GetHTTP01Client(user, settings)
 
 	if err != nil {
 		lsession.Error("new-client-http-builder", err)
@@ -931,80 +927,4 @@ func (m *RouteManager) GetDNSInstructions(route *Route) ([]string, error) {
 		}
 	}
 	return instructions, nil
-}
-
-func newAcmeClient(settings config.Settings, user *utils.User, s3Service *s3.S3, excludes []acme.Challenge) (*acme.Client, error) {
-	client, err := acme.NewClient(settings.AcmeUrl, user, acme.RSA2048)
-	if err != nil {
-		return &acme.Client{}, err
-	}
-
-	if user.GetRegistration() == nil {
-		reg, err := client.Register()
-		if err != nil {
-			return client, err
-		}
-		user.Registration = reg
-	}
-
-	if err := client.AgreeToTOS(); err != nil {
-		return client, err
-	}
-
-	client.SetChallengeProvider(acme.HTTP01, &HTTPProvider{
-		Settings: settings,
-		Service:  s3Service,
-	})
-	client.ExcludeChallenges(excludes)
-
-	return client, nil
-}
-
-type HTTPProvider struct {
-	Settings config.Settings
-	Service  *s3.S3
-}
-
-func (p *HTTPProvider) Present(domain, token, keyAuth string) error {
-	input := s3.PutObjectInput{
-		Bucket: aws.String(p.Settings.Bucket),
-		Key:    aws.String(path.Join(".well-known", "acme-challenge", token)),
-		Body:   strings.NewReader(keyAuth),
-	}
-	if p.Settings.ServerSideEncryption != "" {
-		input.ServerSideEncryption = aws.String(p.Settings.ServerSideEncryption)
-	}
-	if _, err := p.Service.PutObject(&input); err != nil {
-		return err
-	}
-
-	insecureClient := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
-
-	return acme.WaitFor(10*time.Second, 2*time.Second, func() (bool, error) {
-		resp, err := insecureClient.Get("https://" + path.Join(domain, ".well-known", "acme-challenge", token))
-		if err != nil {
-			return false, err
-		}
-		defer resp.Body.Close()
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return false, err
-		}
-		if string(body) == keyAuth {
-			return true, nil
-		}
-		return false, fmt.Errorf("HTTP-01 token mismatch for %s: expected %s, got %s", token, keyAuth, string(body))
-	})
-}
-
-func (p *HTTPProvider) CleanUp(domain, token, keyAuth string) error {
-	_, err := p.Service.DeleteObject(&s3.DeleteObjectInput{
-		Bucket: aws.String(p.Settings.Bucket),
-		Key:    aws.String(path.Join(".well-known", "acme-challenge", token)),
-	})
-	return err
 }

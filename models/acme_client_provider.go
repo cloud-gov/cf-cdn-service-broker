@@ -21,7 +21,3 @@ type AcmeClientProviderInterface interface {
 type AcmeClientProvider struct {
 	logger lager.Logger
 }
-
-func (*AcmeClientProvider) GetHTTP01Client(user *utils.User, settings config.Settings) (acme.ClientInterface, error) {
-	panic("implement me")
-}
