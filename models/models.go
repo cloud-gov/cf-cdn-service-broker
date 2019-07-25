@@ -714,55 +714,58 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 		return err
 	}
 
-	if m.checkDistribution(r) {
-		var challenges []acme.AuthorizationResource
-		if err := json.Unmarshal(r.ChallengeJSON, &challenges); err != nil {
-			lsession.Error("challenge-unmarshall", err)
-			return err
-		}
-		if errs := m.solveChallenges(clients, challenges); len(errs) > 0 {
-			errstr := fmt.Errorf("Error(s) solving challenges: %v", errs)
-			lsession.Error("solve-challenges", errstr)
-			return errstr
-		}
+	isDistributionDeployed := m.checkDistribution(r)
 
-		cert, err := clients[acme.HTTP01].RequestCertificate(challenges, true, nil, false)
-		if err != nil {
-			lsession.Error("request-certificate-http-01", err)
-			return err
-		}
-
-		expires, err := acme.GetPEMCertExpiration(cert.Certificate)
-		if err != nil {
-			lsession.Error("get-cert-expiry", err)
-			return err
-		}
-		if err := m.deployCertificate(*r, cert); err != nil {
-			lsession.Error("deploy-certificate", err)
-			return err
-		}
-
-		certRow := Certificate{
-			Domain:      cert.Domain,
-			CertURL:     cert.CertURL,
-			Certificate: cert.Certificate,
-			Expires:     expires,
-		}
-		if err := m.db.Create(&certRow).Error; err != nil {
-			lsession.Error("db-create-cert", err)
-			return err
-		}
-
-		r.State = Provisioned
-		r.Certificate = certRow
-		if err := m.db.Save(r).Error; err != nil {
-			lsession.Error("db-save-cert", err)
-			return err
-		}
+	if !isDistributionDeployed {
+		lsession.Info("distribution-provisioning")
 		return nil
 	}
 
-	lsession.Info("distribution-provisioning")
+	var challenges []acme.AuthorizationResource
+	if err := json.Unmarshal(r.ChallengeJSON, &challenges); err != nil {
+		lsession.Error("challenge-unmarshall", err)
+		return err
+	}
+	if errs := m.solveChallenges(clients, challenges); len(errs) > 0 {
+		errstr := fmt.Errorf("Error(s) solving challenges: %v", errs)
+		lsession.Error("solve-challenges", errstr)
+		return errstr
+	}
+
+	cert, err := clients[acme.HTTP01].RequestCertificate(challenges, true, nil, false)
+	if err != nil {
+		lsession.Error("request-certificate-http-01", err)
+		return err
+	}
+
+	expires, err := acme.GetPEMCertExpiration(cert.Certificate)
+	if err != nil {
+		lsession.Error("get-cert-expiry", err)
+		return err
+	}
+	if err := m.deployCertificate(*r, cert); err != nil {
+		lsession.Error("deploy-certificate", err)
+		return err
+	}
+
+	certRow := Certificate{
+		Domain:      cert.Domain,
+		CertURL:     cert.CertURL,
+		Certificate: cert.Certificate,
+		Expires:     expires,
+	}
+	if err := m.db.Create(&certRow).Error; err != nil {
+		lsession.Error("db-create-cert", err)
+		return err
+	}
+
+	r.State = Provisioned
+	r.Certificate = certRow
+	if err := m.db.Save(r).Error; err != nil {
+		lsession.Error("db-save-cert", err)
+		return err
+	}
+
 	return nil
 }
 
