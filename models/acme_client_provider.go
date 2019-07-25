@@ -11,6 +11,8 @@ import (
 //counterfeiter:generate -o mocks/FakeAcmeClientProvider.go --fake-name FakeAcmeClientProvider . AcmeClientProviderInterface
 //counterfeiter:generate -o mocks/FakeAcmeClient.go --fake-name FakeAcmeClient ../lego/acme ClientInterface
 
+// For code comprehension the DNS and HTTP providers are implemented in separate files
+
 type AcmeClientProviderInterface interface {
 	GetDNS01Client(user *utils.User, settings config.Settings) (acme.ClientInterface, error)
 	GetHTTP01Client(user *utils.User, settings config.Settings) (acme.ClientInterface, error)
@@ -18,10 +20,6 @@ type AcmeClientProviderInterface interface {
 
 type AcmeClientProvider struct {
 	logger lager.Logger
-}
-
-func (*AcmeClientProvider) GetDNS01Client(user *utils.User, settings config.Settings) (acme.ClientInterface, error) {
-	panic("implement me")
 }
 
 func (*AcmeClientProvider) GetHTTP01Client(user *utils.User, settings config.Settings) (acme.ClientInterface, error) {

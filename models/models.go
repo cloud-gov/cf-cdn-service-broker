@@ -955,7 +955,6 @@ func newAcmeClient(settings config.Settings, user *utils.User, s3Service *s3.S3,
 		Settings: settings,
 		Service:  s3Service,
 	})
-	client.SetChallengeProvider(acme.DNS01, &DNSProvider{})
 	client.ExcludeChallenges(excludes)
 
 	return client, nil
@@ -1008,18 +1007,4 @@ func (p *HTTPProvider) CleanUp(domain, token, keyAuth string) error {
 		Key:    aws.String(path.Join(".well-known", "acme-challenge", token)),
 	})
 	return err
-}
-
-type DNSProvider struct{}
-
-func (p *DNSProvider) Present(domain, token, keyAuth string) error {
-	return nil
-}
-
-func (p *DNSProvider) CleanUp(domain, token, keyAuth string) error {
-	return nil
-}
-
-func (p *DNSProvider) Timeout() (time.Duration, time.Duration) {
-	return 10 * time.Second, 2 * time.Second
 }
