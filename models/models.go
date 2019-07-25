@@ -670,27 +670,6 @@ func (m *RouteManager) getHTTP01Client(user *utils.User, settings config.Setting
 	return client, nil
 }
 
-func (m *RouteManager) getClients(user *utils.User, settings config.Settings) (map[acme.Challenge]acme.ClientInterface, error) {
-	lsession := m.logger.Session("route-manager-get-clients")
-
-	clients := map[acme.Challenge]acme.ClientInterface{}
-	var err error
-
-	clients[acme.HTTP01], err = m.getHTTP01Client(user, settings)
-	if err != nil {
-		lsession.Error("get-client-http01", err)
-		return clients, err
-	}
-
-	clients[acme.DNS01], err = m.getDNS01Client(user, settings)
-	if err != nil {
-		lsession.Error("get-client-dns01", err)
-		return clients, err
-	}
-
-	return clients, nil
-}
-
 func (m *RouteManager) updateProvisioning(r *Route) error {
 	lsession := m.logger.Session("route-manager-update-provisioning", lager.Data{
 		"instance-id": r.InstanceId,
@@ -702,9 +681,17 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 		return err
 	}
 
-	clients, err := m.getClients(&user, m.settings)
+	clients := map[acme.Challenge]acme.ClientInterface{}
+
+	clients[acme.HTTP01], err = m.getHTTP01Client(&user, m.settings)
 	if err != nil {
-		lsession.Error("get-clients", err)
+		lsession.Error("get-client-http01", err)
+		return err
+	}
+
+	clients[acme.DNS01], err = m.getDNS01Client(&user, m.settings)
+	if err != nil {
+		lsession.Error("get-client-dns01", err)
 		return err
 	}
 
