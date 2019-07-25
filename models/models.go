@@ -520,13 +520,13 @@ func (m *RouteManager) Renew(r *Route) error {
 		return err
 	}
 
-	clients, err := m.getClients(&user, m.settings)
+	client, err := m.getHTTP01Client(&user, m.settings)
 	if err != nil {
-		lsession.Error("get-clients", err)
+		lsession.Error("get-http01-client", err)
 		return err
 	}
 
-	certResource, errs := clients[acme.HTTP01].ObtainCertificate(r.GetDomains(), true, nil, false)
+	certResource, errs := client.ObtainCertificate(r.GetDomains(), true, nil, false)
 	if len(errs) > 0 {
 		err := fmt.Errorf("Error(s) obtaining certificate: %v", errs)
 		lsession.Error("obtain-certificate", err)
