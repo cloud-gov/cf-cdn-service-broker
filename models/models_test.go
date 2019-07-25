@@ -49,6 +49,13 @@ func (_f MockUtilsIam) DeleteCertificate(certName string) error {
 	return args.Error(0)
 }
 
+func StubAcmeClientProvider() *mocks.FakeAcmeClientProvider {
+	acmeProviderMock := mocks.FakeAcmeClientProvider{}
+	acmeProviderMock.GetDNS01ClientReturns(&mocks.FakeAcmeClient{}, nil)
+	acmeProviderMock.GetHTTP01ClientReturns(&mocks.FakeAcmeClient{}, nil)
+	return &acmeProviderMock
+}
+
 var _ = Describe("Models", func() {
 	It("should delete orphaned certs", func() {
 		logger := lager.NewLogger("cdn-cron-test")
@@ -144,12 +151,15 @@ var _ = Describe("Models", func() {
 		mui.On("DeleteCertificate", "some-orphaned-cert").Return(nil)
 		mui.On("DeleteCertificate", "some-other-orphaned-cert").Return(nil)
 
+		acmeProviderMock := StubAcmeClientProvider()
+
 		m := models.NewManager(
 			logger,
 			mui,
 			&utils.Distribution{settings, fakecf},
 			settings,
 			&gorm.DB{},
+			acmeProviderMock,
 		)
 
 		//run the test
@@ -213,12 +223,15 @@ var _ = Describe("Models", func() {
 		// expect the orphaned certs to fail to be deleted
 		mui.On("DeleteCertificate", "some-orphaned-cert").Return(errors.New("DeleteCertificate error"))
 
+		acmeProviderMock := StubAcmeClientProvider()
+
 		m := models.NewManager(
 			logger,
 			mui,
 			&utils.Distribution{settings, fakecf},
 			settings,
 			&gorm.DB{},
+			acmeProviderMock,
 		)
 
 		//run the test
@@ -283,12 +296,15 @@ var _ = Describe("Models", func() {
 		mui.Settings = settings
 		mui.Service = fakeiam
 
+		acmeProviderMock := StubAcmeClientProvider()
+
 		m := models.NewManager(
 			logger,
 			mui,
 			&utils.Distribution{settings, fakecf},
 			settings,
 			&gorm.DB{},
+			acmeProviderMock,
 		)
 
 		//run the test
@@ -347,12 +363,15 @@ var _ = Describe("Models", func() {
 		mui.Settings = settings
 		mui.Service = fakeiam
 
+		acmeProviderMock := StubAcmeClientProvider()
+
 		m := models.NewManager(
 			logger,
 			mui,
 			&utils.Distribution{settings, fakecf},
 			settings,
 			&gorm.DB{},
+			acmeProviderMock,
 		)
 
 		//run the test
@@ -368,11 +387,20 @@ var _ = Describe("Models", func() {
 		)
 	})
 
-	Context("Poll", func() {
+	Context("Create", func() {
 
-		It("should perform only DNS01 challenges when domains are being created", func() {
+		It("should perform only DNS01 challenges", func() {
 			logger := lager.NewLogger("dns-01-test-only")
 			logger.RegisterSink(lager.NewWriterSink(GinkgoWriter, lager.ERROR))
+
+			instanceID := "cloudfoundry-instance-id"
+			domain := "foo.paas.gov.uk"
+			origin := "foo.cloudapps.digital"
+			path := "/"
+			insecureOrigin := false
+			forwardedHeaders := utils.Headers{}
+			forwardCookies := false
+			tags := map[string]string{}
 
 			settings, _ := config.NewSettings()
 			awsSession := session.New(nil)
@@ -407,14 +435,7 @@ var _ = Describe("Models", func() {
 			mui.Settings = settings
 			mui.Service = fakeiam
 
-			acmeProviderMock := mocks.FakeAcmeClientProvider{}
-			acmeProviderMock.GetDNS01ClientReturns(&mocks.FakeAcmeClient{}, nil)
-			acmeProviderMock.GetHTTP01ClientReturns(&mocks.FakeAcmeClient{}, nil)
-
-			route := models.Route{
-				DomainInternal: "",
-				DistId:         "some-cloudfront-id",
-			}
+			acmeProviderMock := StubAcmeClientProvider()
 
 			manager := models.NewManager(
 				logger,
@@ -422,16 +443,21 @@ var _ = Describe("Models", func() {
 				&utils.Distribution{settings, fakecf},
 				settings,
 				&gorm.DB{},
+				acmeProviderMock,
 			)
 
-			err := manager.Poll(&route)
-			Expect(err).NotTo(HaveOccurred())
+			_, err := manager.Create(
+				instanceID, domain, origin, path,
+				insecureOrigin, forwardedHeaders, forwardCookies, tags,
+			)
 			Expect(acmeProviderMock.GetHTTP01ClientCallCount()).To(
 				Equal(0), "Creating a CDN service should never use HTTP challenges",
 			)
 			Expect(acmeProviderMock.GetDNS01ClientCallCount()).To(
 				Equal(1), "Creating a CDN service should use only DNS challenges",
 			)
+			// We are just testing the newing up of the correct client
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 

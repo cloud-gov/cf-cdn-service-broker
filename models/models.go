@@ -225,11 +225,12 @@ type RouteManagerIface interface {
 }
 
 type RouteManager struct {
-	logger     lager.Logger
-	iam        utils.IamIface
-	cloudFront utils.DistributionIface
-	settings   config.Settings
-	db         *gorm.DB
+	logger             lager.Logger
+	iam                utils.IamIface
+	cloudFront         utils.DistributionIface
+	settings           config.Settings
+	db                 *gorm.DB
+	acmeClientProvider AcmeClientProviderInterface
 }
 
 func NewManager(
@@ -238,13 +239,15 @@ func NewManager(
 	cloudFront utils.DistributionIface,
 	settings config.Settings,
 	db *gorm.DB,
+	acmeClientProvider AcmeClientProviderInterface,
 ) RouteManager {
 	return RouteManager{
-		logger:     logger,
-		iam:        iam,
-		cloudFront: cloudFront,
-		settings:   settings,
-		db:         db,
+		logger:             logger,
+		iam:                iam,
+		cloudFront:         cloudFront,
+		settings:           settings,
+		db:                 db,
+		acmeClientProvider: acmeClientProvider,
 	}
 }
 
@@ -268,9 +271,9 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 		return nil, err
 	}
 
-	clients, err := m.getClients(&user, m.settings)
+	client, err := m.getDNS01Client(&user, m.settings)
 	if err != nil {
-		lsession.Error("get-clients", err)
+		lsession.Error("get-dns-01-client", err)
 		return nil, err
 	}
 
@@ -282,8 +285,8 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 
 	route.UserData = userData
 
-	if err := m.ensureChallenges(route, clients[acme.HTTP01], false); err != nil {
-		lsession.Error("ensure-challenges-http-01", err)
+	if err := m.ensureChallenges(route, client, false); err != nil {
+		lsession.Error("ensure-challenges-dns-01", err)
 		return nil, err
 	}
 
@@ -630,22 +633,53 @@ func (m *RouteManager) RenewAll() {
 	}
 }
 
-func (m *RouteManager) getClients(user *utils.User, settings config.Settings) (map[acme.Challenge]*acme.Client, error) {
-	session := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
+func (m *RouteManager) getDNS01Client(user *utils.User, settings config.Settings) (acme.ClientInterface, error) {
+	lsession := m.logger.Session("route-manager-get-dns01-client")
 
-	lsession := m.logger.Session("route-manager-get-clients")
+	client, err := m.acmeClientProvider.GetDNS01Client(user, settings)
 
-	var err error
-
-	clients := map[acme.Challenge]*acme.Client{}
-	clients[acme.HTTP01], err = utils.NewClient(settings, user, s3.New(session), []acme.Challenge{acme.TLSSNI01, acme.DNS01})
-	if err != nil {
-		lsession.Error("new-client-http-builder", err)
-		return clients, err
-	}
-	clients[acme.DNS01], err = utils.NewClient(settings, user, s3.New(session), []acme.Challenge{acme.TLSSNI01, acme.HTTP01})
 	if err != nil {
 		lsession.Error("new-client-dns-builder", err)
+		return client, err
+	}
+
+	lsession.Info("new-client-dns-builder-success")
+	return client, nil
+}
+
+func (m *RouteManager) getHTTP01Client(user *utils.User, settings config.Settings) (acme.ClientInterface, error) {
+	session := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
+	lsession := m.logger.Session("route-manager-get-http01-client")
+
+	client, err := newAcmeClient(
+		settings, user, s3.New(session),
+		[]acme.Challenge{acme.TLSSNI01, acme.DNS01},
+	)
+
+	if err != nil {
+		lsession.Error("new-client-http-builder", err)
+		return client, err
+	}
+
+	lsession.Info("new-client-http-builder-success")
+	return client, nil
+}
+
+func (m *RouteManager) getClients(user *utils.User, settings config.Settings) (map[acme.Challenge]acme.ClientInterface, error) {
+	lsession := m.logger.Session("route-manager-get-clients")
+
+	clients := map[acme.Challenge]acme.ClientInterface{}
+	var err error
+
+	clients[acme.HTTP01], err = m.getHTTP01Client(user, settings)
+	if err != nil {
+		lsession.Error("get-client-http01", err)
+		return clients, err
+	}
+
+	clients[acme.DNS01], err = m.getDNS01Client(user, settings)
+	if err != nil {
+		lsession.Error("get-client-dns01", err)
 		return clients, err
 	}
 
@@ -756,7 +790,7 @@ func (m *RouteManager) checkDistribution(r *Route) bool {
 	return *dist.Status == "Deployed" && *dist.DistributionConfig.Enabled
 }
 
-func (m *RouteManager) solveChallenges(clients map[acme.Challenge]*acme.Client, challenges []acme.AuthorizationResource) map[string]error {
+func (m *RouteManager) solveChallenges(clients map[acme.Challenge]acme.ClientInterface, challenges []acme.AuthorizationResource) map[string]error {
 	startTime := time.Now()
 	lsession := m.logger.Session("solve-challenges", lager.Data{
 		"start_time": startTime.String(),
@@ -766,7 +800,7 @@ func (m *RouteManager) solveChallenges(clients map[acme.Challenge]*acme.Client, 
 	errs := make(chan map[string]error)
 
 	for _, client := range clients {
-		go func(client *acme.Client) {
+		go func(client acme.ClientInterface) {
 			errs <- client.SolveChallenges(challenges)
 		}(client)
 	}
@@ -829,7 +863,7 @@ func (m *RouteManager) deployCertificate(route Route, cert acme.CertificateResou
 	return nil
 }
 
-func (m *RouteManager) ensureChallenges(route *Route, client *acme.Client, update bool) error {
+func (m *RouteManager) ensureChallenges(route *Route, client acme.ClientInterface, update bool) error {
 	lsession := m.logger.Session("ensure-challenges", lager.Data{
 		"instance-id": route.InstanceId,
 		"domains":     route.GetDomains(),
@@ -907,4 +941,95 @@ func (m *RouteManager) GetDNSInstructions(route *Route) ([]string, error) {
 		}
 	}
 	return instructions, nil
+}
+
+func newAcmeClient(settings config.Settings, user *utils.User, s3Service *s3.S3, excludes []acme.Challenge) (*acme.Client, error) {
+	client, err := acme.NewClient(settings.AcmeUrl, user, acme.RSA2048)
+	if err != nil {
+		return &acme.Client{}, err
+	}
+
+	if user.GetRegistration() == nil {
+		reg, err := client.Register()
+		if err != nil {
+			return client, err
+		}
+		user.Registration = reg
+	}
+
+	if err := client.AgreeToTOS(); err != nil {
+		return client, err
+	}
+
+	client.SetChallengeProvider(acme.HTTP01, &HTTPProvider{
+		Settings: settings,
+		Service:  s3Service,
+	})
+	client.SetChallengeProvider(acme.DNS01, &DNSProvider{})
+	client.ExcludeChallenges(excludes)
+
+	return client, nil
+}
+
+type HTTPProvider struct {
+	Settings config.Settings
+	Service  *s3.S3
+}
+
+func (p *HTTPProvider) Present(domain, token, keyAuth string) error {
+	input := s3.PutObjectInput{
+		Bucket: aws.String(p.Settings.Bucket),
+		Key:    aws.String(path.Join(".well-known", "acme-challenge", token)),
+		Body:   strings.NewReader(keyAuth),
+	}
+	if p.Settings.ServerSideEncryption != "" {
+		input.ServerSideEncryption = aws.String(p.Settings.ServerSideEncryption)
+	}
+	if _, err := p.Service.PutObject(&input); err != nil {
+		return err
+	}
+
+	insecureClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+
+	return acme.WaitFor(10*time.Second, 2*time.Second, func() (bool, error) {
+		resp, err := insecureClient.Get("https://" + path.Join(domain, ".well-known", "acme-challenge", token))
+		if err != nil {
+			return false, err
+		}
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return false, err
+		}
+		if string(body) == keyAuth {
+			return true, nil
+		}
+		return false, fmt.Errorf("HTTP-01 token mismatch for %s: expected %s, got %s", token, keyAuth, string(body))
+	})
+}
+
+func (p *HTTPProvider) CleanUp(domain, token, keyAuth string) error {
+	_, err := p.Service.DeleteObject(&s3.DeleteObjectInput{
+		Bucket: aws.String(p.Settings.Bucket),
+		Key:    aws.String(path.Join(".well-known", "acme-challenge", token)),
+	})
+	return err
+}
+
+type DNSProvider struct{}
+
+func (p *DNSProvider) Present(domain, token, keyAuth string) error {
+	return nil
+}
+
+func (p *DNSProvider) CleanUp(domain, token, keyAuth string) error {
+	return nil
+}
+
+func (p *DNSProvider) Timeout() (time.Duration, time.Duration) {
+	return 10 * time.Second, 2 * time.Second
 }
