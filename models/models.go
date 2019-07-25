@@ -285,7 +285,7 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 
 	route.UserData = userData
 
-	if err := m.ensureChallenges(route, client, false); err != nil {
+	if err := m.ensureChallenges(route, client); err != nil {
 		lsession.Error("ensure-challenges-dns-01", err)
 		return nil, err
 	}
@@ -388,7 +388,7 @@ func (m *RouteManager) Update(instanceId, domain, origin string, path string, in
 		}
 
 		route.ChallengeJSON = []byte("")
-		if err := m.ensureChallenges(route, client, false); err != nil {
+		if err := m.ensureChallenges(route, client); err != nil {
 			lsession.Error("ensure-challenges", err)
 			return err
 		}
@@ -708,11 +708,18 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 		return err
 	}
 
-	// Handle provisioning instances created before DNS challenge
-	if err := m.ensureChallenges(r, clients[acme.HTTP01], true); err != nil {
+	if err := m.ensureChallenges(r, clients[acme.HTTP01]); err != nil {
 		lsession.Error("ensure-challenges", err)
 		return err
 	}
+
+	// Ensure the challenges from LetsEncrypt are persisted in the database
+	lsession.Info("db-save-route-challenge")
+	err = m.db.Save(r).Error
+	if err != nil {
+		lsession.Error("db-save-route-challenge-err", err)
+	}
+	lsession.Info("db-saved-route-challenge")
 
 	isDistributionDeployed := m.checkDistribution(r)
 
@@ -871,7 +878,7 @@ func (m *RouteManager) deployCertificate(route Route, cert acme.CertificateResou
 	return nil
 }
 
-func (m *RouteManager) ensureChallenges(route *Route, client acme.ClientInterface, update bool) error {
+func (m *RouteManager) ensureChallenges(route *Route, client acme.ClientInterface) error {
 	lsession := m.logger.Session("ensure-challenges", lager.Data{
 		"instance-id": route.InstanceId,
 		"domains":     route.GetDomains(),
@@ -897,18 +904,6 @@ func (m *RouteManager) ensureChallenges(route *Route, client acme.ClientInterfac
 		return err
 	}
 
-	if !update {
-		lsession.Info("not-updating")
-		return nil
-	}
-
-	lsession.Info("db-save-route-challenge")
-	err = m.db.Save(route).Error
-	if err != nil {
-		lsession.Error("db-save-route-challenge-err", err)
-	}
-
-	lsession.Info("updated")
 	return nil
 }
 
