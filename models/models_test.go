@@ -2,7 +2,11 @@ package models_test
 
 import (
 	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"database/sql"
+	"encoding/pem"
 	"errors"
 	"time"
 
@@ -57,6 +61,22 @@ func StubAcmeClientProvider() *mocks.FakeAcmeClientProvider {
 	acmeProviderMock.GetHTTP01ClientReturns(&mocks.FakeAcmeClient{}, nil)
 	return &acmeProviderMock
 }
+
+const (
+	// hopefully the CDN broker is gone in 36500 days
+	selfSignedCert = `-----BEGIN CERTIFICATE-----
+MIIBzDCCAXYCCQDis4Zpma57yjANBgkqhkiG9w0BAQsFADBsMQswCQYDVQQGEwJH
+QjEQMA4GA1UECAwHRW5nbGFuZDEPMA0GA1UEBwwGTG9uZG9uMQ0wCwYDVQQKDARD
+QUJPMQwwCgYDVQQLDANHRFMxHTAbBgNVBAMMFGNsb3VkLnNlcnZpY2UuZ292LnVr
+MCAXDTE5MDcyNTE1NDQ1M1oYDzIxMTkwNzAxMTU0NDUzWjBsMQswCQYDVQQGEwJH
+QjEQMA4GA1UECAwHRW5nbGFuZDEPMA0GA1UEBwwGTG9uZG9uMQ0wCwYDVQQKDARD
+QUJPMQwwCgYDVQQLDANHRFMxHTAbBgNVBAMMFGNsb3VkLnNlcnZpY2UuZ292LnVr
+MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBALAAb/6B5tu6YHXj3fVBptvYjnnCLYjQ
+MnoDJjHksKKS66pvu3P56Xr5usEsV3zA8hU9M5939LG9y39InfhWcpsCAwEAATAN
+BgkqhkiG9w0BAQsFAANBAJCU4Mxpa+WvDe0vg/8l5Pk2zEDXQ6jw+KgW2aAOhcMH
+VZZ3cRRY1RvyqlEyjRqlO9pJSp7RQYB4dwNg/MpXArE=
+-----END CERTIFICATE-----`
+)
 
 var _ = Describe("Models", func() {
 	var gormDB *gorm.DB
@@ -476,6 +496,236 @@ var _ = Describe("Models", func() {
 			)
 			// We are just testing the newing up of the correct client
 			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
+	Context("updateProvisioning", func() {
+		It("", func() {
+			logger := lager.NewLogger("dns-01-test-only")
+			logger.RegisterSink(lager.NewWriterSink(GinkgoWriter, lager.ERROR))
+
+			instanceID := "cloudfoundry-instance-id"
+			domain := "foo.paas.gov.uk"
+			origin := "foo.cloudapps.digital"
+			path := "/"
+			insecureOrigin := false
+
+			settings, _ := config.NewSettings()
+			awsSession := session.New(nil)
+
+			fakecf := cloudfront.New(awsSession)
+			fakecf.Handlers.Clear()
+			fakecf.Handlers.Send.PushBack(func(r *request.Request) {
+				distributionConfig := &cloudfront.DistributionConfig{
+					Aliases: &cloudfront.Aliases{
+						Quantity: aws.Int64(0),
+						Items:    []*string{},
+					},
+					Enabled:           aws.Bool(true),
+					ViewerCertificate: &cloudfront.ViewerCertificate{},
+				}
+
+				switch r.Operation.Name {
+				case "GetDistribution2016_11_25":
+					data := r.Data.(*cloudfront.GetDistributionOutput)
+					data.Distribution = &cloudfront.Distribution{
+						Id:                 aws.String("cloudfront-distribution-id"),
+						DomainName:         aws.String("foo.paas.gov.uk"),
+						Status:             aws.String("Deployed"),
+						DistributionConfig: distributionConfig,
+					}
+					data.ETag = aws.String("etag")
+				case "GetDistributionConfig2016_11_25":
+					data := r.Data.(*cloudfront.GetDistributionConfigOutput)
+					data.DistributionConfig = distributionConfig
+				}
+			})
+
+			fakeiam := iam.New(awsSession)
+			mui := new(MockUtilsIam)
+			mui.Settings = settings
+			mui.Service = fakeiam
+
+			fakeHTTP01Client := &mocks.FakeAcmeClient{}
+			fakeHTTP01Client.RequestCertificateReturns(acme.CertificateResource{
+				Certificate: []byte(selfSignedCert),
+			}, nil)
+
+			acmeProviderMock := mocks.FakeAcmeClientProvider{}
+			acmeProviderMock.GetDNS01ClientReturns(&mocks.FakeAcmeClient{}, nil)
+			acmeProviderMock.GetHTTP01ClientReturns(fakeHTTP01Client, nil)
+
+			manager := models.NewManager(
+				logger,
+				mui,
+				&utils.Distribution{settings, fakecf},
+				settings,
+				gormDB,
+				&acmeProviderMock,
+			)
+
+			route := &models.Route{
+				InstanceId:     instanceID,
+				State:          models.Provisioning,
+				DomainExternal: domain,
+				Origin:         origin,
+				Path:           path,
+				InsecureOrigin: insecureOrigin,
+			}
+
+			rsaTestKey, err := rsa.GenerateKey(rand.Reader, 2048)
+			Expect(err).NotTo(HaveOccurred(), "Generating test key")
+			pemdata := pem.EncodeToMemory(
+				&pem.Block{
+					Type:  "RSA PRIVATE KEY",
+					Bytes: x509.MarshalPKCS1PrivateKey(rsaTestKey),
+				},
+			)
+
+			mockDB.ExpectQuery(
+				`SELECT \* FROM "user_data"`,
+			).WillReturnRows(
+				sqlmock.NewRows(
+					[]string{
+						"id", "created_at", "updated_at", "deleted_at",
+						"email", "key", "reg",
+					},
+				).AddRow(
+					1, time.Now(), time.Now(), nil,
+					"the-mocky-cloud-paas-team@digital.cabinet-office.gov.uk",
+					string(pemdata),
+					`{
+						"Email": "the-mocky-cloud-paas-team@digital.cabinet-office.gov.uk",
+						"Registration": null
+					}`,
+				),
+			)
+
+			mockDB.ExpectExec(`INSERT INTO "routes"`).WillReturnResult(sqlmock.NewResult(1, 1))
+			mockDB.ExpectExec(`INSERT INTO "certificates"`).WillReturnResult(sqlmock.NewResult(1, 1))
+			mockDB.ExpectExec(`UPDATE "routes"`).WillReturnResult(sqlmock.NewResult(1, 1))
+			mockDB.ExpectExec(`UPDATE "certificates"`).WillReturnResult(sqlmock.NewResult(1, 1))
+
+			err = manager.Poll(route)
+			Expect(err).NotTo(HaveOccurred())
+
+		})
+	})
+
+	Context("GetCurrentlyDeployedDomains", func() {
+		setupCloudFrontMock := func(aliases []string, fakecf *cloudfront.CloudFront) {
+			awsAliases := make([]*string, 0)
+			for _, alias := range aliases {
+				awsAliases = append(awsAliases, aws.String(alias))
+			}
+
+			aliasQuantity := len(awsAliases)
+
+			fakecf.Handlers.Send.PushBack(func(r *request.Request) {
+				distributionConfig := &cloudfront.DistributionConfig{
+					Aliases: &cloudfront.Aliases{
+						Quantity: aws.Int64(int64(aliasQuantity)),
+						Items:    awsAliases,
+					},
+					Enabled:           aws.Bool(true),
+					ViewerCertificate: &cloudfront.ViewerCertificate{},
+				}
+
+				switch r.Operation.Name {
+				case "GetDistribution2016_11_25":
+					data := r.Data.(*cloudfront.GetDistributionOutput)
+					data.Distribution = &cloudfront.Distribution{
+						Id:                 aws.String("cloudfront-distribution-id"),
+						DomainName:         aws.String("foo.paas.gov.uk"),
+						Status:             aws.String("Deployed"),
+						DistributionConfig: distributionConfig,
+					}
+					data.ETag = aws.String("etag")
+				case "GetDistributionConfig2016_11_25":
+					data := r.Data.(*cloudfront.GetDistributionConfigOutput)
+					data.DistributionConfig = distributionConfig
+				}
+			})
+		}
+
+		var (
+			manager models.RouteManager
+			route   *models.Route
+			fakecf  *cloudfront.CloudFront
+		)
+
+		BeforeEach(func() {
+			logger := lager.NewLogger("cdn-cron-test")
+			logOutput := bytes.NewBuffer([]byte{})
+			logger.RegisterSink(lager.NewWriterSink(logOutput, lager.ERROR))
+
+			instanceID := "cloudfoundry-instance-id"
+			domain := "foo.paas.gov.uk"
+			origin := "foo.cloudapps.digital"
+			path := "/"
+			insecureOrigin := false
+
+			settings, _ := config.NewSettings()
+			awsSession := session.New(nil)
+
+			fakecf = cloudfront.New(awsSession)
+			fakecf.Handlers.Clear()
+
+			fakeiam := iam.New(awsSession)
+			mui := new(MockUtilsIam)
+			mui.Settings = settings
+			mui.Service = fakeiam
+
+			manager = models.NewManager(
+				logger,
+				mui,
+				&utils.Distribution{settings, fakecf},
+				settings,
+				gormDB,
+				StubAcmeClientProvider(),
+			)
+
+			route = &models.Route{
+				InstanceId:     instanceID,
+				State:          models.Provisioning,
+				DomainExternal: domain,
+				Origin:         origin,
+				Path:           path,
+				InsecureOrigin: insecureOrigin,
+			}
+		})
+
+		It("should return the domains correctly when only zero CNAMEs", func() {
+			aliases := []string{}
+			setupCloudFrontMock(aliases, fakecf)
+
+			domains, err := manager.GetCurrentlyDeployedDomains(route)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(domains).To(HaveLen(0))
+		})
+
+		It("should return the domains correctly when only one CNAME", func() {
+			aliases := []string{"foo.cloudapps.digital"}
+			setupCloudFrontMock(aliases, fakecf)
+
+			domains, err := manager.GetCurrentlyDeployedDomains(route)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(domains).To(ConsistOf("foo.cloudapps.digital"))
+		})
+
+		It("should return the domains correctly when many CNAMEs", func() {
+			aliases := []string{"foo.cloudapps.digital", "bar.cloudapps.digital"}
+			setupCloudFrontMock(aliases, fakecf)
+
+			domains, err := manager.GetCurrentlyDeployedDomains(route)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(domains).To(ConsistOf(
+				"foo.cloudapps.digital",
+				"bar.cloudapps.digital",
+			))
 		})
 	})
 

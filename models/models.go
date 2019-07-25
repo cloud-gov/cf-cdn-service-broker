@@ -716,6 +716,9 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 		lsession.Error("challenge-unmarshall", err)
 		return err
 	}
+
+	// HERE WE NEED TO CHOOSE DNS OR HTTP CHALLENGES
+
 	if errs := m.solveChallenges(clients, challenges); len(errs) > 0 {
 		errstr := fmt.Errorf("Error(s) solving challenges: %v", errs)
 		lsession.Error("solve-challenges", errstr)
@@ -927,4 +930,25 @@ func (m *RouteManager) GetDNSInstructions(route *Route) ([]string, error) {
 		}
 	}
 	return instructions, nil
+}
+
+func (m *RouteManager) GetCurrentlyDeployedDomains(r *Route) ([]string, error) {
+	lsession := m.logger.Session("get-currently-deployed-domains")
+
+	lsession.Info("cloudfront-get-start")
+	dist, err := m.cloudFront.Get(r.DistId)
+	if err != nil {
+		lsession.Error("cloudfront-get-error", err)
+
+		return []string{}, err
+	}
+	lsession.Info("cloudfront-get-done")
+
+	deployedDomains := []string{}
+	for _, domain := range dist.DistributionConfig.Aliases.Items {
+		deployedDomains = append(deployedDomains, *domain)
+	}
+
+	lsession.Info("finished")
+	return deployedDomains, nil
 }
