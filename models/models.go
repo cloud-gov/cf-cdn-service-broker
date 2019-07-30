@@ -671,27 +671,33 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 		"instance-id": r.InstanceId,
 	})
 
+	isDistributionDeployed := m.checkDistribution(r)
+
+	if !isDistributionDeployed {
+		lsession.Info("distribution-provisioning")
+		return nil
+	}
+
 	user, err := r.loadUser(m.db)
 	if err != nil {
 		lsession.Error("load-user", err)
 		return err
 	}
 
-	clients := map[acme.Challenge]acme.ClientInterface{}
-
-	clients[acme.HTTP01], err = m.getHTTP01Client(&user, m.settings)
+	desiredDomains := r.GetDomains()
+	deployedDomains, err := m.GetCurrentlyDeployedDomains(r)
 	if err != nil {
-		lsession.Error("get-client-http01", err)
+		lsession.Error("get-currently-deployed-domains", err)
 		return err
 	}
 
-	clients[acme.DNS01], err = m.getDNS01Client(&user, m.settings)
+	client, err := m.GetAppropriateACMEClient(&user, deployedDomains, desiredDomains)
 	if err != nil {
-		lsession.Error("get-client-dns01", err)
+		lsession.Error("get-appropriate-acme-client-failed", err)
 		return err
 	}
 
-	if err := m.ensureChallenges(r, clients[acme.HTTP01]); err != nil {
+	if err := m.ensureChallenges(r, client); err != nil {
 		lsession.Error("ensure-challenges", err)
 		return err
 	}
@@ -704,28 +710,19 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 	}
 	lsession.Info("db-saved-route-challenge")
 
-	isDistributionDeployed := m.checkDistribution(r)
-
-	if !isDistributionDeployed {
-		lsession.Info("distribution-provisioning")
-		return nil
-	}
-
 	var challenges []acme.AuthorizationResource
 	if err := json.Unmarshal(r.ChallengeJSON, &challenges); err != nil {
 		lsession.Error("challenge-unmarshall", err)
 		return err
 	}
 
-	// HERE WE NEED TO CHOOSE DNS OR HTTP CHALLENGES
-
-	if errs := m.solveChallenges(clients, challenges); len(errs) > 0 {
+	if errs := m.solveChallenges(lsession, client, challenges); len(errs) > 0 {
 		errstr := fmt.Errorf("Error(s) solving challenges: %v", errs)
 		lsession.Error("solve-challenges", errstr)
 		return errstr
 	}
 
-	cert, err := clients[acme.HTTP01].RequestCertificate(challenges, true, nil, false)
+	cert, err := client.RequestCertificate(challenges, true, nil, false)
 	if err != nil {
 		lsession.Error("request-certificate-http-01", err)
 		return err
@@ -791,34 +788,29 @@ func (m *RouteManager) checkDistribution(r *Route) bool {
 	return *dist.Status == "Deployed" && *dist.DistributionConfig.Enabled
 }
 
-func (m *RouteManager) solveChallenges(clients map[acme.Challenge]acme.ClientInterface, challenges []acme.AuthorizationResource) map[string]error {
+func (m *RouteManager) solveChallenges(logger lager.Logger, client acme.ClientInterface, challenges []acme.AuthorizationResource) map[string]error {
 	startTime := time.Now()
-	lsession := m.logger.Session("solve-challenges", lager.Data{
+	lsession := logger.Session("solve-challenge", lager.Data{
 		"start_time": startTime.String(),
 	})
-	lsession.Info("solve-challenges-start")
+	lsession.Info("solve-challenge-start")
 
-	errs := make(chan map[string]error)
+	failures := client.SolveChallenges(challenges)
+	endTime := time.Now()
 
-	for _, client := range clients {
-		go func(client acme.ClientInterface) {
-			errs <- client.SolveChallenges(challenges)
-		}(client)
-	}
-
-	var failures map[string]error
-	for challenge := range clients {
-		failures = <-errs
-		endTime := time.Now()
-		lsession.Info("solve-challenges-results", lager.Data{
-			"challenge": challenge,
-			"failures":  failures,
-			"end_time":  endTime.String(),
-			"duration":  endTime.Sub(startTime).String(),
+	if len(failures) > 0 {
+		lsession.Error("solve-challenges-errors", fmt.Errorf(
+			"Encountered non-zero number of failures solving challenges",
+		), lager.Data{
+			"failures": failures,
+			"end_time": endTime.String(),
+			"duration": endTime.Sub(startTime).String(),
 		})
-		if len(failures) == 0 {
-			return failures
-		}
+	} else {
+		lsession.Info("solve-challenges-success", lager.Data{
+			"end_time": endTime.String(),
+			"duration": endTime.Sub(startTime).String(),
+		})
 	}
 
 	return failures
@@ -951,4 +943,43 @@ func (m *RouteManager) GetCurrentlyDeployedDomains(r *Route) ([]string, error) {
 
 	lsession.Info("finished")
 	return deployedDomains, nil
+}
+
+func (m *RouteManager) GetAppropriateACMEClient(
+	user *utils.User, deployed []string, desired []string,
+) (acme.ClientInterface, error) {
+	lsession := m.logger.Session("get-appropriate-acme-client")
+	lsession.Info("start")
+
+	// If the deployed domains are the same as the desired domains, we are able
+	// to do HTTP01 challenge, and it is desirable to do so, so that that user
+	// does not have to change their DNS record. If they are different then we
+	// MUST do DNS01 challenge
+
+	deployedAndDesiredAreTheSame := utils.StrSlicesAreEqual(deployed, desired)
+
+	var client acme.ClientInterface
+	var err error
+	var challengeType string
+
+	if deployedAndDesiredAreTheSame {
+		client, err = m.getHTTP01Client(user, m.settings)
+		challengeType = "http01"
+
+		if err != nil {
+			lsession.Error("get-client-http01", err)
+			return client, err
+		}
+	} else {
+		client, err = m.getDNS01Client(user, m.settings)
+		challengeType = "dns01"
+
+		if err != nil {
+			lsession.Error("get-client-dns01", err)
+			return client, err
+		}
+	}
+
+	lsession.Info("finished", lager.Data{"challenge-type": challengeType})
+	return client, nil
 }
