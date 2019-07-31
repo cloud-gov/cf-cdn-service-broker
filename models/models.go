@@ -213,14 +213,39 @@ type Certificate struct {
 }
 
 type RouteManagerIface interface {
-	Create(instanceId, domain, origin, path string, insecureOrigin bool, forwardedHeaders utils.Headers, forwardCookies bool, tags map[string]string) (*Route, error)
-	Update(instanceId string, domain, origin string, path string, insecureOrigin bool, forwardedHeaders utils.Headers, forwardCookies bool) error
+	Create(
+		instanceId,
+		domain,
+		origin,
+		path string,
+		insecureOrigin bool,
+		forwardedHeaders utils.Headers,
+		forwardCookies bool,
+		tags map[string]string,
+	) (*Route, error)
+
+	Update(
+		instanceId string,
+		domain,
+		origin string,
+		path string,
+		insecureOrigin bool,
+		forwardedHeaders utils.Headers,
+		forwardCookies bool,
+	) error
+
 	Get(instanceId string) (*Route, error)
+
 	Poll(route *Route) error
+
 	Disable(route *Route) error
+
 	Renew(route *Route) error
+
 	RenewAll()
+
 	DeleteOrphanedCerts()
+
 	GetDNSInstructions(route *Route) ([]string, error)
 }
 
@@ -251,7 +276,17 @@ func NewManager(
 	}
 }
 
-func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureOrigin bool, forwardedHeaders utils.Headers, forwardCookies bool, tags map[string]string) (*Route, error) {
+func (m *RouteManager) Create(
+	instanceId,
+	domain,
+	origin,
+	path string,
+	insecureOrigin bool,
+	forwardedHeaders utils.Headers,
+	forwardCookies bool,
+	tags map[string]string,
+) (*Route, error) {
+
 	route := &Route{
 		InstanceId:     instanceId,
 		State:          Provisioning,
@@ -290,7 +325,16 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 		return nil, err
 	}
 
-	dist, err := m.cloudFront.Create(instanceId, make([]string, 0), origin, path, insecureOrigin, forwardedHeaders, forwardCookies, tags)
+	dist, err := m.cloudFront.Create(
+		instanceId,
+		make([]string, 0),
+		origin,
+		path,
+		insecureOrigin,
+		forwardedHeaders,
+		forwardCookies,
+		tags,
+	)
 	if err != nil {
 		lsession.Error("create-cloudfront-instance", err)
 		return nil, err
@@ -325,7 +369,16 @@ func (m *RouteManager) Get(instanceId string) (*Route, error) {
 	}
 }
 
-func (m *RouteManager) Update(instanceId, domain, origin string, path string, insecureOrigin bool, forwardedHeaders utils.Headers, forwardCookies bool) error {
+func (m *RouteManager) Update(
+	instanceId,
+	domain,
+	origin string,
+	path string,
+	insecureOrigin bool,
+	forwardedHeaders utils.Headers,
+	forwardCookies bool,
+) error {
+
 	lsession := m.logger.Session("route-manager-update", lager.Data{
 		"instance-id": instanceId,
 	})
@@ -501,7 +554,10 @@ func (m *RouteManager) stillActive(r *Route) error {
 		}
 
 		if string(body) != r.InstanceId {
-			err := fmt.Errorf("Canary check failed for %s; expected %s, got %s", domain, r.InstanceId, string(body))
+			err := fmt.Errorf(
+				"Canary check failed for %s; expected %s, got %s",
+				domain, r.InstanceId, string(body),
+			)
 			lsession.Error("", err)
 			return err
 		}
@@ -648,7 +704,11 @@ func (m *RouteManager) RenewAll() {
 	}
 }
 
-func (m *RouteManager) getDNS01Client(user *utils.User, settings config.Settings) (acme.ClientInterface, error) {
+func (m *RouteManager) getDNS01Client(
+	user *utils.User,
+	settings config.Settings,
+) (acme.ClientInterface, error) {
+
 	lsession := m.logger.Session("route-manager-get-dns01-client")
 
 	client, err := m.acmeClientProvider.GetDNS01Client(user, settings)
@@ -662,7 +722,11 @@ func (m *RouteManager) getDNS01Client(user *utils.User, settings config.Settings
 	return client, nil
 }
 
-func (m *RouteManager) getHTTP01Client(user *utils.User, settings config.Settings) (acme.ClientInterface, error) {
+func (m *RouteManager) getHTTP01Client(
+	user *utils.User,
+	settings config.Settings,
+) (acme.ClientInterface, error) {
+
 	lsession := m.logger.Session("route-manager-get-http01-client")
 
 	client, err := m.acmeClientProvider.GetHTTP01Client(user, settings)
@@ -806,7 +870,12 @@ func (m *RouteManager) checkDistribution(r *Route) bool {
 	return *dist.Status == "Deployed" && *dist.DistributionConfig.Enabled
 }
 
-func (m *RouteManager) solveChallenges(logger lager.Logger, client acme.ClientInterface, challenges []acme.AuthorizationResource) map[string]error {
+func (m *RouteManager) solveChallenges(
+	logger lager.Logger,
+	client acme.ClientInterface,
+	challenges []acme.AuthorizationResource,
+) map[string]error {
+
 	startTime := time.Now()
 	lsession := logger.Session("solve-challenge", lager.Data{
 		"start_time": startTime.String(),
@@ -834,7 +903,11 @@ func (m *RouteManager) solveChallenges(logger lager.Logger, client acme.ClientIn
 	return failures
 }
 
-func (m *RouteManager) deployCertificate(route Route, cert acme.CertificateResource) error {
+func (m *RouteManager) deployCertificate(
+	route Route,
+	cert acme.CertificateResource,
+) error {
+
 	lsession := m.logger.Session("deploy-certificate", lager.Data{
 		"instance-id": route.InstanceId,
 		"domains":     route.GetDomains(),
@@ -848,7 +921,11 @@ func (m *RouteManager) deployCertificate(route Route, cert acme.CertificateResou
 		return err
 	}
 
-	name := fmt.Sprintf("cdn-route-%s-%s", route.InstanceId, expires.Format("2006-01-02_15-04-05"))
+	name := fmt.Sprintf(
+		"cdn-route-%s-%s",
+		route.InstanceId,
+		expires.Format("2006-01-02_15-04-05"),
+	)
 	lsession.Info("iam-upload-certificate", lager.Data{"name": name})
 	certId, err := m.iam.UploadCertificate(name, cert)
 	if err != nil {
@@ -874,7 +951,11 @@ func (m *RouteManager) deployCertificate(route Route, cert acme.CertificateResou
 	return nil
 }
 
-func (m *RouteManager) ensureChallenges(route *Route, client acme.ClientInterface) error {
+func (m *RouteManager) ensureChallenges(
+	route *Route,
+	client acme.ClientInterface,
+) error {
+
 	lsession := m.logger.Session("ensure-challenges", lager.Data{
 		"instance-id": route.InstanceId,
 		"domains":     route.GetDomains(),
@@ -928,14 +1009,25 @@ func (m *RouteManager) GetDNSInstructions(route *Route) ([]string, error) {
 	for _, auth := range challenges {
 		for _, challenge := range auth.Body.Challenges {
 			if challenge.Type == acme.DNS01 {
-				lsession.Info("get-key-authorization-for-a-dns-challenge", lager.Data{"domain": auth.Domain})
-				keyAuth, err := acme.GetKeyAuthorization(challenge.Token, user.GetPrivateKey())
+				lsession.Info(
+					"get-key-authorization-for-a-dns-challenge",
+					lager.Data{
+						"domain": auth.Domain,
+					},
+				)
+				keyAuth, err := acme.GetKeyAuthorization(
+					challenge.Token,
+					user.GetPrivateKey(),
+				)
 				if err != nil {
 					lsession.Error("get-key-authorization-err", err)
 					return instructions, err
 				}
 				fqdn, value, ttl := acme.DNS01Record(auth.Domain, keyAuth)
-				instructions = append(instructions, fmt.Sprintf("name: %s, value: %s, ttl: %d", fqdn, value, ttl))
+				instructions = append(instructions, fmt.Sprintf(
+					"name: %s, value: %s, ttl: %d",
+					fqdn, value, ttl,
+				))
 			}
 		}
 	}
