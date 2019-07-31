@@ -300,18 +300,21 @@ func (m *RouteManager) Create(
 		"instance-id": instanceId,
 	})
 
+	lsession.Info("create-user")
 	user, err := CreateUser(m.settings.Email)
 	if err != nil {
 		lsession.Error("create-user", err)
 		return nil, err
 	}
 
+	lsession.Info("getting-dns01-client")
 	client, err := m.getDNS01Client(&user, m.settings)
 	if err != nil {
 		lsession.Error("get-dns-01-client", err)
 		return nil, err
 	}
 
+	lsession.Info("saving-user")
 	userData, err := SaveUser(m.db, user)
 	if err != nil {
 		lsession.Error("save-user", err)
@@ -320,11 +323,13 @@ func (m *RouteManager) Create(
 
 	route.UserData = userData
 
+	lsession.Info("ensure-challenges-dns-01")
 	if err := m.ensureChallenges(route, client); err != nil {
 		lsession.Error("ensure-challenges-dns-01", err)
 		return nil, err
 	}
 
+	lsession.Info("create-cloudfront-instance")
 	dist, err := m.cloudFront.Create(
 		instanceId,
 		make([]string, 0),
@@ -343,6 +348,7 @@ func (m *RouteManager) Create(
 	route.DomainInternal = *dist.DomainName
 	route.DistId = *dist.Id
 
+	lsession.Info("db-create-route")
 	if err := m.db.Create(route).Error; err != nil {
 		lsession.Error("db-create-route", err)
 		return nil, err
@@ -356,6 +362,7 @@ func (m *RouteManager) Get(instanceId string) (*Route, error) {
 
 	lsession := m.logger.Session("route-manager-get")
 
+	lsession.Info("db-first-route")
 	result := m.db.First(&route, Route{InstanceId: instanceId})
 	if result.Error == nil {
 		lsession.Error("db-get-first-route", result.Error)
@@ -384,6 +391,7 @@ func (m *RouteManager) Update(
 	})
 
 	// Get current route
+	lsession.Info("get-route")
 	route, err := m.Get(instanceId)
 	if err != nil {
 		lsession.Error("get-route", err)
@@ -393,23 +401,29 @@ func (m *RouteManager) Update(
 	// When we update the CloudFront distribution we should use the old domains
 	// until we have a valid certificate in IAM.
 	// CloudFront gets updated when we receive new certificates during Poll
+	lsession.Info("get-domains")
 	oldDomainsForCloudFront := route.GetDomains()
 
 	// Override any settings that are new or different.
 	if domain != "" {
+		lsession.Info("param-update-domain")
 		route.DomainExternal = domain
 	}
 	if origin != "" {
+		lsession.Info("param-update-origin")
 		route.Origin = origin
 	}
 	if path != route.Path {
+		lsession.Info("param-update-path")
 		route.Path = path
 	}
 	if insecureOrigin != route.InsecureOrigin {
+		lsession.Info("param-update-insecure-origin")
 		route.InsecureOrigin = insecureOrigin
 	}
 
 	// Update the distribution
+	lsession.Info("cloudfront-update-excluding-domains")
 	dist, err := m.cloudFront.Update(
 		route.DistId,
 		oldDomainsForCloudFront,
@@ -417,7 +431,7 @@ func (m *RouteManager) Update(
 		forwardedHeaders, forwardCookies,
 	)
 	if err != nil {
-		lsession.Error("cloudfront-update", err)
+		lsession.Error("cloudfront-update-excluding-domains", err)
 		return err
 	}
 
@@ -426,11 +440,13 @@ func (m *RouteManager) Update(
 	route.DistId = *dist.Id
 
 	if domain == "" {
+		lsession.Info("set-state-provisioned")
 		// CloudFront has been updated with all the configuration
 		// The domains are not being updated so we do not need a new certificate
 		// The Update step is therefore now finished
 		route.State = Provisioned
 	} else {
+		lsession.Info("set-state-provisioning")
 		route.State = Provisioning
 
 		// We need to ensure there is a challenge in the database when provisioning
@@ -438,18 +454,21 @@ func (m *RouteManager) Update(
 		// responsibility of the ACME server to give us what challenges are
 		// supported. I.e. LetsEncrypt will return ALPN01, HTTP01, DNS01 regardless
 		// of which client is used
+		lsession.Info("load-user")
 		user, err := route.loadUser(m.db)
 		if err != nil {
 			lsession.Error("load-user", err)
 			return err
 		}
 
+		lsession.Info("get-dns01-client")
 		client, err := m.getDNS01Client(&user, m.settings)
 		if err != nil {
-			lsession.Error("get-clients", err)
+			lsession.Error("get-dns01-client", err)
 			return err
 		}
 
+		lsession.Info("ensure-challenges")
 		route.ChallengeJSON = []byte("")
 		if err := m.ensureChallenges(route, client); err != nil {
 			lsession.Error("ensure-challenges", err)
@@ -458,6 +477,7 @@ func (m *RouteManager) Update(
 	}
 
 	// Save the database.
+	lsession.Info("db-save-route")
 	result := m.db.Save(route)
 	if result.Error != nil {
 		lsession.Error("db-save-route", err)
@@ -467,10 +487,15 @@ func (m *RouteManager) Update(
 }
 
 func (m *RouteManager) Poll(r *Route) error {
+	lsession := m.logger.Session("route-manager-update", lager.Data{
+		"instance-id": r.InstanceId,
+	})
 	switch r.State {
 	case Provisioning:
+		lsession.Info("update-provisioning")
 		return m.updateProvisioning(r)
 	case Deprovisioning:
+		lsession.Info("update-deprovisioning")
 		return m.updateDeprovisioning(r)
 	default:
 		return nil
@@ -482,12 +507,14 @@ func (m *RouteManager) Disable(r *Route) error {
 		"instance-id": r.InstanceId,
 	})
 
+	lsession.Info("cloudfront-disable")
 	err := m.cloudFront.Disable(r.DistId)
 	if err != nil {
 		lsession.Error("cloudfront-disable", err)
 		return err
 	}
 
+	lsession.Info("db-save")
 	r.State = Deprovisioning
 	if err := m.db.Save(r).Error; err != nil {
 		lsession.Error("db-save-error", err)
@@ -497,13 +524,12 @@ func (m *RouteManager) Disable(r *Route) error {
 }
 
 func (m *RouteManager) stillActive(r *Route) error {
-
-	m.logger.Info("Starting canary check", lager.Data{
-		"route": r,
-	})
-
 	lsession := m.logger.Session("route-manager-still-active", lager.Data{
 		"instance-id": r.InstanceId,
+	})
+
+	lsession.Info("Starting canary check", lager.Data{
+		"route": r,
 	})
 
 	lsession.Info("starting-canary-check", lager.Data{
@@ -528,6 +554,10 @@ func (m *RouteManager) stillActive(r *Route) error {
 		input.ServerSideEncryption = aws.String(m.settings.ServerSideEncryption)
 	}
 
+	lsession.Info("s3-put-object", lager.Data{
+		"bucket": m.settings.Bucket,
+		"key":    target,
+	})
 	if _, err := s3client.PutObject(&input); err != nil {
 		lsession.Error("s3-put-object", err)
 		return err
@@ -539,7 +569,12 @@ func (m *RouteManager) stillActive(r *Route) error {
 		},
 	}
 
+	lsession.Info("get-domains")
 	for _, domain := range r.GetDomains() {
+		lsession.Info("insecure-client-get", lager.Data{
+			"domain": domain,
+			"target": target,
+		})
 		resp, err := insecureClient.Get("https://" + path.Join(domain, target))
 		if err != nil {
 			lsession.Error("insecure-client-get", err)
@@ -547,22 +582,31 @@ func (m *RouteManager) stillActive(r *Route) error {
 		}
 
 		defer resp.Body.Close()
+		lsession.Info("read-response-body", lager.Data{
+			"domain": domain,
+			"target": target,
+		})
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			lsession.Error("read-response-body", err)
 			return err
 		}
 
+		lsession.Info("canary-check", lager.Data{
+			"domain": domain,
+			"target": target,
+		})
 		if string(body) != r.InstanceId {
 			err := fmt.Errorf(
 				"Canary check failed for %s; expected %s, got %s",
 				domain, r.InstanceId, string(body),
 			)
-			lsession.Error("", err)
+			lsession.Error("canary-check-failed", err)
 			return err
 		}
 	}
 
+	lsession.Info("finished")
 	return nil
 }
 
@@ -571,6 +615,7 @@ func (m *RouteManager) Renew(r *Route) error {
 		"instance-id": r.InstanceId,
 	})
 
+	lsession.Info("check-still-active")
 	err := m.stillActive(r)
 	if err != nil {
 		err := fmt.Errorf("Route is not active, skipping renewal: %v", err)
@@ -579,24 +624,28 @@ func (m *RouteManager) Renew(r *Route) error {
 	}
 
 	var certRow Certificate
+	lsession.Info("db-find-related-cert")
 	err = m.db.Model(r).Related(&certRow, "Certificate").Error
 	if err != nil {
 		lsession.Error("db-find-related-cert", err)
 		return err
 	}
 
+	lsession.Info("db-load-user")
 	user, err := r.loadUser(m.db)
 	if err != nil {
 		lsession.Error("db-load-user", err)
 		return err
 	}
 
+	lsession.Info("get-http01-client")
 	client, err := m.getHTTP01Client(&user, m.settings)
 	if err != nil {
 		lsession.Error("get-http01-client", err)
 		return err
 	}
 
+	lsession.Info("obtain-certificate")
 	certResource, errs := client.ObtainCertificate(r.GetDomains(), true, nil, false)
 	if len(errs) > 0 {
 		err := fmt.Errorf("Error(s) obtaining certificate: %v", errs)
@@ -604,12 +653,14 @@ func (m *RouteManager) Renew(r *Route) error {
 		return err
 	}
 
+	lsession.Info("get-pem-cert-expiry")
 	expires, err := acme.GetPEMCertExpiration(certResource.Certificate)
 	if err != nil {
 		lsession.Error("get-pem-cert-expiry", err)
 		return err
 	}
 
+	lsession.Info("deploy-certificate")
 	if err := m.deployCertificate(*r, certResource); err != nil {
 		lsession.Error("deploy-certificate", err)
 		return err
@@ -619,17 +670,26 @@ func (m *RouteManager) Renew(r *Route) error {
 	certRow.CertURL = certResource.CertURL
 	certRow.Certificate = certResource.Certificate
 	certRow.Expires = expires
+	lsession.Info("db-save-cert", lager.Data{
+		"domain":   certResource.Domain,
+		"cert-url": certResource.CertURL,
+		"expires":  expires,
+	})
 	if err := m.db.Save(&certRow).Error; err != nil {
 		lsession.Error("db-save-cert", err)
 		return err
 	}
+
+	lsession.Info("finished")
 	return nil
 }
 
 func (m *RouteManager) DeleteOrphanedCerts() {
+	lsession := m.logger.Session("delete-orphaned-certs")
 	// iterate over all distributions and record all certificates in-use by these distributions
 	activeCerts := make(map[string]string)
 
+	lsession.Info("list-distributions")
 	err := m.cloudFront.ListDistributions(func(distro cloudfront.DistributionSummary) bool {
 		if distro.ViewerCertificate.IAMCertificateId != nil {
 			activeCerts[*distro.ViewerCertificate.IAMCertificateId] = *distro.ARN
@@ -638,41 +698,49 @@ func (m *RouteManager) DeleteOrphanedCerts() {
 	})
 
 	if err != nil {
-		m.logger.Error("cloudfront_list_distributions", err)
+		lsession.Error("cloudfront-list-distributions", err)
 		return
 	}
 
 	// iterate over all certificates
+	lsession.Info("list-certificates")
 	err = m.iam.ListCertificates(func(cert iam.ServerCertificateMetadata) bool {
 
 		// delete any certs not attached to a distribution that are older than 24 hours
 		_, active := activeCerts[*cert.ServerCertificateId]
 		if !active && time.Since(*cert.UploadDate).Hours() > 24 {
-			m.logger.Info("cleaning-orphaned-certificate", lager.Data{
+			lsession.Info("cleaning-orphaned-certificate", lager.Data{
 				"cert": cert,
 			})
 
 			err := m.iam.DeleteCertificate(*cert.ServerCertificateName)
 			if err != nil {
-				m.logger.Error("iam-delete-certificate", err, lager.Data{
+				lsession.Error("iam-delete-certificate", err, lager.Data{
 					"cert": cert,
 				})
 			}
+		} else {
+			lsession.Info("skipping", lager.Data{
+				"cert": cert,
+			})
 		}
 
 		return true
 	})
+
 	if err != nil {
-		m.logger.Error("iam_list_certificates", err)
+		lsession.Error("iam_list_certificates", err)
 	}
+
+	lsession.Info("finished")
 }
 
 func (m *RouteManager) RenewAll() {
-	routes := []Route{}
-
 	lsession := m.logger.Session("route-manager-renew-all")
 
-	m.logger.Info("Looking for routes that are expiring soon")
+	routes := []Route{}
+
+	lsession.Info("Looking for routes that are expiring soon")
 
 	m.db.Having(
 		"max(expires) < now() + interval '30 days'",
@@ -684,7 +752,7 @@ func (m *RouteManager) RenewAll() {
 		"join certificates on routes.id = certificates.route_id",
 	).Find(&routes)
 
-	m.logger.Info("routes-needing-renewal", lager.Data{
+	lsession.Info("routes-needing-renewal", lager.Data{
 		"num-routes": len(routes),
 	})
 
@@ -702,6 +770,7 @@ func (m *RouteManager) RenewAll() {
 			})
 		}
 	}
+	lsession.Info("finished")
 }
 
 func (m *RouteManager) getDNS01Client(
@@ -745,6 +814,7 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 		"instance-id": r.InstanceId,
 	})
 
+	lsession.Info("check-distribution")
 	isDistributionDeployed := m.checkDistribution(r)
 
 	if !isDistributionDeployed {
@@ -752,6 +822,7 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 		return nil
 	}
 
+	lsession.Info("load-user")
 	user, err := r.loadUser(m.db)
 	if err != nil {
 		lsession.Error("load-user", err)
@@ -759,6 +830,7 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 	}
 
 	desiredDomains := r.GetDomains()
+	lsession.Info("get-currently-deployed-domains")
 	deployedDomains, err := m.GetCurrentlyDeployedDomains(r)
 	if err != nil {
 		lsession.Error("get-currently-deployed-domains", err)
@@ -773,12 +845,14 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 		},
 	)
 
+	lsession.Info("get-dns01-client")
 	client, err := m.acmeClientProvider.GetDNS01Client(&user, m.settings)
 	if err != nil {
 		lsession.Error("get-dns01-client-failed", err)
 		return err
 	}
 
+	lsession.Info("ensure-challenges")
 	if err := m.ensureChallenges(r, client); err != nil {
 		lsession.Error("ensure-challenges", err)
 		return err
@@ -792,29 +866,35 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 	}
 	lsession.Info("db-saved-route-challenge")
 
+	lsession.Info("challenge-unmarshall")
 	var challenges []acme.AuthorizationResource
 	if err := json.Unmarshal(r.ChallengeJSON, &challenges); err != nil {
 		lsession.Error("challenge-unmarshall", err)
 		return err
 	}
 
+	lsession.Info("solve-challenges")
 	if errs := m.solveChallenges(lsession, client, challenges); len(errs) > 0 {
 		errstr := fmt.Errorf("Error(s) solving challenges: %v", errs)
 		lsession.Error("solve-challenges", errstr)
 		return errstr
 	}
 
+	lsession.Info("request-certificate")
 	cert, err := client.RequestCertificate(challenges, true, nil, false)
 	if err != nil {
-		lsession.Error("request-certificate-http-01", err)
+		lsession.Error("request-certificate", err)
 		return err
 	}
 
+	lsession.Info("get-pem-cert-expiry")
 	expires, err := acme.GetPEMCertExpiration(cert.Certificate)
 	if err != nil {
-		lsession.Error("get-cert-expiry", err)
+		lsession.Error("get-pem-cert-expiry", err)
 		return err
 	}
+
+	lsession.Info("deploy-certificate")
 	if err := m.deployCertificate(*r, cert); err != nil {
 		lsession.Error("deploy-certificate", err)
 		return err
@@ -826,24 +906,30 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 		Certificate: cert.Certificate,
 		Expires:     expires,
 	}
+
+	lsession.Info("db-create-cert")
 	if err := m.db.Create(&certRow).Error; err != nil {
 		lsession.Error("db-create-cert", err)
 		return err
 	}
 
+	lsession.Info("set-provisioned")
 	r.State = Provisioned
 	r.Certificate = certRow
+	lsession.Info("db-save-cert")
 	if err := m.db.Save(r).Error; err != nil {
 		lsession.Error("db-save-cert", err)
 		return err
 	}
 
+	lsession.Info("finished")
 	return nil
 }
 
 func (m *RouteManager) updateDeprovisioning(r *Route) error {
 	lsession := m.logger.Session("route-manager-update-deprovisioning")
 
+	lsession.Info("cloudfront-delete")
 	deleted, err := m.cloudFront.Delete(r.DistId)
 	if err != nil {
 		lsession.Error("cloudfront-delete", err)
@@ -852,21 +938,32 @@ func (m *RouteManager) updateDeprovisioning(r *Route) error {
 
 	if deleted {
 		r.State = Deprovisioned
+		lsession.Info("db-save-deprovisioned")
 		if err := m.db.Save(r).Error; err != nil {
-			lsession.Error("db-save-delete-state", err)
+			lsession.Error("db-save-deprovisioned", err)
 		}
 	}
 
+	lsession.Info("finished")
 	return nil
 }
 
 func (m *RouteManager) checkDistribution(r *Route) bool {
+	lsession := m.logger.Session("check-distribution", lager.Data{
+		"instance-id": r.InstanceId,
+	})
+
+	lsession.Info("cloudfront-get")
 	dist, err := m.cloudFront.Get(r.DistId)
 	if err != nil {
-		m.logger.Session("check-distribution").Error("cloudfront-get", err)
+		lsession.Error("cloudfront-get", err)
 		return false
 	}
 
+	lsession.Info("finished", lager.Data{
+		"status":  *dist.Status,
+		"enabled": *dist.DistributionConfig.Enabled,
+	})
 	return *dist.Status == "Deployed" && *dist.DistributionConfig.Enabled
 }
 
@@ -900,6 +997,9 @@ func (m *RouteManager) solveChallenges(
 		})
 	}
 
+	lsession.Info("finished", lager.Data{
+		"failures": failures,
+	})
 	return failures
 }
 
@@ -941,13 +1041,14 @@ func (m *RouteManager) deployCertificate(
 	})
 	err = m.cloudFront.SetCertificateAndCname(route.DistId, certId, route.GetDomains())
 	if err != nil {
-		lsession.Info("iam-set-certificate-and-cname-err", lager.Data{
+		lsession.Error("iam-set-certificate-and-cname-err", err, lager.Data{
 			"name":    name,
 			"cert_id": certId,
-			"err":     err,
 		})
 		return err
 	}
+
+	lsession.Info("finished")
 	return nil
 }
 
@@ -974,6 +1075,7 @@ func (m *RouteManager) ensureChallenges(
 		return err
 	}
 
+	lsession.Info("unmarshal-challenges")
 	var err error
 	route.ChallengeJSON, err = json.Marshal(challenges)
 	if err != nil {
@@ -981,6 +1083,7 @@ func (m *RouteManager) ensureChallenges(
 		return err
 	}
 
+	lsession.Info("finished")
 	return nil
 }
 
@@ -1000,6 +1103,7 @@ func (m *RouteManager) GetDNSInstructions(route *Route) ([]string, error) {
 		return instructions, err
 	}
 
+	lsession.Info("json-unmarshal-challenge")
 	if err := json.Unmarshal(route.ChallengeJSON, &challenges); err != nil {
 		lsession.Error("json-unmarshal-challenge", err)
 		return instructions, err
@@ -1031,6 +1135,8 @@ func (m *RouteManager) GetDNSInstructions(route *Route) ([]string, error) {
 			}
 		}
 	}
+
+	lsession.Info("finished")
 	return instructions, nil
 }
 
