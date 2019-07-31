@@ -1,5 +1,7 @@
 # code.cloudfoundry.org/lager v0.0.0-20170223024724-de8e9c6c6e47
 code.cloudfoundry.org/lager
+# github.com/DATA-DOG/go-sqlmock v1.3.3
+github.com/DATA-DOG/go-sqlmock
 # github.com/aws/aws-sdk-go v1.6.27
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/session
@@ -34,11 +36,9 @@ github.com/cloudfoundry-community/go-cfclient
 github.com/davecgh/go-spew/spew
 # github.com/go-ini/ini v1.27.0
 github.com/go-ini/ini
-# github.com/golang/protobuf v1.2.0
+# github.com/golang/protobuf v1.3.2
 github.com/golang/protobuf/proto
-# github.com/gorilla/context v1.1.1
-github.com/gorilla/context
-# github.com/gorilla/mux v1.6.2
+# github.com/gorilla/mux v1.7.3
 github.com/gorilla/mux
 # github.com/hpcloud/tail v1.0.0
 github.com/hpcloud/tail
@@ -98,22 +98,22 @@ github.com/onsi/gomega/matchers/support/goraph/util
 # github.com/pivotal-cf/brokerapi v0.0.0-20170307172350-8f25c50c2794
 github.com/pivotal-cf/brokerapi
 github.com/pivotal-cf/brokerapi/auth
-# github.com/pkg/errors v0.8.0
+# github.com/pkg/errors v0.8.1
 github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0
 github.com/pmezard/go-difflib/difflib
 # github.com/robfig/cron v1.0.0
 github.com/robfig/cron
-# github.com/stretchr/objx v0.1.1
+# github.com/stretchr/objx v0.2.0
 github.com/stretchr/objx
 # github.com/stretchr/testify v1.3.0
 github.com/stretchr/testify/mock
 github.com/stretchr/testify/suite
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
-# golang.org/x/crypto v0.0.0-20190325154230-a5d413f7728c
+# golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
 golang.org/x/crypto/ocsp
-# golang.org/x/net v0.0.0-20190311183353-d8887717615a
+# golang.org/x/net v0.0.0-20190724013045-ca1201d0de80
 golang.org/x/net/publicsuffix
 golang.org/x/net/context
 golang.org/x/net/html/charset
@@ -124,9 +124,9 @@ golang.org/x/net/html/atom
 golang.org/x/oauth2
 golang.org/x/oauth2/clientcredentials
 golang.org/x/oauth2/internal
-# golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a
+# golang.org/x/sys v0.0.0-20190726091711-fc99dfbffb4e
 golang.org/x/sys/unix
-# golang.org/x/text v0.3.1-0.20180807135948-17ff2d5776d2
+# golang.org/x/text v0.3.2
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
 golang.org/x/text/encoding/htmlindex
@@ -144,7 +144,7 @@ golang.org/x/text/runes
 golang.org/x/text/internal/language
 golang.org/x/text/internal/language/compact
 golang.org/x/text/internal/tag
-# google.golang.org/appengine v1.4.0
+# google.golang.org/appengine v1.6.1
 google.golang.org/appengine/urlfetch
 google.golang.org/appengine/internal
 google.golang.org/appengine/internal/urlfetch
