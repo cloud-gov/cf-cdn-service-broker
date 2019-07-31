@@ -21,3 +21,9 @@ type AcmeClientProviderInterface interface {
 type AcmeClientProvider struct {
 	logger lager.Logger
 }
+
+func NewAcmeClientProvider(logger lager.Logger) AcmeClientProviderInterface {
+	return &AcmeClientProvider{
+		logger: logger,
+	}
+}
