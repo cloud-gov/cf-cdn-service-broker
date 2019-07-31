@@ -357,19 +357,29 @@ func (m *RouteManager) Update(instanceId, domain, origin string, path string, in
 	}
 
 	// Update the distribution
-	dist, err := m.cloudFront.Update(route.DistId, oldDomainsForCloudFront,
-		route.Origin, route.Path, route.InsecureOrigin, forwardedHeaders, forwardCookies)
+	dist, err := m.cloudFront.Update(
+		route.DistId,
+		oldDomainsForCloudFront,
+		route.Origin, route.Path, route.InsecureOrigin,
+		forwardedHeaders, forwardCookies,
+	)
 	if err != nil {
 		lsession.Error("cloudfront-update", err)
 		return err
 	}
-	route.State = Provisioning
 
 	// Get the updated domain name and dist id.
 	route.DomainInternal = *dist.DomainName
 	route.DistId = *dist.Id
 
-	if domain != "" {
+	if domain == "" {
+		// CloudFront has been updated with all the configuration
+		// The domains are not being updated so we do not need a new certificate
+		// The Update step is therefore now finished
+		route.State = Provisioned
+	} else {
+		route.State = Provisioning
+
 		// We need to ensure there is a challenge in the database when provisioning
 		// It does not matter which client HTTP01 or DNS01 we use because it is the
 		// responsibility of the ACME server to give us what challenges are
@@ -381,7 +391,7 @@ func (m *RouteManager) Update(instanceId, domain, origin string, path string, in
 			return err
 		}
 
-		client, err := m.getHTTP01Client(&user, m.settings)
+		client, err := m.getDNS01Client(&user, m.settings)
 		if err != nil {
 			lsession.Error("get-clients", err)
 			return err
@@ -691,9 +701,17 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 		return err
 	}
 
-	client, err := m.GetAppropriateACMEClient(&user, deployedDomains, desiredDomains)
+	lsession.Info(
+		"router-manager-update-provisioning",
+		lager.Data{
+			"deployed-domains": deployedDomains,
+			"desired-domains":  desiredDomains,
+		},
+	)
+
+	client, err := m.acmeClientProvider.GetDNS01Client(&user, m.settings)
 	if err != nil {
-		lsession.Error("get-appropriate-acme-client-failed", err)
+		lsession.Error("get-dns01-client-failed", err)
 		return err
 	}
 
@@ -943,43 +961,4 @@ func (m *RouteManager) GetCurrentlyDeployedDomains(r *Route) ([]string, error) {
 
 	lsession.Info("finished")
 	return deployedDomains, nil
-}
-
-func (m *RouteManager) GetAppropriateACMEClient(
-	user *utils.User, deployed []string, desired []string,
-) (acme.ClientInterface, error) {
-	lsession := m.logger.Session("get-appropriate-acme-client")
-	lsession.Info("start")
-
-	// If the deployed domains are the same as the desired domains, we are able
-	// to do HTTP01 challenge, and it is desirable to do so, so that that user
-	// does not have to change their DNS record. If they are different then we
-	// MUST do DNS01 challenge
-
-	deployedAndDesiredAreTheSame := utils.StrSlicesAreEqual(deployed, desired)
-
-	var client acme.ClientInterface
-	var err error
-	var challengeType string
-
-	if deployedAndDesiredAreTheSame {
-		client, err = m.getHTTP01Client(user, m.settings)
-		challengeType = "http01"
-
-		if err != nil {
-			lsession.Error("get-client-http01", err)
-			return client, err
-		}
-	} else {
-		client, err = m.getDNS01Client(user, m.settings)
-		challengeType = "dns01"
-
-		if err != nil {
-			lsession.Error("get-client-dns01", err)
-			return client, err
-		}
-	}
-
-	lsession.Info("finished", lager.Data{"challenge-type": challengeType})
-	return client, nil
 }

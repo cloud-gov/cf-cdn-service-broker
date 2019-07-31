@@ -500,7 +500,7 @@ var _ = Describe("Models", func() {
 	})
 
 	Context("Poll", func() {
-		It("updateProvisiong works correctly", func() {
+		It("updateProvisioning works correctly", func() {
 			logger := lager.NewLogger("dns-01-test-only")
 			logger.RegisterSink(lager.NewWriterSink(GinkgoWriter, lager.ERROR))
 
@@ -735,89 +735,4 @@ var _ = Describe("Models", func() {
 		})
 	})
 
-	Context("GetAppropriateACMEClient", func() {
-		var (
-			user             = utils.User{}
-			manager          models.RouteManager
-			acmeProviderMock *mocks.FakeAcmeClientProvider
-		)
-
-		BeforeEach(func() {
-			logger := lager.NewLogger("cdn-cron-test")
-			logOutput := bytes.NewBuffer([]byte{})
-			logger.RegisterSink(lager.NewWriterSink(logOutput, lager.ERROR))
-
-			settings, _ := config.NewSettings()
-			awsSession := session.New(nil)
-
-			fakecf := cloudfront.New(awsSession)
-			fakecf.Handlers.Clear()
-
-			fakeiam := iam.New(awsSession)
-			mui := new(MockUtilsIam)
-			mui.Settings = settings
-			mui.Service = fakeiam
-
-			acmeProviderMock = StubAcmeClientProvider()
-
-			manager = models.NewManager(
-				logger,
-				mui,
-				&utils.Distribution{settings, fakecf},
-				settings,
-				gormDB,
-				acmeProviderMock,
-			)
-		})
-
-		It("should return HTTP01 client when the domains are identical", func() {
-			deployed := []string{"foo.bar.com"}
-			desired := []string{"foo.bar.com"}
-			_, err := manager.GetAppropriateACMEClient(&user, deployed, desired)
-
-			Expect(err).NotTo(HaveOccurred())
-			Expect(acmeProviderMock.GetHTTP01ClientCallCount()).To(Equal(1))
-			Expect(acmeProviderMock.GetDNS01ClientCallCount()).To(Equal(0))
-		})
-
-		It("should return DNS01 client when no domains are deployed", func() {
-			deployed := []string{}
-			desired := []string{"foo.bar.com"}
-			_, err := manager.GetAppropriateACMEClient(&user, deployed, desired)
-
-			Expect(err).NotTo(HaveOccurred())
-			Expect(acmeProviderMock.GetHTTP01ClientCallCount()).To(Equal(0))
-			Expect(acmeProviderMock.GetDNS01ClientCallCount()).To(Equal(1))
-		})
-
-		It("should return DNS01 client when removing a domain", func() {
-			deployed := []string{"foo.bar.com", "extra.domain.com"}
-			desired := []string{"foo.bar.com"}
-			_, err := manager.GetAppropriateACMEClient(&user, deployed, desired)
-
-			Expect(err).NotTo(HaveOccurred())
-			Expect(acmeProviderMock.GetHTTP01ClientCallCount()).To(Equal(0))
-			Expect(acmeProviderMock.GetDNS01ClientCallCount()).To(Equal(1))
-		})
-
-		It("should return DNS01 client when adding domains", func() {
-			deployed := []string{"foo.bar.com"}
-			desired := []string{"foo.bar.com", "extra.domain.com"}
-			_, err := manager.GetAppropriateACMEClient(&user, deployed, desired)
-
-			Expect(err).NotTo(HaveOccurred())
-			Expect(acmeProviderMock.GetHTTP01ClientCallCount()).To(Equal(0))
-			Expect(acmeProviderMock.GetDNS01ClientCallCount()).To(Equal(1))
-		})
-
-		It("should return DNS01 client when swapping domains", func() {
-			deployed := []string{"other.domain.com", "foo.bar.com"}
-			desired := []string{"foo.bar.com", "extra.domain.com"}
-			_, err := manager.GetAppropriateACMEClient(&user, deployed, desired)
-
-			Expect(err).NotTo(HaveOccurred())
-			Expect(acmeProviderMock.GetHTTP01ClientCallCount()).To(Equal(0))
-			Expect(acmeProviderMock.GetDNS01ClientCallCount()).To(Equal(1))
-		})
-	})
 })
