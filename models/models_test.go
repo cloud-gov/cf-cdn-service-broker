@@ -736,23 +736,39 @@ var _ = Describe("Models", func() {
 	})
 
 	Context("Update", func() {
-		It("should not perform any ACME challenges when domains are updated", func() {
-			logger := lager.NewLogger("no-challenge-test-only")
-			logger.RegisterSink(lager.NewWriterSink(GinkgoWriter, lager.ERROR))
+		var (
+			cloudfrontDistID = "cloudfoundry-instance-id"
+			domain           = "foo.paas.gov.uk"
+			origin           = "foo.cloudapps.digital"
+			path             = "/"
+			insecureOrigin   = false
+			forwardedHeaders = utils.Headers{"X-Forwarded-Five": true}
+			forwardCookies   = false
 
-			cloudfrontDistID := "cloudfoundry-instance-id"
-			domain := "foo.paas.gov.uk"
-			origin := "foo.cloudapps.digital"
-			path := "/"
-			insecureOrigin := false
-			forwardedHeaders := utils.Headers{"X-Forwarded-Five": true}
-			forwardCookies := false
+			pemdata []byte
 
-			settings, _ := config.NewSettings()
+			fakecf   *cloudfront.CloudFront
+			fakeiam  *iam.IAM
+			settings config.Settings
+			mui      *MockUtilsIam
+		)
+
+		BeforeEach(func() {
+			rsaTestKey, err := rsa.GenerateKey(rand.Reader, 2048)
+			Expect(err).NotTo(HaveOccurred(), "Generating test key")
+			pemdata = pem.EncodeToMemory(
+				&pem.Block{
+					Type:  "RSA PRIVATE KEY",
+					Bytes: x509.MarshalPKCS1PrivateKey(rsaTestKey),
+				},
+			)
+
+			settings, _ = config.NewSettings()
 			awsSession := session.New(nil)
 
-			fakecf := cloudfront.New(awsSession)
+			fakecf = cloudfront.New(awsSession)
 			fakecf.Handlers.Clear()
+
 			fakecf.Handlers.Send.PushBack(func(r *request.Request) {
 				distributionConfig := &cloudfront.DistributionConfig{
 					Aliases: &cloudfront.Aliases{
@@ -787,10 +803,15 @@ var _ = Describe("Models", func() {
 				}
 			})
 
-			fakeiam := iam.New(awsSession)
-			mui := new(MockUtilsIam)
+			fakeiam = iam.New(awsSession)
+			mui = new(MockUtilsIam)
 			mui.Settings = settings
 			mui.Service = fakeiam
+		})
+
+		It("should not perform any ACME challenges when domains are updated", func() {
+			logger := lager.NewLogger("no-challenge-test-only")
+			logger.RegisterSink(lager.NewWriterSink(GinkgoWriter, lager.ERROR))
 
 			fakeDNS01Client := &mocks.FakeAcmeClient{}
 			fakeDNS01Client.RequestCertificateReturns(
@@ -839,15 +860,6 @@ var _ = Describe("Models", func() {
 				),
 			)
 
-			rsaTestKey, err := rsa.GenerateKey(rand.Reader, 2048)
-			Expect(err).NotTo(HaveOccurred(), "Generating test key")
-			pemdata := pem.EncodeToMemory(
-				&pem.Block{
-					Type:  "RSA PRIVATE KEY",
-					Bytes: x509.MarshalPKCS1PrivateKey(rsaTestKey),
-				},
-			)
-
 			mockDB.ExpectExec(
 				`UPDATE "routes"`,
 			).WithArgs(
@@ -881,7 +893,7 @@ var _ = Describe("Models", func() {
 			// not want to change the currently configured domain
 			brokerAPICallDomainArgument := ""
 
-			err = manager.Update(
+			err := manager.Update(
 				cloudfrontDistID,
 				brokerAPICallDomainArgument,
 				origin,
@@ -899,58 +911,6 @@ var _ = Describe("Models", func() {
 		It("should perform a DNS challenge when domains are updated", func() {
 			logger := lager.NewLogger("dns-01-test-only")
 			logger.RegisterSink(lager.NewWriterSink(GinkgoWriter, lager.ERROR))
-
-			cloudfrontDistID := "cloudfoundry-instance-id"
-			domain := "foo.paas.gov.uk"
-			origin := "foo.cloudapps.digital"
-			path := "/"
-			insecureOrigin := false
-			forwardedHeaders := utils.Headers{"X-Forwarded-Five": true}
-			forwardCookies := false
-
-			settings, _ := config.NewSettings()
-			awsSession := session.New(nil)
-
-			fakecf := cloudfront.New(awsSession)
-			fakecf.Handlers.Clear()
-			fakecf.Handlers.Send.PushBack(func(r *request.Request) {
-				distributionConfig := &cloudfront.DistributionConfig{
-					Aliases: &cloudfront.Aliases{
-						Quantity: aws.Int64(1),
-						Items:    []*string{aws.String("foo.paas.gov.uk")},
-					},
-					Enabled:           aws.Bool(true),
-					ViewerCertificate: &cloudfront.ViewerCertificate{},
-					CallerReference:   aws.String("hi mom"),
-				}
-
-				switch r.Operation.Name {
-				case "GetDistribution2016_11_25":
-					data := r.Data.(*cloudfront.GetDistributionOutput)
-					data.Distribution = &cloudfront.Distribution{
-						Id:                 aws.String("cloudfront-distribution-id"),
-						DomainName:         aws.String("foo.paas.gov.uk"),
-						Status:             aws.String("Deployed"),
-						DistributionConfig: distributionConfig,
-					}
-					data.ETag = aws.String("etag")
-				case "GetDistributionConfig2016_11_25":
-					data := r.Data.(*cloudfront.GetDistributionConfigOutput)
-					data.DistributionConfig = distributionConfig
-				case "UpdateDistribution2016_11_25":
-					data := r.Data.(*cloudfront.UpdateDistributionOutput)
-					data.Distribution = &cloudfront.Distribution{
-						DomainName:         aws.String("foo.paas.gov.uk"),
-						Id:                 aws.String(cloudfrontDistID),
-						DistributionConfig: distributionConfig,
-					}
-				}
-			})
-
-			fakeiam := iam.New(awsSession)
-			mui := new(MockUtilsIam)
-			mui.Settings = settings
-			mui.Service = fakeiam
 
 			fakeDNS01Client := &mocks.FakeAcmeClient{}
 			fakeDNS01Client.RequestCertificateReturns(
@@ -1001,15 +961,6 @@ var _ = Describe("Models", func() {
 				),
 			)
 
-			rsaTestKey, err := rsa.GenerateKey(rand.Reader, 2048)
-			Expect(err).NotTo(HaveOccurred(), "Generating test key")
-			pemdata := pem.EncodeToMemory(
-				&pem.Block{
-					Type:  "RSA PRIVATE KEY",
-					Bytes: x509.MarshalPKCS1PrivateKey(rsaTestKey),
-				},
-			)
-
 			mockDB.ExpectQuery(
 				`SELECT \* FROM "user_data"`,
 			).WillReturnRows(
@@ -1043,7 +994,7 @@ var _ = Describe("Models", func() {
 			// want to change the currently configured domain
 			brokerAPICallDomainArgument := "foo.paas.gov.uk,bar.paas.gov.uk"
 
-			err = manager.Update(
+			err := manager.Update(
 				cloudfrontDistID,
 				brokerAPICallDomainArgument,
 				origin,
