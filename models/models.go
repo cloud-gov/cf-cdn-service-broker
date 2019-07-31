@@ -360,7 +360,9 @@ func (m *RouteManager) Create(
 func (m *RouteManager) Get(instanceId string) (*Route, error) {
 	route := Route{}
 
-	lsession := m.logger.Session("route-manager-get")
+	lsession := m.logger.Session("route-manager-get", lager.Data{
+		"instance-id": instanceId,
+	})
 
 	lsession.Info("db-first-route")
 	result := m.db.First(&route, Route{InstanceId: instanceId})
