@@ -59,6 +59,23 @@ type solver interface {
 type validateFunc func(j *jws, domain, uri string, chlng challenge) error
 
 // Client is the user-friendy way to ACME
+type ClientInterface interface {
+	SetChallengeProvider(challenge Challenge, p ChallengeProvider) error
+	SetHTTPAddress(iface string) error
+	SetTLSAddress(iface string) error
+	ExcludeChallenges(challenges []Challenge)
+	Register() (*RegistrationResource, error)
+	DeleteRegistration() error
+	QueryRegistration() (*RegistrationResource, error)
+	AgreeToTOS() error
+	ObtainCertificateForCSR(csr x509.CertificateRequest, bundle bool) (CertificateResource, map[string]error)
+	ObtainCertificate(domains []string, bundle bool, privKey crypto.PrivateKey, mustStaple bool) (CertificateResource, map[string]error)
+	RevokeCertificate(certificate []byte) error
+	RenewCertificate(cert CertificateResource, bundle, mustStaple bool) (CertificateResource, error)
+	SolveChallenges(challenges []AuthorizationResource) map[string]error
+	GetChallenges(domains []string) ([]AuthorizationResource, map[string]error)
+	RequestCertificate(authz []AuthorizationResource, bundle bool, privKey crypto.PrivateKey, mustStaple bool) (CertificateResource, error)
+}
 type Client struct {
 	directory directory
 	user      User

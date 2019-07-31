@@ -43,6 +43,7 @@ func main() {
 		&utils.Distribution{settings, cloudfront.New(session)},
 		settings,
 		db,
+		models.NewAcmeClientProvider(logger),
 	)
 
 	c := cron.New()

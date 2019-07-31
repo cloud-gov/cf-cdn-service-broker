@@ -56,6 +56,7 @@ func main() {
 		&utils.Distribution{settings, cloudfront.New(session)},
 		settings,
 		db,
+		models.NewAcmeClientProvider(logger),
 	)
 	broker := broker.New(
 		&manager,

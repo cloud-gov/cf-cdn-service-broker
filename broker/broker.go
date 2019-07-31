@@ -314,12 +314,16 @@ func (b *CdnServiceBroker) Update(
 		return brokerapi.UpdateServiceSpec{}, err
 	}
 
-	err = b.manager.Update(instanceID, options.Domain, options.Origin, options.Path, options.InsecureOrigin, headers, options.Cookies)
+	provisioningAsync, err := b.manager.Update(
+		instanceID,
+		options.Domain, options.Origin, options.Path, options.InsecureOrigin,
+		headers, options.Cookies,
+	)
 	if err != nil {
 		return brokerapi.UpdateServiceSpec{}, err
 	}
 
-	return brokerapi.UpdateServiceSpec{IsAsync: true}, nil
+	return brokerapi.UpdateServiceSpec{IsAsync: provisioningAsync}, nil
 }
 
 // createBrokerOptions will attempt to take raw json and convert it into the "Options" struct.
