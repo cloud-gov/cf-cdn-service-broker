@@ -735,4 +735,169 @@ var _ = Describe("Models", func() {
 		})
 	})
 
+	Context("Update", func() {
+		It("should not perform any ACME challenges when domains are updated", func() {
+			logger := lager.NewLogger("dns-01-test-only")
+			logger.RegisterSink(lager.NewWriterSink(GinkgoWriter, lager.ERROR))
+
+			cloudfrontDistID := "cloudfoundry-instance-id"
+			domain := "foo.paas.gov.uk"
+			origin := "foo.cloudapps.digital"
+			path := "/"
+			insecureOrigin := false
+			forwardedHeaders := utils.Headers{"X-Forwarded-Five": true}
+			forwardCookies := false
+
+			settings, _ := config.NewSettings()
+			awsSession := session.New(nil)
+
+			fakecf := cloudfront.New(awsSession)
+			fakecf.Handlers.Clear()
+			fakecf.Handlers.Send.PushBack(func(r *request.Request) {
+				distributionConfig := &cloudfront.DistributionConfig{
+					Aliases: &cloudfront.Aliases{
+						Quantity: aws.Int64(1),
+						Items:    []*string{aws.String("foo.paas.gov.uk")},
+					},
+					Enabled:           aws.Bool(true),
+					ViewerCertificate: &cloudfront.ViewerCertificate{},
+					CallerReference:   aws.String("hi mom"),
+				}
+
+				switch r.Operation.Name {
+				case "GetDistribution2016_11_25":
+					data := r.Data.(*cloudfront.GetDistributionOutput)
+					data.Distribution = &cloudfront.Distribution{
+						Id:                 aws.String("cloudfront-distribution-id"),
+						DomainName:         aws.String("foo.paas.gov.uk"),
+						Status:             aws.String("Deployed"),
+						DistributionConfig: distributionConfig,
+					}
+					data.ETag = aws.String("etag")
+				case "GetDistributionConfig2016_11_25":
+					data := r.Data.(*cloudfront.GetDistributionConfigOutput)
+					data.DistributionConfig = distributionConfig
+				case "UpdateDistribution2016_11_25":
+					data := r.Data.(*cloudfront.UpdateDistributionOutput)
+					data.Distribution = &cloudfront.Distribution{
+						DomainName:         aws.String("foo.paas.gov.uk"),
+						Id:                 aws.String(cloudfrontDistID),
+						DistributionConfig: distributionConfig,
+					}
+				}
+			})
+
+			fakeiam := iam.New(awsSession)
+			mui := new(MockUtilsIam)
+			mui.Settings = settings
+			mui.Service = fakeiam
+
+			fakeDNS01Client := &mocks.FakeAcmeClient{}
+			fakeDNS01Client.RequestCertificateReturns(
+				acme.CertificateResource{Certificate: []byte(selfSignedCert)},
+				nil,
+			)
+			fakeDNS01Client.GetChallengesReturns(
+				[]acme.AuthorizationResource{},
+				map[string]error{},
+			)
+
+			acmeProviderMock := StubAcmeClientProvider()
+
+			manager := models.NewManager(
+				logger,
+				mui,
+				&utils.Distribution{settings, fakecf},
+				settings,
+				gormDB,
+				acmeProviderMock,
+			)
+
+			routeID := 101
+			certificateID := 202
+			userDataID := 303
+
+			mockDB.ExpectQuery(
+				`SELECT \* FROM "routes"`,
+			).WillReturnRows(
+				sqlmock.NewRows(
+					[]string{
+						"created_at", "updated_at", "deleted_at",
+						"id", "challenge_json",
+						"domain_external", "domain_internal",
+						"dist_id", "origin", "path",
+						"insecure_origin", "certificate_id", "user_data_id",
+						"state",
+					},
+				).AddRow(
+					time.Now(), time.Now(), nil,
+					routeID, "[]",
+					domain, "foo.cloudfront.net",
+					cloudfrontDistID, origin, path,
+					false, certificateID, userDataID,
+					"Provisioned",
+				),
+			)
+
+			rsaTestKey, err := rsa.GenerateKey(rand.Reader, 2048)
+			Expect(err).NotTo(HaveOccurred(), "Generating test key")
+			pemdata := pem.EncodeToMemory(
+				&pem.Block{
+					Type:  "RSA PRIVATE KEY",
+					Bytes: x509.MarshalPKCS1PrivateKey(rsaTestKey),
+				},
+			)
+
+			mockDB.ExpectExec(
+				`UPDATE "routes"`,
+			).WithArgs(
+				sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
+				"provisioned", // Expect new state to be Provisioned
+				sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
+				sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
+				sqlmock.AnyArg(),
+			).WillReturnResult(sqlmock.NewResult(1, 1))
+
+			mockDB.ExpectQuery(
+				`SELECT \* FROM "user_data"`,
+			).WillReturnRows(
+				sqlmock.NewRows(
+					[]string{
+						"id", "created_at", "updated_at", "deleted_at",
+						"email", "key", "reg",
+					},
+				).AddRow(
+					1, time.Now(), time.Now(), nil,
+					"the-mocky-cloud-paas-team@digital.cabinet-office.gov.uk",
+					string(pemdata),
+					`{
+						"Email": "the-mocky-cloud-paas-team@digital.cabinet-office.gov.uk",
+						"Registration": null
+					}`,
+				),
+			)
+
+			// we are simulating that someone is updating the distribution, but does
+			// not want to change the currently configured domain
+			brokerAPICallDomainArgument := ""
+
+			err = manager.Update(
+				cloudfrontDistID,
+				brokerAPICallDomainArgument,
+				origin,
+				path,
+				insecureOrigin,
+				forwardedHeaders,
+				forwardCookies,
+			)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(acmeProviderMock.GetDNS01ClientCallCount()).To(Equal(0))
+			Expect(acmeProviderMock.GetHTTP01ClientCallCount()).To(Equal(0))
+		})
+
+		It("should perform a DNS challenge when domains are updated", func() {
+		})
+	})
+
 })
