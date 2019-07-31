@@ -232,7 +232,7 @@ type RouteManagerIface interface {
 		insecureOrigin bool,
 		forwardedHeaders utils.Headers,
 		forwardCookies bool,
-	) error
+	) (bool, error)
 
 	Get(instanceId string) (*Route, error)
 
@@ -378,6 +378,8 @@ func (m *RouteManager) Get(instanceId string) (*Route, error) {
 	}
 }
 
+// Update updates the CDN route service and returns whether the update has been
+// performed asynchronously or not
 func (m *RouteManager) Update(
 	instanceId,
 	domain,
@@ -386,7 +388,7 @@ func (m *RouteManager) Update(
 	insecureOrigin bool,
 	forwardedHeaders utils.Headers,
 	forwardCookies bool,
-) error {
+) (bool, error) {
 
 	lsession := m.logger.Session("route-manager-update", lager.Data{
 		"instance-id": instanceId,
@@ -397,7 +399,7 @@ func (m *RouteManager) Update(
 	route, err := m.Get(instanceId)
 	if err != nil {
 		lsession.Error("get-route", err)
-		return err
+		return false, err
 	}
 
 	// When we update the CloudFront distribution we should use the old domains
@@ -434,7 +436,7 @@ func (m *RouteManager) Update(
 	)
 	if err != nil {
 		lsession.Error("cloudfront-update-excluding-domains", err)
-		return err
+		return false, err
 	}
 
 	// Get the updated domain name and dist id.
@@ -460,21 +462,21 @@ func (m *RouteManager) Update(
 		user, err := route.loadUser(m.db)
 		if err != nil {
 			lsession.Error("load-user", err)
-			return err
+			return false, err
 		}
 
 		lsession.Info("get-dns01-client")
 		client, err := m.getDNS01Client(&user, m.settings)
 		if err != nil {
 			lsession.Error("get-dns01-client", err)
-			return err
+			return false, err
 		}
 
 		lsession.Info("ensure-challenges")
 		route.ChallengeJSON = []byte("")
 		if err := m.ensureChallenges(route, client); err != nil {
 			lsession.Error("ensure-challenges", err)
-			return err
+			return false, err
 		}
 	}
 
@@ -483,9 +485,11 @@ func (m *RouteManager) Update(
 	result := m.db.Save(route)
 	if result.Error != nil {
 		lsession.Error("db-save-route", err)
-		return result.Error
+		return false, result.Error
 	}
-	return nil
+
+	performedAsynchronously := route.State == Provisioning
+	return performedAsynchronously, nil
 }
 
 func (m *RouteManager) Poll(r *Route) error {

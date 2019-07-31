@@ -893,7 +893,7 @@ var _ = Describe("Models", func() {
 			// not want to change the currently configured domain
 			brokerAPICallDomainArgument := ""
 
-			err := manager.Update(
+			performedAsynchronously, err := manager.Update(
 				cloudfrontDistID,
 				brokerAPICallDomainArgument,
 				origin,
@@ -904,6 +904,7 @@ var _ = Describe("Models", func() {
 			)
 
 			Expect(err).NotTo(HaveOccurred())
+			Expect(performedAsynchronously).To(Equal(false))
 			Expect(acmeProviderMock.GetDNS01ClientCallCount()).To(Equal(0))
 			Expect(acmeProviderMock.GetHTTP01ClientCallCount()).To(Equal(0))
 		})
@@ -994,7 +995,7 @@ var _ = Describe("Models", func() {
 			// want to change the currently configured domain
 			brokerAPICallDomainArgument := "foo.paas.gov.uk,bar.paas.gov.uk"
 
-			err := manager.Update(
+			performedAsynchronously, err := manager.Update(
 				cloudfrontDistID,
 				brokerAPICallDomainArgument,
 				origin,
@@ -1005,6 +1006,7 @@ var _ = Describe("Models", func() {
 			)
 
 			Expect(err).NotTo(HaveOccurred())
+			Expect(performedAsynchronously).To(Equal(true))
 			Expect(acmeProviderMock.GetDNS01ClientCallCount()).To(Equal(1))
 			Expect(acmeProviderMock.GetHTTP01ClientCallCount()).To(Equal(0))
 		})
