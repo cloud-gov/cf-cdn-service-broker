@@ -172,6 +172,11 @@ go test -v $(go list ./... | grep -v /vendor/)
 
 See [CONTRIBUTING](CONTRIBUTING.md) for additional information.
 
+### Understanding the CDN broker state changes
+The CDN broker is highly asynchronous, and deals with AWS CloudFront and Let's Encrypt simultaneously. For that reason, it can be difficult to reason about the states it has and how it transitions between them. The below diagram is intended to help clarify that.
+
+![A diagram showing how the CDN broker transitions between states](docs/cdn-broker-states.png "By @AP-Hunt")
+
 ## Public domain
 
 This project is in the worldwide [public domain](LICENSE.md). As stated in [CONTRIBUTING](CONTRIBUTING.md):
