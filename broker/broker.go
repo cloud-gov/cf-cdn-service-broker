@@ -155,6 +155,12 @@ func (b *CdnServiceBroker) LastOperation(
 			"domain": route.DomainExternal,
 			"state":  route.State,
 		})
+		if strings.Contains(err.Error(), "CNAMEAlreadyExists") {
+			return brokerapi.LastOperation{
+				State:       brokerapi.Failed,
+				Description: "One or more of the CNAMEs you provided are already associated with a different CDN",
+			}, nil
+		}
 	}
 
 	lsession.Info("provisioning-state", lager.Data{
