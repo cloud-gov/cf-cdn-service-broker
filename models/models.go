@@ -187,6 +187,7 @@ type Route struct {
 	Certificate    Certificate
 	UserData       UserData
 	UserDataID     int
+	DefaultTTL     int64
 }
 
 func (r *Route) GetDomains() []string {
@@ -218,6 +219,7 @@ type RouteManagerIface interface {
 		domain,
 		origin,
 		path string,
+		defaultTTL int64,
 		insecureOrigin bool,
 		forwardedHeaders utils.Headers,
 		forwardCookies bool,
@@ -229,6 +231,7 @@ type RouteManagerIface interface {
 		domain,
 		origin string,
 		path string,
+		defaultTTL int64,
 		insecureOrigin bool,
 		forwardedHeaders utils.Headers,
 		forwardCookies bool,
@@ -281,6 +284,7 @@ func (m *RouteManager) Create(
 	domain,
 	origin,
 	path string,
+	defaultTTL int64,
 	insecureOrigin bool,
 	forwardedHeaders utils.Headers,
 	forwardCookies bool,
@@ -293,6 +297,7 @@ func (m *RouteManager) Create(
 		DomainExternal: domain,
 		Origin:         origin,
 		Path:           path,
+		DefaultTTL:     defaultTTL,
 		InsecureOrigin: insecureOrigin,
 	}
 
@@ -335,6 +340,7 @@ func (m *RouteManager) Create(
 		make([]string, 0),
 		origin,
 		path,
+		defaultTTL,
 		insecureOrigin,
 		forwardedHeaders,
 		forwardCookies,
@@ -385,6 +391,7 @@ func (m *RouteManager) Update(
 	domain,
 	origin string,
 	path string,
+	defaultTTL int64,
 	insecureOrigin bool,
 	forwardedHeaders utils.Headers,
 	forwardCookies bool,
@@ -421,6 +428,10 @@ func (m *RouteManager) Update(
 		lsession.Info("param-update-path")
 		route.Path = path
 	}
+	if defaultTTL != route.DefaultTTL {
+		lsession.Info("param-update-default-ttl")
+		route.DefaultTTL = defaultTTL
+	}
 	if insecureOrigin != route.InsecureOrigin {
 		lsession.Info("param-update-insecure-origin")
 		route.InsecureOrigin = insecureOrigin
@@ -431,7 +442,9 @@ func (m *RouteManager) Update(
 	dist, err := m.cloudFront.Update(
 		route.DistId,
 		oldDomainsForCloudFront,
-		route.Origin, route.Path, route.InsecureOrigin,
+		route.Origin, route.Path,
+		route.DefaultTTL,
+		route.InsecureOrigin,
 		forwardedHeaders, forwardCookies,
 	)
 	if err != nil {

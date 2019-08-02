@@ -26,6 +26,7 @@ type Settings struct {
 	ClientID             string `envconfig:"client_id" required:"true"`
 	ClientSecret         string `envconfig:"client_secret" required:"true"`
 	DefaultOrigin        string `envconfig:"default_origin" required:"true"`
+	DefaultDefaultTTL    int64  `envconfig:"default_default_ttl" default:"0"`
 	Schedule             string `envconfig:"schedule" default:"0 0 * * * *"`
 }
 
