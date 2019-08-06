@@ -187,7 +187,7 @@ type Route struct {
 	Certificate    Certificate
 	UserData       UserData
 	UserDataID     int
-	DefaultTTL     int64
+	DefaultTTL     int64 `gorm:"default:86400"`
 }
 
 func (r *Route) GetDomains() []string {
