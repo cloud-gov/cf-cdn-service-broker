@@ -120,6 +120,15 @@ $ cf create-service cdn-route cdn-route my-cdn-route \
 Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
 ```
 
+The default TTL for the CloudFront distribution is `0`. To change this, you can pass it as a parameter:
+
+```bash
+$ cf create-service cdn-route cdn-route my-cdn-route \
+    -c '{"domain": "my.domain.gov", "default_ttl": 12345}'
+
+Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
+```
+
 ## Cookie Forwarding
 
 If you do not want cookies forwarded to your origin, you'll need to add another parameter:
