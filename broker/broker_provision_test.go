@@ -33,12 +33,12 @@ type ProvisionSuite struct {
 
 func (s *ProvisionSuite) allowCreateWithExpectedHeaders(expectedHeaders utils.Headers) {
 	route := &models.Route{State: models.Provisioning}
-	s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", "", false, expectedHeaders, true,
+	s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", "", s.settings.DefaultDefaultTTL, false, expectedHeaders, true,
 		map[string]string{"Organization": "", "Space": "", "Service": "", "Plan": ""}).Return(route, nil)
 }
 
 func (s *ProvisionSuite) failCreateWithExpectedHeaders(expectedHeaders utils.Headers) {
-	s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", "", false, expectedHeaders, true,
+	s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", "", s.settings.DefaultDefaultTTL, false, expectedHeaders, true,
 		map[string]string{"Organization": "", "Space": "", "Service": "", "Plan": ""}).Return(nil, errors.New("fail"))
 }
 
@@ -51,6 +51,7 @@ var _ = Describe("Last operation", func() {
 		s.logger = lager.NewLogger("test")
 		s.settings = config.Settings{
 			DefaultOrigin: "origin.cloud.gov",
+			DefaultDefaultTTL: int64(0),
 		}
 		s.Broker = broker.New(
 			&s.Manager,
@@ -107,7 +108,7 @@ var _ = Describe("Last operation", func() {
 		s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
 		route := &models.Route{State: models.Provisioning}
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
-		s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", "", false, utils.Headers{"Host": true}, true,
+		s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", "", s.settings.DefaultDefaultTTL, false, utils.Headers{"Host": true}, true,
 			map[string]string{"Organization": "", "Space": "", "Service": "", "Plan": ""}).Return(route, nil)
 
 		details := brokerapi.ProvisionDetails{
@@ -118,10 +119,29 @@ var _ = Describe("Last operation", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
+	It("Should create a cloudfront instance with a custom DefaultTTL", func() {
+		s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
+		route := &models.Route{State: models.Provisioning}
+		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
+		s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", "", int64(52), false, utils.Headers{"Host": true}, true,
+			map[string]string{"Organization": "", "Space": "", "Service": "", "Plan": ""}).Return(route, nil)
+
+		details := brokerapi.ProvisionDetails{
+			RawParameters: []byte(`{
+				"domain": "domain.gov",
+				"default_ttl": 52
+			}`),
+
+		}
+		_, err := s.Broker.Provision(s.ctx, "123", details, true)
+
+		Expect(err).NotTo(HaveOccurred())
+	})
+
 	It("Should succeed with a custom origin", func() {
 		s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
 		route := &models.Route{State: models.Provisioning}
-		s.Manager.On("Create", "123", "domain.gov", "custom.cloud.gov", "", false, utils.Headers{}, true,
+		s.Manager.On("Create", "123", "domain.gov", "custom.cloud.gov", "", s.settings.DefaultDefaultTTL, false, utils.Headers{}, true,
 			map[string]string{"Organization": "", "Space": "", "Service": "", "Plan": ""}).Return(route, nil)
 
 		details := brokerapi.ProvisionDetails{

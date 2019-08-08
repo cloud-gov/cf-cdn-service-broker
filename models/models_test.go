@@ -437,6 +437,7 @@ var _ = Describe("Models", func() {
 			domain := "foo.paas.gov.uk"
 			origin := "foo.cloudapps.digital"
 			path := "/"
+			defaultTTL := int64(0)
 			insecureOrigin := false
 			forwardedHeaders := utils.Headers{}
 			forwardCookies := false
@@ -485,7 +486,7 @@ var _ = Describe("Models", func() {
 			)
 
 			_, err := manager.Create(
-				instanceID, domain, origin, path,
+				instanceID, domain, origin, path, defaultTTL,
 				insecureOrigin, forwardedHeaders, forwardCookies, tags,
 			)
 			Expect(acmeProviderMock.GetHTTP01ClientCallCount()).To(
@@ -508,6 +509,7 @@ var _ = Describe("Models", func() {
 			domain := "foo.paas.gov.uk"
 			origin := "foo.cloudapps.digital"
 			path := "/"
+			defaultTTL := int64(0)
 			insecureOrigin := false
 
 			settings, _ := config.NewSettings()
@@ -575,6 +577,7 @@ var _ = Describe("Models", func() {
 				DomainExternal: domain,
 				Origin:         origin,
 				Path:           path,
+				DefaultTTL:defaultTTL,
 				InsecureOrigin: insecureOrigin,
 			}
 
@@ -669,6 +672,7 @@ var _ = Describe("Models", func() {
 			domain := "foo.paas.gov.uk"
 			origin := "foo.cloudapps.digital"
 			path := "/"
+			defaultTTL := int64(0)
 			insecureOrigin := false
 
 			settings, _ := config.NewSettings()
@@ -697,6 +701,7 @@ var _ = Describe("Models", func() {
 				DomainExternal: domain,
 				Origin:         origin,
 				Path:           path,
+				DefaultTTL:		defaultTTL,
 				InsecureOrigin: insecureOrigin,
 			}
 		})
@@ -741,6 +746,7 @@ var _ = Describe("Models", func() {
 			domain           = "foo.paas.gov.uk"
 			origin           = "foo.cloudapps.digital"
 			path             = "/"
+			defaultTTL       = int64(0)
 			insecureOrigin   = false
 			forwardedHeaders = utils.Headers{"X-Forwarded-Five": true}
 			forwardCookies   = false
@@ -846,7 +852,7 @@ var _ = Describe("Models", func() {
 						"created_at", "updated_at", "deleted_at",
 						"id", "challenge_json",
 						"domain_external", "domain_internal",
-						"dist_id", "origin", "path",
+						"dist_id", "origin", "path", "default_ttl",
 						"insecure_origin", "certificate_id", "user_data_id",
 						"state",
 					},
@@ -855,8 +861,8 @@ var _ = Describe("Models", func() {
 					routeID, "[]",
 					domain, "foo.cloudfront.net",
 					cloudfrontDistID, origin, path,
-					false, certificateID, userDataID,
-					"Provisioned",
+					defaultTTL, false, certificateID,
+					userDataID,	"Provisioned",
 				),
 			)
 
@@ -867,7 +873,7 @@ var _ = Describe("Models", func() {
 				"provisioned", // Expect new state to be Provisioned
 				sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 				sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-				sqlmock.AnyArg(),
+				sqlmock.AnyArg(), sqlmock.AnyArg(),
 			).WillReturnResult(sqlmock.NewResult(1, 1))
 
 			mockDB.ExpectQuery(
@@ -898,6 +904,7 @@ var _ = Describe("Models", func() {
 				brokerAPICallDomainArgument,
 				origin,
 				path,
+				defaultTTL,
 				insecureOrigin,
 				forwardedHeaders,
 				forwardCookies,
@@ -949,16 +956,16 @@ var _ = Describe("Models", func() {
 						"id", "challenge_json",
 						"domain_external", "domain_internal",
 						"dist_id", "origin", "path",
-						"insecure_origin", "certificate_id", "user_data_id",
-						"state",
+						"default_ttl", "insecure_origin", "certificate_id",
+						"user_data_id", "state",
 					},
 				).AddRow(
 					time.Now(), time.Now(), nil,
 					routeID, "[]",
 					domain, "foo.cloudfront.net",
 					cloudfrontDistID, origin, path,
-					false, certificateID, userDataID,
-					"Provisioned",
+					defaultTTL, false, certificateID,
+					userDataID, "Provisioned",
 				),
 			)
 
@@ -988,7 +995,7 @@ var _ = Describe("Models", func() {
 				"provisioning", // Expect new state to be Provisioning
 				sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 				sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-				sqlmock.AnyArg(),
+				sqlmock.AnyArg(), sqlmock.AnyArg(),
 			).WillReturnResult(sqlmock.NewResult(1, 1))
 
 			// we are simulating that someone is updating the distribution, and DOES
@@ -1000,6 +1007,7 @@ var _ = Describe("Models", func() {
 				brokerAPICallDomainArgument,
 				origin,
 				path,
+				defaultTTL,
 				insecureOrigin,
 				forwardedHeaders,
 				forwardCookies,

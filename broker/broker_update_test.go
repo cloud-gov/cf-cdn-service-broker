@@ -32,11 +32,11 @@ type UpdateSuite struct {
 }
 
 func (s *UpdateSuite) allowUpdateWithExpectedHeaders(expectedHeaders utils.Headers) {
-	s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", ".", true, expectedHeaders, true).Return(nil)
+	s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", ".", s.settings.DefaultDefaultTTL, true, expectedHeaders, true).Return(nil)
 }
 
 func (s *UpdateSuite) failOnUpdateWithExpectedHeaders(expectedHeaders utils.Headers) {
-	s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", ".", true, expectedHeaders, true).Return(errors.New("fail"))
+	s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", ".", s.settings.DefaultDefaultTTL, true, expectedHeaders, true).Return(errors.New("fail"))
 }
 
 var _ = Describe("Update", func() {
@@ -48,6 +48,7 @@ var _ = Describe("Update", func() {
 		s.logger = lager.NewLogger("test")
 		s.settings = config.Settings{
 			DefaultOrigin: "origin.cloud.gov",
+			DefaultDefaultTTL: int64(0),
 		}
 		s.Broker = broker.New(
 			&s.Manager,
@@ -72,7 +73,7 @@ var _ = Describe("Update", func() {
 		details := brokerapi.UpdateDetails{
 			RawParameters: json.RawMessage(`{"domain": "domain.gov"}`),
 		}
-		s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", "", false, utils.Headers{"Host": true}, true).Return(nil)
+		s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", "", s.settings.DefaultDefaultTTL, false, utils.Headers{"Host": true}, true).Return(nil)
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 		_, err := s.Broker.Update(s.ctx, "", details, true)
 
@@ -83,7 +84,7 @@ var _ = Describe("Update", func() {
 		details := brokerapi.UpdateDetails{
 			RawParameters: json.RawMessage(`{"origin": "origin.gov"}`),
 		}
-		s.Manager.On("Update", "", "", "origin.gov", "", false, utils.Headers{}, true).Return(nil)
+		s.Manager.On("Update", "", "", "origin.gov", "", s.settings.DefaultDefaultTTL, false, utils.Headers{}, true).Return(nil)
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 		_, err := s.Broker.Update(s.ctx, "", details, true)
 
@@ -98,7 +99,7 @@ var _ = Describe("Update", func() {
 				"path": "."
 			}`),
 		}
-		s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", ".", true, utils.Headers{"Host": true}, true).Return(nil)
+		s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", ".", s.settings.DefaultDefaultTTL, true, utils.Headers{"Host": true}, true).Return(nil)
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 		_, err := s.Broker.Update(s.ctx, "", details, true)
 

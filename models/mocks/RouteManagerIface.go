@@ -11,13 +11,13 @@ type RouteManagerIface struct {
 	mock.Mock
 }
 
-// Create provides a mock function with given fields: instanceId, domain, origin, path, insecureOrigin, forwardedHeaders, forwardCookies, tags
-func (_m *RouteManagerIface) Create(instanceId string, domain string, origin string, path string, insecureOrigin bool, forwardedHeaders utils.Headers, forwardCookies bool, tags map[string]string) (*models.Route, error) {
-	ret := _m.Called(instanceId, domain, origin, path, insecureOrigin, forwardedHeaders, forwardCookies, tags)
+// Create provides a mock function with given fields: instanceId, domain, origin, path, defaultTTL,  insecureOrigin, forwardedHeaders, forwardCookies, tags
+func (_m *RouteManagerIface) Create(instanceId string, domain string, origin string, path string, defaultTTL int64, insecureOrigin bool, forwardedHeaders utils.Headers, forwardCookies bool, tags map[string]string) (*models.Route, error) {
+	ret := _m.Called(instanceId, domain, origin, path,  defaultTTL,  insecureOrigin, forwardedHeaders, forwardCookies, tags)
 
 	var r0 *models.Route
-	if rf, ok := ret.Get(0).(func(string, string, string, string, bool, utils.Headers, bool, map[string]string) *models.Route); ok {
-		r0 = rf(instanceId, domain, origin, path, insecureOrigin, forwardedHeaders, forwardCookies, tags)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, int64, bool, utils.Headers, bool, map[string]string) *models.Route); ok {
+		r0 = rf(instanceId, domain, origin, path, defaultTTL,  insecureOrigin, forwardedHeaders, forwardCookies, tags)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Route)
@@ -25,8 +25,8 @@ func (_m *RouteManagerIface) Create(instanceId string, domain string, origin str
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string, string, string, string, bool, utils.Headers, bool, map[string]string) error); ok {
-		r1 = rf(instanceId, domain, origin, path, insecureOrigin, forwardedHeaders, forwardCookies, tags)
+	if rf, ok := ret.Get(1).(func(string, string, string, string, int64, bool, utils.Headers, bool, map[string]string) error); ok {
+		r1 = rf(instanceId, domain, origin, path, defaultTTL,  insecureOrigin, forwardedHeaders, forwardCookies, tags)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -133,12 +133,12 @@ func (_m *RouteManagerIface) RenewAll() {
 }
 
 // Update provides a mock function with given fields: instanceId, domain, origin, path, insecureOrigin, forwardedHeaders, forwardCookies
-func (_m *RouteManagerIface) Update(instanceId string, domain string, origin string, path string, insecureOrigin bool, forwardedHeaders utils.Headers, forwardCookies bool) (bool, error) {
-	ret := _m.Called(instanceId, domain, origin, path, insecureOrigin, forwardedHeaders, forwardCookies)
+func (_m *RouteManagerIface) Update(instanceId string, domain string, origin string, path string, defaultTTL int64, insecureOrigin bool, forwardedHeaders utils.Headers, forwardCookies bool) (bool, error) {
+	ret := _m.Called(instanceId, domain, origin, path, defaultTTL,  insecureOrigin, forwardedHeaders, forwardCookies)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string, bool, utils.Headers, bool) error); ok {
-		r0 = rf(instanceId, domain, origin, path, insecureOrigin, forwardedHeaders, forwardCookies)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, int64, bool, utils.Headers, bool) error); ok {
+		r0 = rf(instanceId, domain, origin, path, defaultTTL,  insecureOrigin, forwardedHeaders, forwardCookies)
 	} else {
 		r0 = ret.Error(0)
 	}

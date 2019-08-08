@@ -21,6 +21,7 @@ type Options struct {
 	Domain         string   `json:"domain"`
 	Origin         string   `json:"origin"`
 	Path           string   `json:"path"`
+	DefaultTTL     int64    `json:"default_ttl"`
 	InsecureOrigin bool     `json:"insecure_origin"`
 	Cookies        bool     `json:"cookies"`
 	Headers        []string `json:"headers"`
@@ -116,7 +117,7 @@ func (b *CdnServiceBroker) Provision(
 		"Plan":         details.PlanID,
 	}
 
-	_, err = b.manager.Create(instanceID, options.Domain, options.Origin, options.Path, options.InsecureOrigin, headers, options.Cookies, tags)
+	_, err = b.manager.Create(instanceID, options.Domain, options.Origin, options.Path, options.DefaultTTL, options.InsecureOrigin, headers, options.Cookies, tags)
 	if err != nil {
 		lsession.Info("manager-create-err", lager.Data{
 			"options": options,
@@ -322,7 +323,9 @@ func (b *CdnServiceBroker) Update(
 
 	provisioningAsync, err := b.manager.Update(
 		instanceID,
-		options.Domain, options.Origin, options.Path, options.InsecureOrigin,
+		options.Domain, options.Origin, options.Path,
+		options.DefaultTTL,
+		options.InsecureOrigin,
 		headers, options.Cookies,
 	)
 	if err != nil {
@@ -342,6 +345,7 @@ func (b *CdnServiceBroker) createBrokerOptions(details []byte) (options Options,
 		Origin:  b.settings.DefaultOrigin,
 		Cookies: true,
 		Headers: []string{},
+		DefaultTTL: b.settings.DefaultDefaultTTL,
 	}
 	err = json.Unmarshal(details, &options)
 	if err != nil {
