@@ -5,7 +5,7 @@
   "bindable": true,
   "metadata": {
     "displayName": "CDN Route",
-    "documentationUrl": "https://cloud.gov/docs/services/cdn-route/"
+    "documentationUrl": "https://docs.cloud.service.gov.uk/deploying_services/use_a_custom_domain/#managing-custom-domains-using-the-cdn-route-service"
   },
   "plan_updateable": true,
   "plans": [
