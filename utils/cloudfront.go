@@ -209,8 +209,9 @@ func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionCon
 	}
 	config.Aliases = d.getAliases(domains)
 	config.PriceClass = aws.String("PriceClass_100")
+	cfDefaultCert := true
 	config.ViewerCertificate = &cloudfront.ViewerCertificate{
-		CloudFrontDefaultCertificate: &true,
+		CloudFrontDefaultCertificate: &cfDefaultCert,
 		MinimumProtocolVersion: aws.String("TLSv1.2_2018"),
 	}
 }
