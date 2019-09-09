@@ -209,7 +209,11 @@ func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionCon
 	}
 	config.Aliases = d.getAliases(domains)
 	config.PriceClass = aws.String("PriceClass_100")
-	config.ViewerCertificate.MinimumProtocolVersion = aws.String("TLSv1.2_2018")
+	config.ViewerCertificate = cloudfront.ViewerCertificate{
+		CloudFrontDefaultCertificate: true,
+		
+		MinimumProtocolVersion: aws.String("TLSv1.2_2018")
+	}
 }
 
 func (d *Distribution) Create(callerReference string, domains []string, origin, path string, insecureOrigin bool, forwardedHeaders Headers, forwardCookies bool, tags map[string]string) (*cloudfront.Distribution, error) {
