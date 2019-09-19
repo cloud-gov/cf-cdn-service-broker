@@ -9,7 +9,7 @@ jobs:
 
 - name: push-cf-cdn-service-broker-staging
   plan:
-  - aggregate:
+  - in_parallel:
     - get: broker-src
       passed: [test-cdn-broker]
       trigger: true
@@ -22,7 +22,7 @@ jobs:
       SERVICE_NAME: rds-cdn-broker
       SERVICE_PLAN: shared-psql
       <<: *cf-creds-staging
-  - aggregate:
+  - in_parallel:
     - put: broker-deploy-staging
       params:
         path: broker-src
@@ -80,7 +80,7 @@ jobs:
   - get: broker-src
     passed: [push-cf-cdn-service-broker-staging]
     trigger: true
-  - aggregate:
+  - in_parallel:
     - task: acceptance-tests-dns-01
       file: broker-src/ci/acceptance-tests.yml
       params: &acceptance-tests-params-staging
@@ -98,7 +98,7 @@ jobs:
 
 - name: push-cf-cdn-service-broker-production
   plan:
-  - aggregate:
+  - in_parallel:
     - get: broker-src
       passed: [acceptance-tests-staging]
       trigger: true
@@ -111,7 +111,7 @@ jobs:
       SERVICE_NAME: rds-cdn-broker
       SERVICE_PLAN: shared-psql
       <<: *cf-creds-production
-  - aggregate:
+  - in_parallel:
     - put: broker-deploy-production
       params:
         path: broker-src
@@ -169,7 +169,7 @@ jobs:
   - get: broker-src
     passed: [push-cf-cdn-service-broker-production]
     trigger: true
-  - aggregate:
+  - in_parallel:
     - task: acceptance-tests-dns-01
       file: broker-src/ci/acceptance-tests.yml
       params: &acceptance-tests-params-production
