@@ -28,20 +28,20 @@ jobs:
         path: broker-src
         manifest: broker-src/manifest-broker.yml
         environment_variables: &cfenv-staging
-          BROKER_USERNAME: {{cdn-broker-user-staging}}
-          BROKER_PASSWORD: {{cdn-broker-pass-staging}}
-          EMAIL: {{cdn-broker-email-staging}}
-          ACME_URL: {{cdn-broker-acme-url-staging}}
-          BUCKET: {{cdn-broker-bucket-staging}}
-          IAM_PATH_PREFIX: {{cdn-broker-iam-path-prefix-staging}}
-          AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id-staging}}
-          AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key-staging}}
-          AWS_DEFAULT_REGION: {{cdn-broker-region-staging}}
+          BROKER_USERNAME: ((cdn-broker-user-staging))
+          BROKER_PASSWORD: ((cdn-broker-pass-staging))
+          EMAIL: ((cdn-broker-email-staging))
+          ACME_URL: ((cdn-broker-acme-url-staging))
+          BUCKET: ((cdn-broker-bucket-staging))
+          IAM_PATH_PREFIX: ((cdn-broker-iam-path-prefix-staging))
+          AWS_ACCESS_KEY_ID: ((cdn-broker-access-key-id-staging))
+          AWS_SECRET_ACCESS_KEY: ((cdn-broker-secret-access-key-staging))
+          AWS_DEFAULT_REGION: ((cdn-broker-region-staging))
           SERVER_SIDE_ENCRYPTION: AES256
-          API_ADDRESS: {{cf-api-url-staging}}
-          CLIENT_ID: {{cdn-broker-client-id-staging}}
-          CLIENT_SECRET: {{cdn-broker-client-secret-staging}}
-          DEFAULT_ORIGIN: {{cdn-broker-default-origin-staging}}
+          API_ADDRESS: ((cf-api-url-staging))
+          CLIENT_ID: ((cdn-broker-client-id-staging))
+          CLIENT_SECRET: ((cdn-broker-client-secret-staging))
+          DEFAULT_ORIGIN: ((cdn-broker-default-origin-staging))
     - put: broker-deploy-staging
       params:
         path: broker-src
@@ -52,27 +52,27 @@ jobs:
     params:
       <<: *cf-creds-staging
       BROKER_NAME: cdn-broker
-      AUTH_USER: {{cdn-broker-user-staging}}
-      AUTH_PASS: {{cdn-broker-pass-staging}}
+      AUTH_USER: ((cdn-broker-user-staging))
+      AUTH_PASS: ((cdn-broker-pass-staging))
       SERVICES: cdn-route
   on_failure:
     put: slack
     params:
       text: |
-        :x: FAILED to deploy cf-cdn-service-broker on {{cf-api-url-staging}}
+        :x: FAILED to deploy cf-cdn-service-broker on ((cf-api-url-staging))
         <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
-      channel: {{slack-channel}}
-      username: {{slack-username}}
-      icon_url: {{slack-icon-url}}
+      channel: ((slack-channel))
+      username: ((slack-username))
+      icon_url: ((slack-icon-url))
   on_success:
     put: slack
     params:
       text: |
-        :white_check_mark: Successfully deployed cf-cdn-service-broker on {{cf-api-url-staging}}
+        :white_check_mark: Successfully deployed cf-cdn-service-broker on ((cf-api-url-staging))
         <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
-      channel: {{slack-channel}}
-      username: {{slack-username}}
-      icon_url: {{slack-icon-url}}
+      channel: ((slack-channel))
+      username: ((slack-username))
+      icon_url: ((slack-icon-url))
 
 - name: acceptance-tests-staging
   serial: true
@@ -89,12 +89,12 @@ jobs:
         PLAN_NAME: cdn-route
         SERVICE_INSTANCE_NAME: cdn-acceptance-test-%s
         CHALLENGE_TYPE: DNS-01
-        AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id-staging}}
-        AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key-staging}}
-        HOSTED_ZONE_ID: {{hosted-zone-id-staging}}
-        DOMAIN: {{domain-url-staging}}
-        CDN_TIMEOUT: {{cdn-timeout}}
-        CA_CERT: {{acceptance-test-ca-cert-staging}}
+        AWS_ACCESS_KEY_ID: ((cdn-broker-access-key-id-staging))
+        AWS_SECRET_ACCESS_KEY: ((cdn-broker-secret-access-key-staging))
+        HOSTED_ZONE_ID: ((hosted-zone-id-staging))
+        DOMAIN: ((domain-url-staging))
+        CDN_TIMEOUT: ((cdn-timeout))
+        CA_CERT: ((acceptance-test-ca-cert-staging))
 
 - name: push-cf-cdn-service-broker-production
   plan:
@@ -117,20 +117,20 @@ jobs:
         path: broker-src
         manifest: broker-src/manifest-broker.yml
         environment_variables: &cfenv-production
-          BROKER_USERNAME: {{cdn-broker-user-production}}
-          BROKER_PASSWORD: {{cdn-broker-pass-production}}
-          EMAIL: {{cdn-broker-email-production}}
-          ACME_URL: {{cdn-broker-acme-url-production}}
-          BUCKET: {{cdn-broker-bucket-production}}
-          IAM_PATH_PREFIX: {{cdn-broker-iam-path-prefix-production}}
-          AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id-production}}
-          AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key-production}}
-          AWS_DEFAULT_REGION: {{cdn-broker-region-production}}
+          BROKER_USERNAME: ((cdn-broker-user-production))
+          BROKER_PASSWORD: ((cdn-broker-pass-production))
+          EMAIL: ((cdn-broker-email-production))
+          ACME_URL: ((cdn-broker-acme-url-production))
+          BUCKET: ((cdn-broker-bucket-production))
+          IAM_PATH_PREFIX: ((cdn-broker-iam-path-prefix-production))
+          AWS_ACCESS_KEY_ID: ((cdn-broker-access-key-id-production))
+          AWS_SECRET_ACCESS_KEY: ((cdn-broker-secret-access-key-production))
+          AWS_DEFAULT_REGION: ((cdn-broker-region-production))
           SERVER_SIDE_ENCRYPTION: AES256
-          API_ADDRESS: {{cf-api-url-production}}
-          CLIENT_ID: {{cdn-broker-client-id-production}}
-          CLIENT_SECRET: {{cdn-broker-client-secret-production}}
-          DEFAULT_ORIGIN: {{cdn-broker-default-origin-production}}
+          API_ADDRESS: ((cf-api-url-production))
+          CLIENT_ID: ((cdn-broker-client-id-production))
+          CLIENT_SECRET: ((cdn-broker-client-secret-production))
+          DEFAULT_ORIGIN: ((cdn-broker-default-origin-production))
     - put: broker-deploy-production
       params:
         path: broker-src
@@ -141,27 +141,27 @@ jobs:
     params:
       <<: *cf-creds-production
       BROKER_NAME: cdn-broker
-      AUTH_USER: {{cdn-broker-user-production}}
-      AUTH_PASS: {{cdn-broker-pass-production}}
+      AUTH_USER: ((cdn-broker-user-production))
+      AUTH_PASS: ((cdn-broker-pass-production))
       SERVICES: cdn-route
   on_failure:
     put: slack
     params:
       text: |
-        :x: FAILED to deploy cf-cdn-service-broker on {{cf-api-url-production}}
+        :x: FAILED to deploy cf-cdn-service-broker on ((cf-api-url-production))
         <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
-      channel: {{slack-channel}}
-      username: {{slack-username}}
-      icon_url: {{slack-icon-url}}
+      channel: ((slack-channel))
+      username: ((slack-username))
+      icon_url: ((slack-icon-url))
   on_success:
     put: slack
     params:
       text: |
-        :white_check_mark: Successfully deployed cf-cdn-service-broker on {{cf-api-url-production}}
+        :white_check_mark: Successfully deployed cf-cdn-service-broker on ((cf-api-url-production))
         <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
-      channel: {{slack-channel}}
-      username: {{slack-username}}
-      icon_url: {{slack-icon-url}}
+      channel: ((slack-channel))
+      username: ((slack-username))
+      icon_url: ((slack-icon-url))
 
 - name: acceptance-tests-production
   serial: true
@@ -178,48 +178,48 @@ jobs:
         PLAN_NAME: cdn-route
         CHALLENGE_TYPE: DNS-01
         SERVICE_INSTANCE_NAME: cdn-acceptance-test-%s
-        AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id-production}}
-        AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key-production}}
-        HOSTED_ZONE_ID: {{hosted-zone-id-production}}
-        DOMAIN: {{domain-url-production}}
-        CDN_TIMEOUT: {{cdn-timeout}}
-        CA_CERT: {{acceptance-test-ca-cert-production}}
+        AWS_ACCESS_KEY_ID: ((cdn-broker-access-key-id-production))
+        AWS_SECRET_ACCESS_KEY: ((cdn-broker-secret-access-key-production))
+        HOSTED_ZONE_ID: ((hosted-zone-id-production))
+        DOMAIN: ((domain-url-production))
+        CDN_TIMEOUT: ((cdn-timeout))
+        CA_CERT: ((acceptance-test-ca-cert-production))
 
 resources:
 - name: broker-src
   type: git
   source:
-    uri: {{cf-cdn-broker-git-url}}
-    branch: {{cf-cdn-broker-git-branch}}
+    uri: ((cf-cdn-broker-git-url))
+    branch: ((cf-cdn-broker-git-branch))
 
 - name: pipeline-tasks
   type: git
   source:
-    uri: {{pipeline-tasks-git-url}}
-    branch: {{pipeline-tasks-git-branch}}
+    uri: ((pipeline-tasks-git-url))
+    branch: ((pipeline-tasks-git-branch))
 
 - name: broker-deploy-staging
   type: cf
   source:
-    api: {{cf-api-url-staging}}
-    username: {{cf-deploy-username-staging}}
-    password: {{cf-deploy-password-staging}}
-    organization: {{cf-organization-staging}}
-    space: {{cf-space-staging}}
+    api: ((cf-api-url-staging))
+    username: ((cf-deploy-username-staging))
+    password: ((cf-deploy-password-staging))
+    organization: ((cf-organization-staging))
+    space: ((cf-space-staging))
 
 - name: broker-deploy-production
   type: cf
   source:
-    api: {{cf-api-url-production}}
-    username: {{cf-deploy-username-production}}
-    password: {{cf-deploy-password-production}}
-    organization: {{cf-organization-production}}
-    space: {{cf-space-production}}
+    api: ((cf-api-url-production))
+    username: ((cf-deploy-username-production))
+    password: ((cf-deploy-password-production))
+    organization: ((cf-organization-production))
+    space: ((cf-space-production))
 
 - name: slack
   type: slack-notification
   source:
-    url: {{slack-webhook-url}}
+    url: ((slack-webhook-url))
 
 resource_types:
 - name: slack-notification
@@ -229,14 +229,14 @@ resource_types:
 
 meta:
   cf-creds-staging: &cf-creds-staging
-    CF_API_URL: {{cf-api-url-staging}}
-    CF_USERNAME: {{cf-deploy-username-staging}}
-    CF_PASSWORD: {{cf-deploy-password-staging}}
-    CF_ORGANIZATION: {{cf-organization-staging}}
-    CF_SPACE: {{cf-space-staging}}
+    CF_API_URL: ((cf-api-url-staging))
+    CF_USERNAME: ((cf-deploy-username-staging))
+    CF_PASSWORD: ((cf-deploy-password-staging))
+    CF_ORGANIZATION: ((cf-organization-staging))
+    CF_SPACE: ((cf-space-staging))
   cf-creds-production: &cf-creds-production
-    CF_API_URL: {{cf-api-url-production}}
-    CF_USERNAME: {{cf-deploy-username-production}}
-    CF_PASSWORD: {{cf-deploy-password-production}}
-    CF_ORGANIZATION: {{cf-organization-production}}
-    CF_SPACE: {{cf-space-production}}
+    CF_API_URL: ((cf-api-url-production))
+    CF_USERNAME: ((cf-deploy-username-production))
+    CF_PASSWORD: ((cf-deploy-password-production))
+    CF_ORGANIZATION: ((cf-organization-production))
+    CF_SPACE: ((cf-space-production))
