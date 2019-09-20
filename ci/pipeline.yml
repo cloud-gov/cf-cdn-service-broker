@@ -21,7 +21,11 @@ jobs:
       SERVICE_TYPE: aws-rds
       SERVICE_NAME: rds-cdn-broker
       SERVICE_PLAN: shared-psql
-      <<: *cf-creds-staging
+      CF_API_URL: ((cf-api-url-staging))
+      CF_USERNAME: ((cf-deploy-username-staging))
+      CF_PASSWORD: ((cf-deploy-password-staging))
+      CF_ORGANIZATION: ((cf-organization-staging))
+      CF_SPACE: ((cf-space-staging))
   - in_parallel:
     - put: broker-deploy-staging
       params:
@@ -50,7 +54,11 @@ jobs:
   - task: update-broker
     file: pipeline-tasks/register-service-broker.yml
     params:
-      <<: *cf-creds-staging
+      CF_API_URL: ((cf-api-url-staging))
+      CF_USERNAME: ((cf-deploy-username-staging))
+      CF_PASSWORD: ((cf-deploy-password-staging))
+      CF_ORGANIZATION: ((cf-organization-staging))
+      CF_SPACE: ((cf-space-staging))
       BROKER_NAME: cdn-broker
       AUTH_USER: ((cdn-broker-user-staging))
       AUTH_PASS: ((cdn-broker-pass-staging))
@@ -59,7 +67,7 @@ jobs:
     put: slack
     params:
       text: |
-        :x: FAILED to deploy cf-cdn-service-broker on ((cf-api-url-staging))
+        :x: FAILED to deploy cf-cdn-service-broker on "((cf-api-url-staging))"
         <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
       channel: ((slack-channel))
       username: ((slack-username))
@@ -68,7 +76,7 @@ jobs:
     put: slack
     params:
       text: |
-        :white_check_mark: Successfully deployed cf-cdn-service-broker on ((cf-api-url-staging))
+        :white_check_mark: Successfully deployed cf-cdn-service-broker on "((cf-api-url-staging))"
         <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
       channel: ((slack-channel))
       username: ((slack-username))
@@ -84,7 +92,11 @@ jobs:
     - task: acceptance-tests-dns-01
       file: broker-src/ci/acceptance-tests.yml
       params: &acceptance-tests-params-staging
-        <<: *cf-creds-staging
+        CF_API_URL: ((cf-api-url-staging))
+        CF_USERNAME: ((cf-deploy-username-staging))
+        CF_PASSWORD: ((cf-deploy-password-staging))
+        CF_ORGANIZATION: ((cf-organization-staging))
+        CF_SPACE: ((cf-space-staging))
         SERVICE_NAME: cdn-route
         PLAN_NAME: cdn-route
         SERVICE_INSTANCE_NAME: cdn-acceptance-test-%s
@@ -110,7 +122,11 @@ jobs:
       SERVICE_TYPE: aws-rds
       SERVICE_NAME: rds-cdn-broker
       SERVICE_PLAN: shared-psql
-      <<: *cf-creds-production
+      CF_API_URL: ((cf-api-url-production))
+      CF_USERNAME: ((cf-deploy-username-production))
+      CF_PASSWORD: ((cf-deploy-password-production))
+      CF_ORGANIZATION: ((cf-organization-production))
+      CF_SPACE: ((cf-space-production))
   - in_parallel:
     - put: broker-deploy-production
       params:
@@ -139,7 +155,11 @@ jobs:
   - task: update-broker
     file: pipeline-tasks/register-service-broker.yml
     params:
-      <<: *cf-creds-production
+      CF_API_URL: ((cf-api-url-production))
+      CF_USERNAME: ((cf-deploy-username-production))
+      CF_PASSWORD: ((cf-deploy-password-production))
+      CF_ORGANIZATION: ((cf-organization-production))
+      CF_SPACE: ((cf-space-production))
       BROKER_NAME: cdn-broker
       AUTH_USER: ((cdn-broker-user-production))
       AUTH_PASS: ((cdn-broker-pass-production))
@@ -148,7 +168,7 @@ jobs:
     put: slack
     params:
       text: |
-        :x: FAILED to deploy cf-cdn-service-broker on ((cf-api-url-production))
+        :x: FAILED to deploy cf-cdn-service-broker on "((cf-api-url-production))"
         <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
       channel: ((slack-channel))
       username: ((slack-username))
@@ -157,7 +177,7 @@ jobs:
     put: slack
     params:
       text: |
-        :white_check_mark: Successfully deployed cf-cdn-service-broker on ((cf-api-url-production))
+        :white_check_mark: Successfully deployed cf-cdn-service-broker on "((cf-api-url-production))"
         <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
       channel: ((slack-channel))
       username: ((slack-username))
@@ -173,7 +193,11 @@ jobs:
     - task: acceptance-tests-dns-01
       file: broker-src/ci/acceptance-tests.yml
       params: &acceptance-tests-params-production
-        <<: *cf-creds-production
+        CF_API_URL: ((cf-api-url-production))
+        CF_USERNAME: ((cf-deploy-username-production))
+        CF_PASSWORD: ((cf-deploy-password-production))
+        CF_ORGANIZATION: ((cf-organization-production))
+        CF_SPACE: ((cf-space-production))
         SERVICE_NAME: cdn-route
         PLAN_NAME: cdn-route
         CHALLENGE_TYPE: DNS-01
@@ -226,17 +250,3 @@ resource_types:
   type: docker-image
   source:
     repository: cfcommunity/slack-notification-resource
-
-meta:
-  cf-creds-staging: &cf-creds-staging
-    CF_API_URL: ((cf-api-url-staging))
-    CF_USERNAME: ((cf-deploy-username-staging))
-    CF_PASSWORD: ((cf-deploy-password-staging))
-    CF_ORGANIZATION: ((cf-organization-staging))
-    CF_SPACE: ((cf-space-staging))
-  cf-creds-production: &cf-creds-production
-    CF_API_URL: ((cf-api-url-production))
-    CF_USERNAME: ((cf-deploy-username-production))
-    CF_PASSWORD: ((cf-deploy-password-production))
-    CF_ORGANIZATION: ((cf-organization-production))
-    CF_SPACE: ((cf-space-production))
