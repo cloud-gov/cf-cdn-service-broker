@@ -35,11 +35,7 @@ jobs:
       SERVICE_TYPE: aws-rds
       SERVICE_NAME: rds-cdn-broker
       SERVICE_PLAN: shared-psql
-      CF_API_URL: ((cf-api-url-staging))
-      CF_USERNAME: ((cf-deploy-username-staging))
-      CF_PASSWORD: ((cf-deploy-password-staging))
-      CF_ORGANIZATION: ((cf-organization-staging))
-      CF_SPACE: ((cf-space-staging))
+      <<: *cf-creds-staging
   - in_parallel:
     - put: broker-deploy-staging
       params:
