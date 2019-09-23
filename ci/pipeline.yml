@@ -128,11 +128,7 @@ jobs:
       SERVICE_TYPE: aws-rds
       SERVICE_NAME: rds-cdn-broker
       SERVICE_PLAN: shared-psql
-      CF_API_URL: ((cf-api-url-production))
-      CF_USERNAME: ((cf-deploy-username-production))
-      CF_PASSWORD: ((cf-deploy-password-production))
-      CF_ORGANIZATION: ((cf-organization-production))
-      CF_SPACE: ((cf-space-production))
+      <<: *cf-creds-production
   - in_parallel:
     - put: broker-deploy-production
       params:
