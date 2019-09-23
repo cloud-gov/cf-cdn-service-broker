@@ -1,4 +1,18 @@
 ---
+meta:
+  cf-creds-staging: &cf-creds-staging
+    CF_API_URL: ((cf-api-url-staging))
+    CF_USERNAME: ((cf-deploy-username-staging))
+    CF_PASSWORD: ((cf-deploy-password-staging))
+    CF_ORGANIZATION: ((cf-organization-staging))
+    CF_SPACE: ((cf-space-staging))
+  cf-creds-production: &cf-creds-production
+    CF_API_URL: ((cf-api-url-production))
+    CF_USERNAME: ((cf-deploy-username-production))
+    CF_PASSWORD: ((cf-deploy-password-production))
+    CF_ORGANIZATION: ((cf-organization-production))
+    CF_SPACE: ((cf-space-production))
+
 jobs:
 - name: test-cdn-broker
   plan:
@@ -54,11 +68,7 @@ jobs:
   - task: update-broker
     file: pipeline-tasks/register-service-broker.yml
     params:
-      CF_API_URL: ((cf-api-url-staging))
-      CF_USERNAME: ((cf-deploy-username-staging))
-      CF_PASSWORD: ((cf-deploy-password-staging))
-      CF_ORGANIZATION: ((cf-organization-staging))
-      CF_SPACE: ((cf-space-staging))
+      <<: *cf-creds-staging
       BROKER_NAME: cdn-broker
       AUTH_USER: ((cdn-broker-user-staging))
       AUTH_PASS: ((cdn-broker-pass-staging))
@@ -92,11 +102,7 @@ jobs:
     - task: acceptance-tests-dns-01
       file: broker-src/ci/acceptance-tests.yml
       params: &acceptance-tests-params-staging
-        CF_API_URL: ((cf-api-url-staging))
-        CF_USERNAME: ((cf-deploy-username-staging))
-        CF_PASSWORD: ((cf-deploy-password-staging))
-        CF_ORGANIZATION: ((cf-organization-staging))
-        CF_SPACE: ((cf-space-staging))
+        <<: *cf-creds-staging
         SERVICE_NAME: cdn-route
         PLAN_NAME: cdn-route
         SERVICE_INSTANCE_NAME: cdn-acceptance-test-%s
@@ -155,11 +161,7 @@ jobs:
   - task: update-broker
     file: pipeline-tasks/register-service-broker.yml
     params:
-      CF_API_URL: ((cf-api-url-production))
-      CF_USERNAME: ((cf-deploy-username-production))
-      CF_PASSWORD: ((cf-deploy-password-production))
-      CF_ORGANIZATION: ((cf-organization-production))
-      CF_SPACE: ((cf-space-production))
+      <<: *cf-creds-production
       BROKER_NAME: cdn-broker
       AUTH_USER: ((cdn-broker-user-production))
       AUTH_PASS: ((cdn-broker-pass-production))
@@ -193,11 +195,7 @@ jobs:
     - task: acceptance-tests-dns-01
       file: broker-src/ci/acceptance-tests.yml
       params: &acceptance-tests-params-production
-        CF_API_URL: ((cf-api-url-production))
-        CF_USERNAME: ((cf-deploy-username-production))
-        CF_PASSWORD: ((cf-deploy-password-production))
-        CF_ORGANIZATION: ((cf-organization-production))
-        CF_SPACE: ((cf-space-production))
+        <<: *cf-creds-production
         SERVICE_NAME: cdn-route
         PLAN_NAME: cdn-route
         CHALLENGE_TYPE: DNS-01
