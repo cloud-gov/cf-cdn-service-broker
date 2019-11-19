@@ -1,6 +1,8 @@
 package models
 
 import (
+	"context"
+	"crypto/rsa"
 	"crypto/tls"
 	"fmt"
 	"io/ioutil"
@@ -9,7 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/18F/cf-cdn-service-broker/lego/acme"
+	goacme "golang.org/x/crypto/acme"
+	legoacme "github.com/18F/cf-cdn-service-broker/lego/acme"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -19,34 +22,41 @@ import (
 	"github.com/18F/cf-cdn-service-broker/utils"
 )
 
-func (*AcmeClientProvider) GetHTTP01Client(user *utils.User, settings config.Settings) (acme.ClientInterface, error) {
-	client, err := acme.NewClient(settings.AcmeUrl, user, acme.RSA2048)
+func (*AcmeClientProvider) GetHTTP01Client(user *utils.User, settings config.Settings) (legoacme.ClientInterface, error) {
+	key := user.GetPrivateKey().(rsa.PrivateKey)
+	client := goacme.Client{Key: &key}
 
+	ctx := context.Background()
+	a := goacme.Account{
+		Contact: []string {fmt.Sprintf("mailto:%s", user.Email)},
+	}
+
+	account, err := client.Register(ctx, &a, goacme.AcceptTOS)
 	if err != nil {
-		return &acme.Client{}, err
+		return nil, err
 	}
 
 	if user.GetRegistration() == nil {
-		reg, err := client.Register()
-		if err != nil {
-			return client, err
+		user.Registration = &legoacme.RegistrationResource{
+			Body:        legoacme.Registration{},
+			URI:         account.URI,
+			NewAuthzURL: "https://acme-v01.api.letsencrypt.org/acme/new-authz",
+			TosURL:      "",
 		}
-		user.Registration = reg
 	}
-
-	if err := client.AgreeToTOS(); err != nil {
-		return client, err
+	legoclient, err := legoacme.NewClient(settings.AcmeUrl, user, legoacme.RSA2048)
+	if err != nil {
+		return &legoacme.Client{}, err
 	}
-
 	session := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
 
-	client.SetChallengeProvider(acme.HTTP01, &HTTPProvider{
+	legoclient.SetChallengeProvider(legoacme.HTTP01, &HTTPProvider{
 		Settings: settings,
 		Service:  s3.New(session),
 	})
-	client.ExcludeChallenges([]acme.Challenge{acme.TLSSNI01, acme.DNS01})
+	legoclient.ExcludeChallenges([]legoacme.Challenge{legoacme.TLSSNI01, legoacme.DNS01})
 
-	return client, nil
+	return legoclient, nil
 }
 
 type HTTPProvider struct {
@@ -73,7 +83,7 @@ func (p *HTTPProvider) Present(domain, token, keyAuth string) error {
 		},
 	}
 
-	return acme.WaitFor(10*time.Second, 2*time.Second, func() (bool, error) {
+	return legoacme.WaitFor(10*time.Second, 2*time.Second, func() (bool, error) {
 		resp, err := insecureClient.Get("https://" + path.Join(domain, ".well-known", "acme-challenge", token))
 		if err != nil {
 			return false, err
