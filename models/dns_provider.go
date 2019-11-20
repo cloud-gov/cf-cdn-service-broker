@@ -14,8 +14,8 @@ import (
 )
 
 func (*AcmeClientProvider) GetDNS01Client(user *utils.User, settings config.Settings) (legoacme.ClientInterface, error) {
-	key := user.GetPrivateKey().(rsa.PrivateKey)
-	client := goacme.Client{Key: &key}
+	key := user.GetPrivateKey().(*rsa.PrivateKey)
+	client := goacme.Client{Key: key}
 
 	ctx := context.Background()
 	a := goacme.Account{
