@@ -29,12 +29,21 @@ func (acp *AcmeClientProvider) GetDNS01Client(user *utils.User, settings config.
 		Contact: []string {fmt.Sprintf("mailto:%s", user.Email)},
 	}
 
-	logSess.Info("register-goacme-account")
-	account, err := client.Register(ctx, &a, goacme.AcceptTOS)
-	if err != nil {
-		logSess.Error("register-goacme-account-error", err)
+	logSess.Info("fetch-goacme-account")
+	account, err := client.GetReg(ctx, "this argument is ignored because the CA is RFC8555 compliant. The key on the client is used instead.")
+	if err == goacme.ErrNoAccount {
+		logSess.Info("goacme-account-not-found")
+		logSess.Info("register-goacme-account")
+		account, err = client.Register(ctx, &a, goacme.AcceptTOS)
+		if err != nil {
+			logSess.Error("register-goacme-account-error", err)
+			return nil, err
+		}
+	} else if err != nil {
+		logSess.Error("fetch-goacme-account", err)
 		return nil, err
 	}
+
 	if user.GetRegistration() == nil {
 		logSess.Info("create-user-registration-resource")
 		user.Registration = &legoacme.RegistrationResource{
