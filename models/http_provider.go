@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"fmt"
+	"gopkg.in/square/go-jose.v1"
 	"io/ioutil"
 	"net/http"
 	"path"
@@ -47,7 +48,15 @@ func (acp *AcmeClientProvider) GetHTTP01Client(user *utils.User, settings config
 	if user.GetRegistration() == nil {
 		logSess.Info("create-user-registration-resource")
 		user.Registration = &legoacme.RegistrationResource{
-			Body:        legoacme.Registration{},
+			Body:        legoacme.Registration{
+				Resource:       account.URI,
+				ID:             0,
+				Key:            jose.JsonWebKey{Key:key},
+				Contact:        nil,
+				Agreement:      account.AgreedTerms,
+				Authorizations: account.Authorizations,
+				Certificates:   account.Certificates,
+			},
 			URI:         account.URI,
 			NewAuthzURL: "https://acme-v01.api.letsencrypt.org/acme/new-authz",
 			TosURL:      "",
