@@ -1,6 +1,7 @@
 package models
 
 import (
+	"code.cloudfoundry.org/lager"
 	"context"
 	"crypto/rsa"
 	"crypto/tls"
@@ -22,21 +23,29 @@ import (
 	"github.com/18F/cf-cdn-service-broker/utils"
 )
 
-func (*AcmeClientProvider) GetHTTP01Client(user *utils.User, settings config.Settings) (legoacme.ClientInterface, error) {
+func (acp *AcmeClientProvider) GetHTTP01Client(user *utils.User, settings config.Settings) (legoacme.ClientInterface, error) {
+	logSess := acp.logger.Session("get-http-01-client")
+
+	logSess.Info("create-goacme-client")
 	key := user.GetPrivateKey().(*rsa.PrivateKey)
 	client := goacme.Client{Key: key}
 
 	ctx := context.Background()
+
+	logSess.Info("create-goacme-account-struct")
 	a := goacme.Account{
 		Contact: []string {fmt.Sprintf("mailto:%s", user.Email)},
 	}
 
+	logSess.Info("register-goacme-account")
 	account, err := client.Register(ctx, &a, goacme.AcceptTOS)
 	if err != nil {
+		logSess.Error("register-goacme-account-error", err)
 		return nil, err
 	}
 
 	if user.GetRegistration() == nil {
+		logSess.Info("create-user-registration-resource")
 		user.Registration = &legoacme.RegistrationResource{
 			Body:        legoacme.Registration{},
 			URI:         account.URI,
@@ -44,18 +53,31 @@ func (*AcmeClientProvider) GetHTTP01Client(user *utils.User, settings config.Set
 			TosURL:      "",
 		}
 	}
+
+	logSess.Info("user-registration-resource", lager.Data{"registration": user.Registration})
+
+	logSess.Info("create-legoacme-client")
 	legoclient, err := legoacme.NewClient(settings.AcmeUrl, user, legoacme.RSA2048)
 	if err != nil {
+		logSess.Error("create-legoacme-client-error", err)
 		return &legoacme.Client{}, err
 	}
-	session := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
 
-	legoclient.SetChallengeProvider(legoacme.HTTP01, &HTTPProvider{
+	logSess.Info("create-aws-session")
+	awsSession := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
+
+	logSess.Info("set-challenge-provider")
+	err = legoclient.SetChallengeProvider(legoacme.HTTP01, &HTTPProvider{
 		Settings: settings,
-		Service:  s3.New(session),
+		Service:  s3.New(awsSession),
 	})
+	if err != nil {
+		logSess.Error("set-challenge-provider-error", err)
+		return nil, err
+	}
 	legoclient.ExcludeChallenges([]legoacme.Challenge{legoacme.TLSSNI01, legoacme.DNS01})
 
+	logSess.Info("created")
 	return legoclient, nil
 }
 
