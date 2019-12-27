@@ -111,10 +111,11 @@ func (b *CdnServiceBroker) Provision(
 	}
 
 	tags := map[string]string{
-		"Organization": details.OrganizationGUID,
-		"Space":        details.SpaceGUID,
-		"Service":      details.ServiceID,
-		"Plan":         details.PlanID,
+		"Organization":    details.OrganizationGUID,
+		"Space":           details.SpaceGUID,
+		"Service":         details.ServiceID,
+		"ServiceInstance": instanceID,
+		"Plan":            details.PlanID,
 	}
 
 	_, err = b.manager.Create(instanceID, options.Domain, options.Origin, options.Path, options.DefaultTTL, options.InsecureOrigin, headers, options.Cookies, tags)
@@ -342,9 +343,9 @@ func (b *CdnServiceBroker) createBrokerOptions(details []byte) (options Options,
 		return
 	}
 	options = Options{
-		Origin:  b.settings.DefaultOrigin,
-		Cookies: true,
-		Headers: []string{},
+		Origin:     b.settings.DefaultOrigin,
+		Cookies:    true,
+		Headers:    []string{},
 		DefaultTTL: b.settings.DefaultDefaultTTL,
 	}
 	err = json.Unmarshal(details, &options)
