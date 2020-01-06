@@ -27,6 +27,7 @@ type Settings struct {
 	ClientSecret         string `envconfig:"client_secret" required:"true"`
 	DefaultOrigin        string `envconfig:"default_origin" required:"true"`
 	Schedule             string `envconfig:"schedule" default:"0 0 * * * *"`
+	UserIdPool					 []string `envconfig:"user_id_pool" required:"true"` 
 }
 
 func NewSettings() (Settings, error) {
