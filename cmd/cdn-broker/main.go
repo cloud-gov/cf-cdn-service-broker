@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"net/http"
 	"os"
+	"time"
 
 	"code.cloudfoundry.org/lager"
 	"github.com/cloudfoundry-community/go-cfclient"
@@ -24,6 +26,8 @@ import (
 func main() {
 	logger := lager.NewLogger("cdn-service-broker")
 	logger.RegisterSink(lager.NewWriterSink(os.Stderr, lager.INFO))
+
+	rand.Seed(time.Now().UnixNano())
 
 	settings, err := config.NewSettings()
 	if err != nil {

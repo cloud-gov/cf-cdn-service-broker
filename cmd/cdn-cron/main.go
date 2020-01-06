@@ -1,8 +1,10 @@
 package main
 
 import (
+	"math/rand"
 	"os"
 	"os/signal"
+	"time"
 
 	"code.cloudfoundry.org/lager"
 	"github.com/robfig/cron"
@@ -20,6 +22,8 @@ import (
 func main() {
 	logger := lager.NewLogger("cdn-cron")
 	logger.RegisterSink(lager.NewWriterSink(os.Stderr, lager.INFO))
+
+	rand.Seed(time.Now().UnixNano())
 
 	settings, err := config.NewSettings()
 	if err != nil {
