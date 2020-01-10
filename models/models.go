@@ -85,9 +85,14 @@ func LoadRandomUser(db *gorm.DB, userIDPool []string) (utils.User, error) {
 	var user utils.User
 	userID := userIDPool[rand.Intn(len(userIDPool))]
 
-	var userData UserData
+	helperLogger.Session("load-random-user").Info("RANDOM_USER_ID", lager.Data{
+		"userID": userID,
+	})
 
-	if err := db.Model(user).Where("id = ?", userID).First(&userData).Error; err != nil {
+	var userData UserData
+	// Enable Logger, show detailed log
+	db.LogMode(true)
+	if err := db.Where("id = ?", userID).First(&userData).Error; err != nil {
 		helperLogger.Session("load-random-user").Error("load-user-data", err)
 		return user, err
 	}
