@@ -26,7 +26,7 @@ jobs:
   - in_parallel:
     - get: broker-src
       passed: [test-cdn-broker]
-      trigger: true
+      trigger: true 
     - get: pipeline-tasks
   - task: create-db
     file: broker-src/ci/create-db.yml
