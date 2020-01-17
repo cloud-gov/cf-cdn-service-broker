@@ -83,7 +83,11 @@ type UserData struct {
  */
 func LoadRandomUser(db *gorm.DB, userIDPool []string) (utils.User, error) {
 	var user utils.User
-        defer func() { if r: = recover(); r != nil { return }}()
+	defer func() {
+		if r := recover(); r != nil {
+			return
+		}
+	}()
 	userID := userIDPool[rand.Intn(len(userIDPool))]
 
 	helperLogger.Session("load-random-user").Info("random-user-id", lager.Data{
