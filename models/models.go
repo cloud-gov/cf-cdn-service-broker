@@ -3,7 +3,6 @@ package models
 import (
 	"crypto"
 	"crypto/ecdsa"
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
@@ -13,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"path"
 	"strings"
@@ -46,12 +46,12 @@ var (
 	helperLogger = lager.NewLogger("helper-logger")
 )
 
-// Marshal a `State` to a `string` when saving to the database
+// Value Marshal a `State` to a `string` when saving to the database
 func (s State) Value() (driver.Value, error) {
 	return string(s), nil
 }
 
-// Unmarshal an `interface{}` to a `State` when reading from the database
+// Scan Unmarshal an `interface{}` to a `State` when reading from the database
 func (s *State) Scan(value interface{}) error {
 	switch value.(type) {
 	case string:
@@ -73,15 +73,35 @@ type UserData struct {
 	Key   []byte
 }
 
-func CreateUser(email string) (utils.User, error) {
-	user := utils.User{Email: email}
+/*
+ * LoadRandomUser The Let's Encrypt v1 acme API has shut down user creation to force users to adopt v2.
+ * In an attempt to contiune using v1 while we develop a v2 compliant broker, we are replacing
+ * calls to create a new user for each new domain registration with a method that fetches an existing user
+ * from a pool of ids. The random selection of users from a pool aims to minimize the impact of the following rate limits:
+ *	- 300 Pending Authorizations per account
+ *	- Failed Validation limit of 5 failures per account, per hostname, per hour.
+ */
+func LoadRandomUser(db *gorm.DB, userIDPool []string) (utils.User, error) {
+	var user utils.User
+        defer func() { if r: = recover(); r != nil { return }}()
+	userID := userIDPool[rand.Intn(len(userIDPool))]
 
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		helperLogger.Session("create-user").Error("rsa-generate-key", err)
+	helperLogger.Session("load-random-user").Info("random-user-id", lager.Data{
+		"userID": userID,
+	})
+
+	var userData UserData
+
+	if err := db.Where("id = ?", userID).First(&userData).Error; err != nil {
+		helperLogger.Session("load-random-user").Error("load-user-data", err)
 		return user, err
 	}
-	user.SetPrivateKey(key)
+
+	user, err := LoadUser(userData)
+	if err != nil {
+		helperLogger.Session("load-random-user").Error("load-user", err)
+		return user, err
+	}
 
 	return user, nil
 }
@@ -254,9 +274,9 @@ func (m *RouteManager) Create(instanceId, domain, origin, path string, insecureO
 		"instance-id": instanceId,
 	})
 
-	user, err := CreateUser(m.settings.Email)
+	user, err := LoadRandomUser(m.db, m.settings.UserIdPool)
 	if err != nil {
-		lsession.Error("create-user", err)
+		lsession.Error("load-random-user", err)
 		return nil, err
 	}
 
@@ -424,8 +444,8 @@ func (m *RouteManager) stillActive(r *Route) error {
 	})
 
 	lsession.Info("starting-canary-check", lager.Data{
-		"route":    r,
-		"settings": m.settings,
+		"route":       r,
+		"settings":    m.settings,
 		"instance-id": r.InstanceId,
 	})
 

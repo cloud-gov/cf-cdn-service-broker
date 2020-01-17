@@ -26,7 +26,7 @@ jobs:
   - in_parallel:
     - get: broker-src
       passed: [test-cdn-broker]
-      trigger: true
+      trigger: true 
     - get: pipeline-tasks
   - task: create-db
     file: broker-src/ci/create-db.yml
@@ -56,6 +56,7 @@ jobs:
           CLIENT_ID: ((cdn-broker-client-id-staging))
           CLIENT_SECRET: ((cdn-broker-client-secret-staging))
           DEFAULT_ORIGIN: ((cdn-broker-default-origin-staging))
+          USER_ID_POOL: ((cdn-broker-user-id-pool-staging))
     - put: broker-deploy-staging
       params:
         path: broker-src
@@ -145,6 +146,7 @@ jobs:
           CLIENT_ID: ((cdn-broker-client-id-production))
           CLIENT_SECRET: ((cdn-broker-client-secret-production))
           DEFAULT_ORIGIN: ((cdn-broker-default-origin-production))
+          USER_ID_POOL: ((cdn-broker-user-id-pool-production))
     - put: broker-deploy-production
       params:
         path: broker-src
