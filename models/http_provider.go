@@ -1,7 +1,6 @@
 package models
 
 import (
-	"code.cloudfoundry.org/lager"
 	"context"
 	"crypto/rsa"
 	"crypto/tls"
@@ -13,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	goacme "golang.org/x/crypto/acme"
 	legoacme "github.com/18F/cf-cdn-service-broker/lego/acme"
+	goacme "golang.org/x/crypto/acme"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -70,8 +69,6 @@ func (acp *AcmeClientProvider) GetHTTP01Client(user *utils.User, settings config
 			TosURL:      "",
 		}
 	}
-
-	logSess.Info("user-registration-resource", lager.Data{"registration": user.Registration})
 
 	logSess.Info("create-legoacme-client")
 	legoclient, err := legoacme.NewClient(settings.AcmeUrl, user, legoacme.RSA2048)

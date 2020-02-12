@@ -1,7 +1,6 @@
 package models
 
 import (
-	"code.cloudfoundry.org/lager"
 	"context"
 	"crypto/rsa"
 	"fmt"
@@ -61,9 +60,7 @@ func (acp *AcmeClientProvider) GetDNS01Client(user *utils.User, settings config.
 			TosURL:      "",
 		}
 	}
-
-	logSess.Info("user-registration-resource", lager.Data{"registration": user.Registration})
-
+	
 	logSess.Info("create-legoacme-client")
 	legoClient, err := legoacme.NewClient(settings.AcmeUrl, user, legoacme.RSA2048)
 	if err != nil {
