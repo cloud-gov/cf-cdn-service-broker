@@ -5,7 +5,19 @@
   "bindable": true,
   "metadata": {
     "displayName": "CDN Route",
-    "documentationUrl": "https://docs.cloud.service.gov.uk/deploying_services/use_a_custom_domain/#managing-custom-domains-using-the-cdn-route-service"
+    "longDescription": "Content Distribution Network (CDN) is a geographically distributed network of proxy servers and their data centers. The goal is to provide high availability and high performance by distributing the service spatially relative to end-users.",
+    "providerDisplayName": "Amazon Web Services",
+    "documentationUrl": "https://docs.cloud.service.gov.uk/deploying_services/use_a_custom_domain/#managing-custom-domains-using-the-cdn-route-service",
+    "supportUrl": "https://www.cloud.service.gov.uk/support",
+    "AdditionalMetadata": {
+      "otherDocumentation": [
+        "https://docs.aws.amazon.com/cloudfront"
+      ],
+      "usecase": [
+        "Bring your own Domain",
+        "Highly available static content distribution"
+      ]
+    }
   },
   "plan_updateable": true,
   "plans": [
@@ -15,7 +27,11 @@
       "description": "Custom domains, CDN caching, and TLS certificates with automatic renewal",
       "free": true,
       "metadata": {
-        "displayName": "Content Distribution Network Route"
+        "displayName": "Content Distribution Network Route",
+        "AdditionalMetadata": {
+          "highlyAvailable": true,
+          "version": "standard"
+        }
       }
     }
   ]
