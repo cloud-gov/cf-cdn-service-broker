@@ -28,6 +28,9 @@ cf target -o "${CF_ORGANIZATION}" -s "${CF_SPACE}"
 # Create private domain
 cf create-domain "${CF_ORGANIZATION}" "${DOMAIN}"
 
+# sleep a little to let the domain create
+sleep 5
+
 # Create service
 opts=$(jq -n --arg domain "${DOMAIN}" '{domain: $domain}')
 cf create-service "${SERVICE_NAME}" "${PLAN_NAME}" "${SERVICE_INSTANCE_NAME}" -c "${opts}"
