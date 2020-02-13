@@ -132,9 +132,6 @@ func (b *CdnServiceBroker) LastOperation(
 		if err != nil {
 			return brokerapi.LastOperation{}, err
 		}
-		if len(instructions) != len(route.GetDomains()) {
-			return brokerapi.LastOperation{}, fmt.Errorf("Expected to find %d tokens; found %d", len(route.GetDomains()), len(instructions))
-		}
 		description := fmt.Sprintf(
 			"Provisioning in progress [%s => %s]; CNAME or ALIAS domain %s to %s or create TXT record(s): \n%s",
 			route.DomainExternal, route.Origin, route.DomainExternal, route.DomainInternal,
