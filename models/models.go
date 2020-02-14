@@ -707,7 +707,7 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 			lsession.Error("deploy-certificate", err)
 			r.State = Failed
 			if dbErr := m.db.Save(r).Error; dbErr != nil {
-				newErr := fmt.Errorf("error saving state to db: %s while processing error deployin certificate: %s", dbErr, err)
+				newErr := fmt.Errorf("error saving state to db: %s while processing error deploying certificate: %s", dbErr, err)
 				return newErr
 			}
 			return err
