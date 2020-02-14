@@ -40,6 +40,7 @@ const (
 	Provisioned          = "provisioned"
 	Deprovisioning       = "deprovisioning"
 	Deprovisioned        = "deprovisioned"
+	Failed               = "failed"
 )
 
 var (
@@ -704,6 +705,11 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 		}
 		if err := m.deployCertificate(*r, cert); err != nil {
 			lsession.Error("deploy-certificate", err)
+			r.State = Failed
+			if dbErr := m.db.Save(r).Error; dbErr != nil {
+				newErr := fmt.Errorf("error saving state to db: %s while processing error deployin certificate: %s", dbErr, err)
+				return newErr
+			}
 			return err
 		}
 

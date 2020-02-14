@@ -149,6 +149,11 @@ func (b *CdnServiceBroker) LastOperation(
 				route.DomainExternal, route.Origin, route.DomainInternal,
 			),
 		}, nil
+	case models.Failed:
+		return brokerapi.LastOperation{
+			State: brokerapi.Failed,
+			Description: "Failure while provisioning instance",
+		}, nil
 	default:
 		return brokerapi.LastOperation{
 			State: brokerapi.Succeeded,
