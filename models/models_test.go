@@ -160,7 +160,7 @@ var _ = Describe("Models", func() {
 		fakecf.Handlers.Send.PushBack(func(r *request.Request) {
 			//t.Log(r.Operation.Name)
 			switch r.Operation.Name {
-			case "ListDistributions2016_11_25":
+			case "ListDistributions2019_03_26":
 				list := []*cloudfront.DistributionSummary{
 					&cloudfront.DistributionSummary{
 						ARN: aws.String("some-distribution"),
@@ -247,7 +247,7 @@ var _ = Describe("Models", func() {
 		fakecf.Handlers.Send.PushBack(func(r *request.Request) {
 			//t.Log(r.Operation.Name)
 			switch r.Operation.Name {
-			case "ListDistributions2016_11_25":
+			case "ListDistributions2019_03_26":
 				list := []*cloudfront.DistributionSummary{}
 				data := r.Data.(*cloudfront.ListDistributionsOutput)
 				data.DistributionList = &cloudfront.DistributionList{
@@ -301,7 +301,7 @@ var _ = Describe("Models", func() {
 		fakecf.Handlers.Send.PushBack(func(r *request.Request) {
 			//t.Log(r.Operation.Name)
 			switch r.Operation.Name {
-			case "ListDistributions2016_11_25":
+			case "ListDistributions2019_03_26":
 				list := []*cloudfront.DistributionSummary{
 					&cloudfront.DistributionSummary{
 						ARN: aws.String("some-distribution"),
@@ -450,7 +450,7 @@ var _ = Describe("Models", func() {
 			fakecf.Handlers.Clear()
 			fakecf.Handlers.Send.PushBack(func(r *request.Request) {
 				switch r.Operation.Name {
-				case "CreateDistributionWithTags2016_11_25":
+				case "CreateDistributionWithTags2019_03_26":
 					data := r.Data.(*cloudfront.CreateDistributionWithTagsOutput)
 					data.Distribution = &cloudfront.Distribution{
 						DomainName: aws.String("foo.paas.gov.uk"),
@@ -528,7 +528,7 @@ var _ = Describe("Models", func() {
 				}
 
 				switch r.Operation.Name {
-				case "GetDistribution2016_11_25":
+				case "GetDistribution2019_03_26":
 					data := r.Data.(*cloudfront.GetDistributionOutput)
 					data.Distribution = &cloudfront.Distribution{
 						Id:                 aws.String("cloudfront-distribution-id"),
@@ -537,7 +537,7 @@ var _ = Describe("Models", func() {
 						DistributionConfig: distributionConfig,
 					}
 					data.ETag = aws.String("etag")
-				case "GetDistributionConfig2016_11_25":
+				case "GetDistributionConfig2019_03_26":
 					data := r.Data.(*cloudfront.GetDistributionConfigOutput)
 					data.DistributionConfig = distributionConfig
 				}
@@ -577,7 +577,7 @@ var _ = Describe("Models", func() {
 				DomainExternal: domain,
 				Origin:         origin,
 				Path:           path,
-				DefaultTTL:defaultTTL,
+				DefaultTTL:     defaultTTL,
 				InsecureOrigin: insecureOrigin,
 			}
 
@@ -641,7 +641,7 @@ var _ = Describe("Models", func() {
 				}
 
 				switch r.Operation.Name {
-				case "GetDistribution2016_11_25":
+				case "GetDistribution2019_03_26":
 					data := r.Data.(*cloudfront.GetDistributionOutput)
 					data.Distribution = &cloudfront.Distribution{
 						Id:                 aws.String("cloudfront-distribution-id"),
@@ -650,7 +650,7 @@ var _ = Describe("Models", func() {
 						DistributionConfig: distributionConfig,
 					}
 					data.ETag = aws.String("etag")
-				case "GetDistributionConfig2016_11_25":
+				case "GetDistributionConfig2019_03_26":
 					data := r.Data.(*cloudfront.GetDistributionConfigOutput)
 					data.DistributionConfig = distributionConfig
 				}
@@ -701,7 +701,7 @@ var _ = Describe("Models", func() {
 				DomainExternal: domain,
 				Origin:         origin,
 				Path:           path,
-				DefaultTTL:		defaultTTL,
+				DefaultTTL:     defaultTTL,
 				InsecureOrigin: insecureOrigin,
 			}
 		})
@@ -787,7 +787,7 @@ var _ = Describe("Models", func() {
 				}
 
 				switch r.Operation.Name {
-				case "GetDistribution2016_11_25":
+				case "GetDistribution2019_03_26":
 					data := r.Data.(*cloudfront.GetDistributionOutput)
 					data.Distribution = &cloudfront.Distribution{
 						Id:                 aws.String("cloudfront-distribution-id"),
@@ -796,10 +796,10 @@ var _ = Describe("Models", func() {
 						DistributionConfig: distributionConfig,
 					}
 					data.ETag = aws.String("etag")
-				case "GetDistributionConfig2016_11_25":
+				case "GetDistributionConfig2019_03_26":
 					data := r.Data.(*cloudfront.GetDistributionConfigOutput)
 					data.DistributionConfig = distributionConfig
-				case "UpdateDistribution2016_11_25":
+				case "UpdateDistribution2019_03_26":
 					data := r.Data.(*cloudfront.UpdateDistributionOutput)
 					data.Distribution = &cloudfront.Distribution{
 						DomainName:         aws.String("foo.paas.gov.uk"),
@@ -862,7 +862,7 @@ var _ = Describe("Models", func() {
 					domain, "foo.cloudfront.net",
 					cloudfrontDistID, origin, path,
 					defaultTTL, false, certificateID,
-					userDataID,	"Provisioned",
+					userDataID, "Provisioned",
 				),
 			)
 
