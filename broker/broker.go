@@ -53,7 +53,19 @@ var (
 	MAX_HEADER_COUNT = 10
 )
 
-func (b *CdnServiceBroker) Services(context context.Context) []brokerapi.Service {
+func (b *CdnServiceBroker) GetBinding(ctx context.Context, first, second string) (brokerapi.GetBindingSpec, error) {
+	return brokerapi.GetBindingSpec{}, fmt.Errorf("GetBinding method not implemented")
+}
+
+func (b *CdnServiceBroker) GetInstance(ctx context.Context, first string) (brokerapi.GetInstanceDetailsSpec, error) {
+	return brokerapi.GetInstanceDetailsSpec{}, fmt.Errorf("GetInstance method not implemented")
+}
+
+func (b *CdnServiceBroker) LastBindingOperation(ctx context.Context, first, second string, pollDetails brokerapi.PollDetails) (brokerapi.LastOperation, error) {
+	return brokerapi.LastOperation{}, fmt.Errorf("LastBindingOperation method not implemented")
+}
+
+func (b *CdnServiceBroker) Services(context context.Context) ([]brokerapi.Service, error) {
 	lsession := b.logger.Session("provision")
 	lsession.Info("start")
 
@@ -61,15 +73,15 @@ func (b *CdnServiceBroker) Services(context context.Context) []brokerapi.Service
 	buf, err := ioutil.ReadFile("./catalog.json")
 	if err != nil {
 		lsession.Error("read-file", err)
-		return []brokerapi.Service{}
+		return []brokerapi.Service{}, err
 	}
 	err = json.Unmarshal(buf, &service)
 	if err != nil {
 		lsession.Error("unmarshal", err)
-		return []brokerapi.Service{}
+		return []brokerapi.Service{}, err
 	}
 	lsession.Info("ok", lager.Data{"service": service})
-	return []brokerapi.Service{service}
+	return []brokerapi.Service{service}, nil
 }
 
 func (b *CdnServiceBroker) Provision(
@@ -134,11 +146,12 @@ func (b *CdnServiceBroker) Provision(
 
 func (b *CdnServiceBroker) LastOperation(
 	context context.Context,
-	instanceID, operationData string,
+	instanceID string,
+	pollDetails brokerapi.PollDetails,
 ) (brokerapi.LastOperation, error) {
 	lsession := b.logger.Session("last-operation", lager.Data{
 		"instance_id":    instanceID,
-		"operation_data": operationData,
+		"operation_data": pollDetails.OperationData,
 	})
 	lsession.Info("start")
 
@@ -272,6 +285,7 @@ func (b *CdnServiceBroker) Bind(
 	context context.Context,
 	instanceID, bindingID string,
 	details brokerapi.BindDetails,
+	asyncAllowed bool,
 ) (brokerapi.Binding, error) {
 	b.logger.Info("bind", lager.Data{
 		"instance_id": instanceID,
@@ -286,14 +300,15 @@ func (b *CdnServiceBroker) Unbind(
 	context context.Context,
 	instanceID, bindingID string,
 	details brokerapi.UnbindDetails,
-) error {
+	asyncAllowed bool,
+) (brokerapi.UnbindSpec, error) {
 	b.logger.Info("unbind", lager.Data{
 		"instance_id": instanceID,
 		"binding_id":  bindingID,
 		"details":     details,
 	})
 
-	return errors.New("service does not support bind")
+	return brokerapi.UnbindSpec{}, errors.New("service does not support bind")
 }
 
 func (b *CdnServiceBroker) Update(

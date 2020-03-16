@@ -55,7 +55,7 @@ var _ = Describe("Last operation", func() {
 			s.logger,
 		)
 
-		operation, err := b.LastOperation(s.ctx, "", "")
+		operation, err := b.LastOperation(s.ctx, "", brokerapi.PollDetails{OperationData: ""})
 		Expect(operation.State).To(Equal(brokerapi.Failed))
 		Expect(operation.Description).To(Equal("Service instance not found"))
 		Expect(err).NotTo(HaveOccurred())
@@ -78,7 +78,7 @@ var _ = Describe("Last operation", func() {
 			s.logger,
 		)
 
-		operation, err := b.LastOperation(s.ctx, "123", "")
+		operation, err := b.LastOperation(s.ctx, "123", brokerapi.PollDetails{OperationData: ""})
 		Expect(operation.State).To(Equal(brokerapi.Succeeded))
 		Expect(operation.Description).To(Equal("Service instance provisioned [cdn.cloud.gov => cdn.apps.cloud.gov]; CDN domain abc.cloudfront.net"))
 		Expect(err).NotTo(HaveOccurred())
@@ -102,7 +102,7 @@ var _ = Describe("Last operation", func() {
 			s.logger,
 		)
 
-		operation, err := b.LastOperation(s.ctx, "123", "")
+		operation, err := b.LastOperation(s.ctx, "123", brokerapi.PollDetails{OperationData: ""})
 		Expect(operation.State).To(Equal(brokerapi.InProgress))
 		Expect(operation.Description).To(ContainSubstring(operation.Description))
 		Expect(operation.Description).To(ContainSubstring("Provisioning in progress [cdn.cloud.gov => cdn.apps.cloud.gov]"))
@@ -126,7 +126,7 @@ var _ = Describe("Last operation", func() {
 			s.logger,
 		)
 
-		operation, err := b.LastOperation(s.ctx, "123", "")
+		operation, err := b.LastOperation(s.ctx, "123", brokerapi.PollDetails{OperationData: ""})
 		Expect(operation.State).To(Equal(brokerapi.InProgress))
 		Expect(operation.Description).To(Equal("Deprovisioning in progress [cdn.cloud.gov => cdn.apps.cloud.gov]; CDN domain abc.cloudfront.net"))
 		Expect(err).NotTo(HaveOccurred())
