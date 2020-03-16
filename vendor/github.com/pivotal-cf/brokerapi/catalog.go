@@ -1,65 +1,77 @@
+// Copyright (C) 2015-Present Pivotal Software, Inc. All rights reserved.
+
+// This program and the accompanying materials are made available under
+// the terms of the under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+// http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package brokerapi
 
-type Service struct {
-	ID              string                  `json:"id"`
-	Name            string                  `json:"name"`
-	Description     string                  `json:"description"`
-	Bindable        bool                    `json:"bindable"`
-	Tags            []string                `json:"tags,omitempty"`
-	PlanUpdatable   bool                    `json:"plan_updateable"`
-	Plans           []ServicePlan           `json:"plans"`
-	Requires        []RequiredPermission    `json:"requires,omitempty"`
-	Metadata        *ServiceMetadata        `json:"metadata,omitempty"`
-	DashboardClient *ServiceDashboardClient `json:"dashboard_client,omitempty"`
-}
+import (
+	"reflect"
 
-type ServiceDashboardClient struct {
-	ID          string `json:"id"`
-	Secret      string `json:"secret"`
-	RedirectURI string `json:"redirect_uri"`
-}
-
-type ServicePlan struct {
-	ID          string               `json:"id"`
-	Name        string               `json:"name"`
-	Description string               `json:"description"`
-	Free        *bool                `json:"free,omitempty"`
-	Bindable    *bool                `json:"bindable,omitempty"`
-	Metadata    *ServicePlanMetadata `json:"metadata,omitempty"`
-}
-
-type ServicePlanMetadata struct {
-	DisplayName string            `json:"displayName,omitempty"`
-	Bullets     []string          `json:"bullets,omitempty"`
-	Costs       []ServicePlanCost `json:"costs,omitempty"`
-}
-
-type ServicePlanCost struct {
-	Amount map[string]float64 `json:"amount"`
-	Unit   string             `json:"unit"`
-}
-
-type ServiceMetadata struct {
-	DisplayName         string `json:"displayName,omitempty"`
-	ImageUrl            string `json:"imageUrl,omitempty"`
-	LongDescription     string `json:"longDescription,omitempty"`
-	ProviderDisplayName string `json:"providerDisplayName,omitempty"`
-	DocumentationUrl    string `json:"documentationUrl,omitempty"`
-	SupportUrl          string `json:"supportUrl,omitempty"`
-}
-
-func FreeValue(v bool) *bool {
-	return &v
-}
-
-func BindableValue(v bool) *bool {
-	return &v
-}
-
-type RequiredPermission string
-
-const (
-	PermissionRouteForwarding = RequiredPermission("route_forwarding")
-	PermissionSyslogDrain     = RequiredPermission("syslog_drain")
-	PermissionVolumeMount     = RequiredPermission("volume_mount")
+	"github.com/pivotal-cf/brokerapi/domain"
 )
+
+//Deprecated: Use github.com/pivotal-cf/brokerapi/domain
+type Service = domain.Service
+
+//Deprecated: Use github.com/pivotal-cf/brokerapi/domain
+type ServiceDashboardClient = domain.ServiceDashboardClient
+
+//Deprecated: Use github.com/pivotal-cf/brokerapi/domain
+type ServicePlan = domain.ServicePlan
+
+//Deprecated: Use github.com/pivotal-cf/brokerapi/domain
+type ServiceSchemas = domain.ServiceSchemas
+
+//Deprecated: Use github.com/pivotal-cf/brokerapi/domain
+type ServiceInstanceSchema = domain.ServiceInstanceSchema
+
+//Deprecated: Use github.com/pivotal-cf/brokerapi/domain
+type ServiceBindingSchema = domain.ServiceBindingSchema
+
+//Deprecated: Use github.com/pivotal-cf/brokerapi/domain
+type Schema = domain.Schema
+
+//Deprecated: Use github.com/pivotal-cf/brokerapi/domain
+type ServicePlanMetadata = domain.ServicePlanMetadata
+
+//Deprecated: Use github.com/pivotal-cf/brokerapi/domain
+type ServicePlanCost = domain.ServicePlanCost
+
+//Deprecated: Use github.com/pivotal-cf/brokerapi/domain
+type ServiceMetadata = domain.ServiceMetadata
+
+//Deprecated: Use github.com/pivotal-cf/brokerapi/domain
+func FreeValue(v bool) *bool {
+	return domain.FreeValue(v)
+}
+
+//Deprecated: Use github.com/pivotal-cf/brokerapi/domain
+func BindableValue(v bool) *bool {
+	return domain.BindableValue(v)
+}
+
+//Deprecated: Use github.com/pivotal-cf/brokerapi/domain
+type RequiredPermission = domain.RequiredPermission
+
+//Deprecated: Use github.com/pivotal-cf/brokerapi/domain
+const (
+	PermissionRouteForwarding = domain.PermissionRouteForwarding
+	PermissionSyslogDrain     = domain.PermissionSyslogDrain
+	PermissionVolumeMount     = domain.PermissionVolumeMount
+)
+
+//Deprecated: Use github.com/pivotal-cf/brokerapi/domain
+func GetJsonNames(s reflect.Value) (res []string) {
+	return domain.GetJsonNames(s)
+}
