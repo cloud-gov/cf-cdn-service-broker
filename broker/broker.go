@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strings"
+	"time"
 
 	"code.cloudfoundry.org/lager"
 	"github.com/pivotal-cf/brokerapi"
@@ -185,6 +186,23 @@ func (b *CdnServiceBroker) LastOperation(
 
 	switch route.State {
 	case models.Provisioning:
+		if route.CreatedAt.Before(time.Now().Add(-24 * time.Hour)) {
+			err = b.manager.Disable(route)
+			if err != nil {
+				return brokerapi.LastOperation{
+					State:       brokerapi.Failed,
+					Description: "Couldn't verify in 24h time slot. Automatic deprovisioning has failed. Please contact support.",
+				}, nil
+			}
+
+			return brokerapi.LastOperation{
+				State: brokerapi.InProgress,
+				Description: fmt.Sprintf(
+					"Couldn't verify in 24h time slot. Deprovisioning in progress [%s => %s]",
+					route.DomainExternal, route.Origin,
+				),
+			}, nil
+		}
 		instructions, err := b.manager.GetDNSInstructions(route)
 		if err != nil {
 			lsession.Error("get-dns-instructions-err", err, lager.Data{
