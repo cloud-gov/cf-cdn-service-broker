@@ -29,7 +29,7 @@ require (
 	github.com/onsi/gomega v1.5.0
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c // indirect
 	github.com/pborman/uuid v1.2.0 // indirect
-	github.com/pivotal-cf/brokerapi v0.0.0-20170307172350-8f25c50c2794
+	github.com/pivotal-cf/brokerapi v6.4.2+incompatible
 	github.com/robfig/cron v1.0.0
 	github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a // indirect
 	github.com/stretchr/objx v0.2.0 // indirect

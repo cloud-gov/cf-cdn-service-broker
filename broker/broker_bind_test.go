@@ -26,7 +26,7 @@ var _ = Describe("Bind", func() {
 			},
 			lager.NewLogger("test"),
 		)
-		_, err := b.Bind(context.Background(), "", "", brokerapi.BindDetails{})
+		_, err := b.Bind(context.Background(), "", "", brokerapi.BindDetails{}, false)
 		Expect(err).To(HaveOccurred())
 	})
 
@@ -39,7 +39,7 @@ var _ = Describe("Bind", func() {
 			},
 			lager.NewLogger("test"),
 		)
-		err := b.Unbind(context.Background(), "", "", brokerapi.UnbindDetails{})
+		_, err := b.Unbind(context.Background(), "", "", brokerapi.UnbindDetails{}, false)
 		Expect(err).To(HaveOccurred())
 	})
 

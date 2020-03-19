@@ -52,6 +52,8 @@ github.com/cloudfoundry-community/go-cfclient
 github.com/davecgh/go-spew/spew
 # github.com/golang/protobuf v1.3.2
 github.com/golang/protobuf/proto
+# github.com/google/uuid v1.0.0
+github.com/google/uuid
 # github.com/gorilla/mux v1.7.3
 github.com/gorilla/mux
 # github.com/hpcloud/tail v1.0.0
@@ -109,9 +111,16 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/pivotal-cf/brokerapi v0.0.0-20170307172350-8f25c50c2794
+# github.com/pborman/uuid v1.2.0
+github.com/pborman/uuid
+# github.com/pivotal-cf/brokerapi v6.4.2+incompatible
 github.com/pivotal-cf/brokerapi
 github.com/pivotal-cf/brokerapi/auth
+github.com/pivotal-cf/brokerapi/domain
+github.com/pivotal-cf/brokerapi/domain/apiresponses
+github.com/pivotal-cf/brokerapi/handlers
+github.com/pivotal-cf/brokerapi/middlewares
+github.com/pivotal-cf/brokerapi/utils
 # github.com/pkg/errors v0.9.1
 github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0
