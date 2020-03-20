@@ -133,10 +133,11 @@ func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionCon
 					Quantity: aws.Int64(0),
 				},
 				CustomOriginConfig: &cloudfront.CustomOriginConfig{
-					HTTPPort:             aws.Int64(80),
-					HTTPSPort:            aws.Int64(443),
-					OriginReadTimeout:    aws.Int64(60),
-					OriginProtocolPolicy: getOriginProtocolPolicy(insecureOrigin),
+					HTTPPort:               aws.Int64(80),
+					HTTPSPort:              aws.Int64(443),
+					OriginReadTimeout:      aws.Int64(60),
+					OriginKeepaliveTimeout: aws.Int64(5),
+					OriginProtocolPolicy:   getOriginProtocolPolicy(insecureOrigin),
 					OriginSslProtocols: &cloudfront.OriginSslProtocols{
 						Quantity: aws.Int64(1),
 						Items: []*string{
