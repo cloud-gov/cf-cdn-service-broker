@@ -140,7 +140,7 @@ var _ = Describe("Last operation", func() {
 		operation, err := b.LastOperation(s.ctx, "123", brokerapi.PollDetails{OperationData: ""})
 		Expect(operation.State).To(Equal(brokerapi.InProgress))
 		Expect(operation.Description).To(ContainSubstring(operation.Description))
-		Expect(operation.Description).To(ContainSubstring("Couldn't verify in 24h time slot. Deprovisioning in progress [cdn.cloud.gov => cdn.apps.cloud.gov]"))
+		Expect(operation.Description).To(ContainSubstring("Couldn't verify in 24h time slot. Expiring instance initialisation."))
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -169,7 +169,7 @@ var _ = Describe("Last operation", func() {
 		operation, err := b.LastOperation(s.ctx, "123", brokerapi.PollDetails{OperationData: ""})
 		Expect(operation.State).To(Equal(brokerapi.Failed))
 		Expect(operation.Description).To(ContainSubstring(operation.Description))
-		Expect(operation.Description).To(ContainSubstring("Couldn't verify in 24h time slot. Automatic deprovisioning has failed. Please contact support."))
+		Expect(operation.Description).To(ContainSubstring("Couldn't verify in 24h time slot. Self-healing has failed. Please contact support."))
 		Expect(err).NotTo(HaveOccurred())
 	})
 

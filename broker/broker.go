@@ -189,18 +189,25 @@ func (b *CdnServiceBroker) LastOperation(
 		if route.CreatedAt.Before(time.Now().Add(-24 * time.Hour)) {
 			err = b.manager.Disable(route)
 			if err != nil {
+				lsession.Error("unable-to-expire-unprovisioned-instance", err, lager.Data{
+					"domain":    route.DomainExternal,
+					"state":     route.State,
+					"createdAt": route.CreatedAt,
+				})
 				return brokerapi.LastOperation{
 					State:       brokerapi.Failed,
-					Description: "Couldn't verify in 24h time slot. Automatic deprovisioning has failed. Please contact support.",
+					Description: "Couldn't verify in 24h time slot. Self-healing has failed. Please contact support.",
 				}, nil
 			}
 
+			lsession.Info("expiring-unprovisioned-instance", lager.Data{
+				"domain":    route.DomainExternal,
+				"state":     route.State,
+				"createdAt": route.CreatedAt,
+			})
 			return brokerapi.LastOperation{
-				State: brokerapi.InProgress,
-				Description: fmt.Sprintf(
-					"Couldn't verify in 24h time slot. Deprovisioning in progress [%s => %s]",
-					route.DomainExternal, route.Origin,
-				),
+				State:       brokerapi.InProgress,
+				Description: "Couldn't verify in 24h time slot. Expiring instance initialisation.",
 			}, nil
 		}
 		instructions, err := b.manager.GetDNSInstructions(route)
