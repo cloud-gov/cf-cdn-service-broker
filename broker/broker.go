@@ -254,7 +254,7 @@ func (b *CdnServiceBroker) LastOperation(
 			State:       brokerapi.InProgress,
 			Description: description,
 		}, nil
-	default:
+	case models.Provisioned:
 		description := fmt.Sprintf(
 			"Service instance provisioned [%s => %s]; CDN domain %s",
 			route.DomainExternal, route.Origin, route.DomainInternal,
@@ -266,6 +266,20 @@ func (b *CdnServiceBroker) LastOperation(
 		})
 		return brokerapi.LastOperation{
 			State:       brokerapi.Succeeded,
+			Description: description,
+		}, nil
+	default:
+		description := "Service instance stuck in unmanagable state."
+		if route.CreatedAt.Before(time.Now().Add(-24 * time.Hour)) {
+			description = fmt.Sprintf("Couldn't verify in 24h time slot. %s", description)
+		}
+		lsession.Info("unmanagable-state", lager.Data{
+			"domain":      route.DomainExternal,
+			"state":       route.State,
+			"description": description,
+		})
+		return brokerapi.LastOperation{
+			State:       brokerapi.Failed,
 			Description: description,
 		}, nil
 	}
