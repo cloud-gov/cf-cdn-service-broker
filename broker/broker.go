@@ -268,6 +268,20 @@ func (b *CdnServiceBroker) LastOperation(
 			State:       brokerapi.Succeeded,
 			Description: description,
 		}, nil
+	case models.Deprovisioned:
+		description := fmt.Sprintf(
+			"Service instance deprovisioned [%s => %s]; CDN domain %s",
+			route.DomainExternal, route.Origin, route.DomainInternal,
+		)
+		lsession.Info("ok", lager.Data{
+			"domain":      route.DomainExternal,
+			"state":       route.State,
+			"description": description,
+		})
+		return brokerapi.LastOperation{
+			State:       brokerapi.Succeeded,
+			Description: description,
+		}, nil
 	default:
 		description := "Service instance stuck in unmanagable state."
 		if route.CreatedAt.Before(time.Now().Add(-24 * time.Hour)) {
