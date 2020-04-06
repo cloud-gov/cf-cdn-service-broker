@@ -525,6 +525,18 @@ var _ = Describe("Models", func() {
 					},
 					Enabled:           aws.Bool(true),
 					ViewerCertificate: &cloudfront.ViewerCertificate{},
+					DefaultCacheBehavior: &cloudfront.DefaultCacheBehavior{
+						ForwardedValues: &cloudfront.ForwardedValues{
+							Cookies: &cloudfront.CookiePreference{
+								Forward: aws.String("all"),
+							},
+							QueryStringCacheKeys: &cloudfront.QueryStringCacheKeys{},
+						},
+						TrustedSigners: &cloudfront.TrustedSigners{},
+						AllowedMethods: &cloudfront.AllowedMethods{
+							CachedMethods: &cloudfront.CachedMethods{},
+						},
+					},
 				}
 
 				switch r.Operation.Name {
@@ -638,6 +650,18 @@ var _ = Describe("Models", func() {
 					},
 					Enabled:           aws.Bool(true),
 					ViewerCertificate: &cloudfront.ViewerCertificate{},
+					DefaultCacheBehavior: &cloudfront.DefaultCacheBehavior{
+						ForwardedValues: &cloudfront.ForwardedValues{
+							Cookies: &cloudfront.CookiePreference{
+								Forward: aws.String("all"),
+							},
+							QueryStringCacheKeys: &cloudfront.QueryStringCacheKeys{},
+						},
+						TrustedSigners: &cloudfront.TrustedSigners{},
+						AllowedMethods: &cloudfront.AllowedMethods{
+							CachedMethods: &cloudfront.CachedMethods{},
+						},
+					},
 				}
 
 				switch r.Operation.Name {
@@ -784,6 +808,18 @@ var _ = Describe("Models", func() {
 					Enabled:           aws.Bool(true),
 					ViewerCertificate: &cloudfront.ViewerCertificate{},
 					CallerReference:   aws.String("hi mom"),
+					DefaultCacheBehavior: &cloudfront.DefaultCacheBehavior{
+						ForwardedValues: &cloudfront.ForwardedValues{
+							Cookies: &cloudfront.CookiePreference{
+								Forward: aws.String("all"),
+							},
+							QueryStringCacheKeys: &cloudfront.QueryStringCacheKeys{},
+						},
+						TrustedSigners: &cloudfront.TrustedSigners{},
+						AllowedMethods: &cloudfront.AllowedMethods{
+							CachedMethods: &cloudfront.CachedMethods{},
+						},
+					},
 				}
 
 				switch r.Operation.Name {

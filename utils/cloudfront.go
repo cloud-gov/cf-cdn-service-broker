@@ -57,111 +57,21 @@ func (d *Distribution) getHeaders(headers []string) *cloudfront.Headers {
 	}
 }
 
-// fillDistributionConfig is a wrapper function that will get all the common config settings for
-// "cloudfront.DistributionConfig". This function is shared between "Create" and "Update".
-// In order to maintain backwards compatibility with older versions of the code where the callerReference was derived
-// from the domain(s), the callerReference has to be explicitly passed in. This is necessary because whenever we do an
-// update, the domains could change but we need to treat the CallerReference like an ID because
-// it can't be changed like the domains and instead the callerReference which was composed of the original domains must
-// be passed in.
-func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionConfig, origin, path string,
-	insecureOrigin bool, callerReference *string, domains []string, forwardedHeaders []string, forwardCookies bool,
-	defaultTTL int64) {
-	config.CallerReference = callerReference
+func (d *Distribution) setDistributionConfigDefaults(config *cloudfront.DistributionConfig, callerReference string) {
+	config.CallerReference = aws.String(callerReference)
 	config.Comment = aws.String("cdn route service")
 	config.Enabled = aws.Bool(true)
 	config.IsIPV6Enabled = aws.Bool(true)
+	config.PriceClass = aws.String("PriceClass_100")
+}
 
-	cookies := aws.String("all")
-	if forwardCookies == false {
-		cookies = aws.String("none")
-	}
-
-	config.DefaultCacheBehavior = &cloudfront.DefaultCacheBehavior{
-		TargetOriginId: aws.String(*callerReference),
-		ForwardedValues: &cloudfront.ForwardedValues{
-			Headers: d.getHeaders(forwardedHeaders),
-			Cookies: &cloudfront.CookiePreference{
-				Forward: cookies,
-			},
-			QueryString: aws.Bool(true),
-			QueryStringCacheKeys: &cloudfront.QueryStringCacheKeys{
-				Quantity: aws.Int64(0),
-			},
-		},
-		SmoothStreaming: aws.Bool(false),
-		DefaultTTL:      aws.Int64(defaultTTL),
-		MinTTL:          aws.Int64(0),
-		MaxTTL:          aws.Int64(31622400),
-		LambdaFunctionAssociations: &cloudfront.LambdaFunctionAssociations{
-			Quantity: aws.Int64(0),
-		},
-		TrustedSigners: &cloudfront.TrustedSigners{
-			Enabled:  aws.Bool(false),
-			Quantity: aws.Int64(0),
-		},
-		ViewerProtocolPolicy: aws.String("redirect-to-https"),
-		AllowedMethods: &cloudfront.AllowedMethods{
-			CachedMethods: &cloudfront.CachedMethods{
-				Quantity: aws.Int64(2),
-				Items: []*string{
-					aws.String("HEAD"),
-					aws.String("GET"),
-				},
-			},
-			Quantity: aws.Int64(7),
-			Items: []*string{
-				aws.String("HEAD"),
-				aws.String("GET"),
-				aws.String("OPTIONS"),
-				aws.String("PUT"),
-				aws.String("POST"),
-				aws.String("PATCH"),
-				aws.String("DELETE"),
-			},
-		},
-		Compress: aws.Bool(false),
-	}
-	config.Origins = &cloudfront.Origins{
-		Quantity: aws.Int64(2),
-		Items: []*cloudfront.Origin{
-			{
-				DomainName: aws.String(origin),
-				Id:         aws.String(*callerReference),
-				OriginPath: aws.String(path),
-				CustomHeaders: &cloudfront.CustomHeaders{
-					Quantity: aws.Int64(0),
-				},
-				CustomOriginConfig: &cloudfront.CustomOriginConfig{
-					HTTPPort:             aws.Int64(80),
-					HTTPSPort:            aws.Int64(443),
-					OriginReadTimeout:    aws.Int64(60),
-					OriginProtocolPolicy: getOriginProtocolPolicy(insecureOrigin),
-					OriginSslProtocols: &cloudfront.OriginSslProtocols{
-						Quantity: aws.Int64(1),
-						Items: []*string{
-							aws.String("TLSv1.2"),
-						},
-					},
-				},
-			},
-			{
-				DomainName: aws.String(fmt.Sprintf("%s.s3.amazonaws.com", d.Settings.Bucket)),
-				Id:         aws.String(fmt.Sprintf("s3-%s-%s", d.Settings.Bucket, *callerReference)),
-				OriginPath: aws.String(""),
-				CustomHeaders: &cloudfront.CustomHeaders{
-					Quantity: aws.Int64(0),
-				},
-				S3OriginConfig: &cloudfront.S3OriginConfig{
-					OriginAccessIdentity: aws.String(""),
-				},
-			},
-		},
-	}
+func (d *Distribution) setDistributionConfigCacheBehaviors(config *cloudfront.DistributionConfig, callerReference string) {
 	config.CacheBehaviors = &cloudfront.CacheBehaviors{
 		Quantity: aws.Int64(1),
 		Items: []*cloudfront.CacheBehavior{
 			{
+				TargetOriginId:         aws.String(callerReference),
+				FieldLevelEncryptionId: aws.String(""),
 				AllowedMethods: &cloudfront.AllowedMethods{
 					CachedMethods: &cloudfront.CachedMethods{
 						Quantity: aws.Int64(2),
@@ -176,9 +86,8 @@ func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionCon
 					},
 					Quantity: aws.Int64(2),
 				},
-				Compress:       aws.Bool(false),
-				PathPattern:    aws.String("/.well-known/acme-challenge/*"),
-				TargetOriginId: aws.String(fmt.Sprintf("s3-%s-%s", d.Settings.Bucket, *callerReference)),
+				Compress:    aws.Bool(false),
+				PathPattern: aws.String("/.well-known/acme-challenge/*"),
 				ForwardedValues: &cloudfront.ForwardedValues{
 					Headers: &cloudfront.Headers{
 						Quantity: aws.Int64(0),
@@ -206,15 +115,138 @@ func (d *Distribution) fillDistributionConfig(config *cloudfront.DistributionCon
 			},
 		},
 	}
+}
+
+func (d *Distribution) setDistributionConfigOrigins(config *cloudfront.DistributionConfig, callerReference string) {
+	config.Origins = &cloudfront.Origins{
+		Quantity: aws.Int64(2),
+		Items: []*cloudfront.Origin{
+			{
+				Id: aws.String(callerReference),
+				CustomHeaders: &cloudfront.CustomHeaders{
+					Quantity: aws.Int64(0),
+				},
+				CustomOriginConfig: &cloudfront.CustomOriginConfig{
+					HTTPPort:               aws.Int64(80),
+					HTTPSPort:              aws.Int64(443),
+					OriginReadTimeout:      aws.Int64(60),
+					OriginKeepaliveTimeout: aws.Int64(5),
+					OriginSslProtocols: &cloudfront.OriginSslProtocols{
+						Quantity: aws.Int64(1),
+						Items: []*string{
+							aws.String("TLSv1.2"),
+						},
+					},
+				},
+			},
+			{
+				Id:         aws.String(fmt.Sprintf("s3-%s-%s", d.Settings.Bucket, callerReference)),
+				DomainName: aws.String(fmt.Sprintf("%s.s3.amazonaws.com", d.Settings.Bucket)),
+				OriginPath: aws.String(""),
+				CustomHeaders: &cloudfront.CustomHeaders{
+					Quantity: aws.Int64(0),
+				},
+				S3OriginConfig: &cloudfront.S3OriginConfig{
+					OriginAccessIdentity: aws.String(""),
+				},
+			},
+		},
+	}
+}
+
+func (d *Distribution) setDistributionConfigDefaultCacheBehavior(config *cloudfront.DistributionConfig, callerReference string) {
+	config.DefaultCacheBehavior.TargetOriginId = aws.String(callerReference)
+
+	config.DefaultCacheBehavior.ForwardedValues.Cookies.Forward = aws.String("all")
+	config.DefaultCacheBehavior.ForwardedValues.QueryString = aws.Bool(true)
+	config.DefaultCacheBehavior.ForwardedValues.QueryStringCacheKeys.Quantity = aws.Int64(0)
+
+	config.DefaultCacheBehavior.SmoothStreaming = aws.Bool(false)
+	config.DefaultCacheBehavior.MinTTL = aws.Int64(0)
+	config.DefaultCacheBehavior.MaxTTL = aws.Int64(31622400)
+	config.DefaultCacheBehavior.Compress = aws.Bool(false)
+
+	config.DefaultCacheBehavior.TrustedSigners.Enabled = aws.Bool(false)
+	config.DefaultCacheBehavior.TrustedSigners.Quantity = aws.Int64(0)
+
+	config.DefaultCacheBehavior.ViewerProtocolPolicy = aws.String("redirect-to-https")
+
+	config.DefaultCacheBehavior.AllowedMethods.CachedMethods.Quantity = aws.Int64(2)
+	config.DefaultCacheBehavior.AllowedMethods.CachedMethods.Items = []*string{
+		aws.String("HEAD"),
+		aws.String("GET"),
+	}
+
+	config.DefaultCacheBehavior.AllowedMethods.Quantity = aws.Int64(7)
+	config.DefaultCacheBehavior.AllowedMethods.Items = []*string{
+		aws.String("HEAD"),
+		aws.String("GET"),
+		aws.String("OPTIONS"),
+		aws.String("PUT"),
+		aws.String("POST"),
+		aws.String("PATCH"),
+		aws.String("DELETE"),
+	}
+}
+
+func (d *Distribution) configureDistributionConfig(
+	config *cloudfront.DistributionConfig,
+	domains []string,
+	origin string,
+	path string,
+	defaultTTL int64,
+	insecureOrigin bool,
+	forwardedHeaders Headers,
+	forwardCookies bool,
+) {
+	if forwardCookies == false {
+		config.DefaultCacheBehavior.ForwardedValues.Cookies.Forward = aws.String("none")
+	}
+
+	config.Origins.Items[0].DomainName = aws.String(origin)
+	config.Origins.Items[0].OriginPath = aws.String(path)
+	config.Origins.Items[0].CustomOriginConfig.OriginProtocolPolicy = getOriginProtocolPolicy(insecureOrigin)
+
 	config.Aliases = d.getAliases(domains)
-	config.PriceClass = aws.String("PriceClass_100")
+
+	config.DefaultCacheBehavior.ForwardedValues.Headers = d.getHeaders(forwardedHeaders.Strings())
+	config.DefaultCacheBehavior.DefaultTTL = aws.Int64(defaultTTL)
 }
 
 func (d *Distribution) Create(callerReference string, domains []string, origin, path string, defaultTTL int64, insecureOrigin bool, forwardedHeaders Headers, forwardCookies bool, tags map[string]string) (*cloudfront.Distribution, error) {
 	distConfig := new(cloudfront.DistributionConfig)
-	d.fillDistributionConfig(distConfig, origin, path, insecureOrigin,
-		aws.String(callerReference), domains, forwardedHeaders.Strings(), forwardCookies,
-		defaultTTL)
+
+	distConfig.DefaultCacheBehavior = &cloudfront.DefaultCacheBehavior{
+		FieldLevelEncryptionId: aws.String(""),
+		ForwardedValues: &cloudfront.ForwardedValues{
+			Cookies:              &cloudfront.CookiePreference{},
+			QueryStringCacheKeys: &cloudfront.QueryStringCacheKeys{},
+		},
+		LambdaFunctionAssociations: &cloudfront.LambdaFunctionAssociations{
+			Quantity: aws.Int64(0),
+		},
+		TrustedSigners: &cloudfront.TrustedSigners{},
+		AllowedMethods: &cloudfront.AllowedMethods{
+			CachedMethods: &cloudfront.CachedMethods{},
+		},
+	}
+
+	d.setDistributionConfigDefaults(distConfig, callerReference)
+	d.setDistributionConfigCacheBehaviors(distConfig, callerReference)
+	d.setDistributionConfigDefaultCacheBehavior(distConfig, callerReference)
+	d.setDistributionConfigOrigins(distConfig, callerReference)
+
+	d.configureDistributionConfig(
+		distConfig,
+		domains,
+		origin,
+		path,
+		defaultTTL,
+		insecureOrigin,
+		forwardedHeaders,
+		forwardCookies,
+	)
+
 	resp, err := d.Service.CreateDistributionWithTags(&cloudfront.CreateDistributionWithTagsInput{
 		DistributionConfigWithTags: &cloudfront.DistributionConfigWithTags{
 			DistributionConfig: distConfig,
@@ -237,9 +269,24 @@ func (d *Distribution) Update(distId string, domains []string, origin, path stri
 	if err != nil {
 		return nil, err
 	}
-	d.fillDistributionConfig(dist.DistributionConfig, origin, path, insecureOrigin,
-		dist.DistributionConfig.CallerReference, domains, forwardedHeaders.Strings(), forwardCookies,
-		defaultTTL)
+
+	callerReference := *dist.DistributionConfig.CallerReference
+
+	d.setDistributionConfigDefaults(dist.DistributionConfig, callerReference)
+	d.setDistributionConfigCacheBehaviors(dist.DistributionConfig, callerReference)
+	d.setDistributionConfigDefaultCacheBehavior(dist.DistributionConfig, callerReference)
+	d.setDistributionConfigOrigins(dist.DistributionConfig, callerReference)
+
+	d.configureDistributionConfig(
+		dist.DistributionConfig,
+		domains,
+		origin,
+		path,
+		defaultTTL,
+		insecureOrigin,
+		forwardedHeaders,
+		forwardCookies,
+	)
 
 	// Call the UpdateDistribution function
 	resp, err := d.Service.UpdateDistribution(&cloudfront.UpdateDistributionInput{
