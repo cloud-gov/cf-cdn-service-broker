@@ -215,9 +215,9 @@ type Certificate struct {
 
 type RouteManagerIface interface {
 	Create(
-		instanceId,
-		domain,
-		origin,
+		instanceId string,
+		domain string,
+		origin string,
 		path string,
 		defaultTTL int64,
 		insecureOrigin bool,
@@ -228,7 +228,7 @@ type RouteManagerIface interface {
 
 	Update(
 		instanceId string,
-		domain,
+		domain string,
 		origin string,
 		path string,
 		defaultTTL int64,
@@ -387,7 +387,7 @@ func (m *RouteManager) Get(instanceId string) (*Route, error) {
 // Update updates the CDN route service and returns whether the update has been
 // performed asynchronously or not
 func (m *RouteManager) Update(
-	instanceId,
+	instanceId string,
 	domain,
 	origin string,
 	path string,

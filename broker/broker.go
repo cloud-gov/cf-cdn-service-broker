@@ -131,7 +131,17 @@ func (b *CdnServiceBroker) Provision(
 		"Plan":            details.PlanID,
 	}
 
-	_, err = b.manager.Create(instanceID, options.Domain, options.Origin, options.Path, options.DefaultTTL, options.InsecureOrigin, headers, options.Cookies, tags)
+	_, err = b.manager.Create(
+		instanceID,
+		options.Domain,
+		options.Origin,
+		options.Path,
+		options.DefaultTTL,
+		options.InsecureOrigin,
+		headers,
+		options.Cookies,
+		tags,
+	)
 	if err != nil {
 		lsession.Info("manager-create-err", lager.Data{
 			"options": options,
