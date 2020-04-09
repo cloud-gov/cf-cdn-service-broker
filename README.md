@@ -91,26 +91,6 @@ The easiest/recommended way to deploy the broker is via the [Concourse](http://c
     $ cf map-route <app> my.domain.gov
     ```
 
-## Custom origins
-
-If you are pointing your domain to a non-Cloud Foundry application, such as a public S3 bucket, you can pass a custom origin to the broker:
-
-```bash
-$ cf create-service cdn-route cdn-route my-cdn-route \
-    -c '{"domain": "my.domain.gov", "origin": "my-app.apps.cloud.gov"}'
-
-Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
-```
-
-If your origin is non-HTTPS, you'll need to add another parameter:
-
-```bash
-$ cf create-service cdn-route cdn-route my-cdn-route \
-    -c '{"domain": "my.domain.gov", "origin": "my-app.apps.cloud.gov", "insecure_origin": true}'
-
-Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
-```
-
 The default TTL for the CloudFront distribution is `0`. To change this, you can pass it as a parameter:
 
 ```bash
