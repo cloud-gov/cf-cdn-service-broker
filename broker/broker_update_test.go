@@ -47,7 +47,7 @@ var _ = Describe("Update", func() {
 		s.cfclient = cfmock.Client{}
 		s.logger = lager.NewLogger("test")
 		s.settings = config.Settings{
-			DefaultOrigin: "origin.cloud.gov",
+			DefaultOrigin:     "origin.cloud.gov",
 			DefaultDefaultTTL: int64(0),
 		}
 		s.Broker = broker.New(
@@ -61,12 +61,12 @@ var _ = Describe("Update", func() {
 
 	It("Should error when not given options", func() {
 		details := brokerapi.UpdateDetails{
-			RawParameters: json.RawMessage(`{"origin": ""}`),
+			RawParameters: json.RawMessage(`{}`),
 		}
 		_, err := s.Broker.Update(s.ctx, "", details, true)
 
 		Expect(err).To(HaveOccurred())
-		Expect(err).To(MatchError(ContainSubstring("must pass non-empty `domain` or `origin`")))
+		Expect(err).To(MatchError(ContainSubstring("must pass non-empty `domain`")))
 	})
 
 	It("Should succeed when given only a domain", func() {
@@ -74,17 +74,6 @@ var _ = Describe("Update", func() {
 			RawParameters: json.RawMessage(`{"domain": "domain.gov"}`),
 		}
 		s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", "", s.settings.DefaultDefaultTTL, false, utils.Headers{"Host": true}, true).Return(nil)
-		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
-		_, err := s.Broker.Update(s.ctx, "", details, true)
-
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	It("Should succeed when given only an origin", func() {
-		details := brokerapi.UpdateDetails{
-			RawParameters: json.RawMessage(`{"origin": "origin.gov"}`),
-		}
-		s.Manager.On("Update", "", "", "origin.gov", "", s.settings.DefaultDefaultTTL, false, utils.Headers{}, true).Return(nil)
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 		_, err := s.Broker.Update(s.ctx, "", details, true)
 

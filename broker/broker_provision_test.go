@@ -161,26 +161,6 @@ var _ = Describe("Last operation", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("Should succeed with a custom origin", func() {
-		s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
-		route := &models.Route{State: models.Provisioning}
-		s.Manager.On("Create", "123", "domain.gov", "custom.cloud.gov", "", s.settings.DefaultDefaultTTL, false, utils.Headers{}, true,
-			map[string]string{
-				"Organization":    "",
-				"Space":           "",
-				"Service":         "",
-				"ServiceInstance": "123",
-				"Plan":            "",
-			}).Return(route, nil)
-
-		details := brokerapi.ProvisionDetails{
-			RawParameters: []byte(`{"domain": "domain.gov", "origin": "custom.cloud.gov"}`),
-		}
-		_, err := s.Broker.Provision(s.ctx, "123", details, true)
-
-		Expect(err).NotTo(HaveOccurred())
-	})
-
 	It("Should error when Cloud Foundry does not have the domain registered", func() {
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, errors.New("fail"))
 		details := brokerapi.ProvisionDetails{

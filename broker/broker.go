@@ -20,7 +20,6 @@ import (
 
 type CreateOptions struct {
 	Domain         string   `json:"domain"`
-	Origin         string   `json:"origin"`
 	Path           string   `json:"path"`
 	DefaultTTL     int64    `json:"default_ttl"`
 	InsecureOrigin bool     `json:"insecure_origin"`
@@ -30,7 +29,6 @@ type CreateOptions struct {
 
 type UpdateOptions struct {
 	Domain         string   `json:"domain"`
-	Origin         string   `json:"origin"`
 	Path           string   `json:"path"`
 	DefaultTTL     int64    `json:"default_ttl"`
 	InsecureOrigin bool     `json:"insecure_origin"`
@@ -127,8 +125,7 @@ func (b *CdnServiceBroker) Provision(
 		return spec, brokerapi.ErrInstanceAlreadyExists
 	}
 
-	originIsDefault := options.Origin == b.settings.DefaultOrigin
-	headers, err := b.getHeaders(options.Headers, originIsDefault)
+	headers, err := b.getHeaders(options.Headers)
 	if err != nil {
 		lsession.Error("get-headers-err", err)
 		return spec, err
@@ -145,7 +142,7 @@ func (b *CdnServiceBroker) Provision(
 	_, err = b.manager.Create(
 		instanceID,
 		options.Domain,
-		options.Origin,
+		b.settings.DefaultOrigin,
 		options.Path,
 		options.DefaultTTL,
 		options.InsecureOrigin,
@@ -406,15 +403,16 @@ func (b *CdnServiceBroker) Update(
 	}
 	b.logger.Info("update-options", lager.Data{"instance_id": instanceID, "options": options})
 
-	originIsDefault := options.Origin == b.settings.DefaultOrigin
-	headers, err := b.getHeaders(options.Headers, originIsDefault)
+	headers, err := b.getHeaders(options.Headers)
 	if err != nil {
 		return brokerapi.UpdateServiceSpec{}, err
 	}
 
 	provisioningAsync, err := b.manager.Update(
 		instanceID,
-		options.Domain, options.Origin, options.Path,
+		options.Domain,
+		b.settings.DefaultOrigin,
+		options.Path,
 		options.DefaultTTL,
 		options.InsecureOrigin,
 		headers, options.Cookies,
@@ -430,7 +428,6 @@ func (b *CdnServiceBroker) Update(
 // are provided.
 func (b *CdnServiceBroker) parseProvisionDetails(details brokerapi.ProvisionDetails) (options CreateOptions, err error) {
 	options = CreateOptions{
-		Origin:     b.settings.DefaultOrigin,
 		Cookies:    true,
 		Headers:    []string{},
 		DefaultTTL: b.settings.DefaultDefaultTTL,
@@ -450,11 +447,9 @@ func (b *CdnServiceBroker) parseProvisionDetails(details brokerapi.ProvisionDeta
 		return
 	}
 
-	if options.Origin == b.settings.DefaultOrigin {
-		err = b.checkDomain(options.Domain, details.OrganizationGUID)
-		if err != nil {
-			return
-		}
+	err = b.checkDomain(options.Domain, details.OrganizationGUID)
+	if err != nil {
+		return
 	}
 
 	return
@@ -464,7 +459,6 @@ func (b *CdnServiceBroker) parseProvisionDetails(details brokerapi.ProvisionDeta
 // are provided.
 func (b *CdnServiceBroker) parseUpdateDetails(details brokerapi.UpdateDetails) (options UpdateOptions, err error) {
 	options = UpdateOptions{
-		Origin:     b.settings.DefaultOrigin,
 		Cookies:    true,
 		Headers:    []string{},
 		DefaultTTL: b.settings.DefaultDefaultTTL,
@@ -479,12 +473,12 @@ func (b *CdnServiceBroker) parseUpdateDetails(details brokerapi.UpdateDetails) (
 		return
 	}
 
-	if options.Domain == "" && options.Origin == "" {
-		err = errors.New("must pass non-empty `domain` or `origin`")
+	if options.Domain == "" {
+		err = errors.New("must pass non-empty `domain`")
 		return
 	}
 
-	if options.Domain != "" && options.Origin == b.settings.DefaultOrigin {
+	if options.Domain != "" {
 		err = b.checkDomain(options.Domain, details.PreviousValues.OrgID)
 		if err != nil {
 			return
@@ -524,7 +518,7 @@ func (b *CdnServiceBroker) checkDomain(domain, orgGUID string) error {
 	return nil
 }
 
-func (b *CdnServiceBroker) getHeaders(headerNames []string, originIsDefault bool) (headers utils.Headers, err error) {
+func (b *CdnServiceBroker) getHeaders(headerNames []string) (headers utils.Headers, err error) {
 	headers = utils.Headers{}
 	for _, header := range headerNames {
 		if headers.Contains(header) {
@@ -541,7 +535,7 @@ func (b *CdnServiceBroker) getHeaders(headerNames []string, originIsDefault bool
 	}
 
 	// Ensure the Host header is forwarded if using a CloudFoundry origin.
-	if originIsDefault && !headers.Contains("*") {
+	if !headers.Contains("*") {
 		headers.Add("Host")
 	}
 
