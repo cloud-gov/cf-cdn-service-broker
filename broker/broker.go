@@ -18,7 +18,17 @@ import (
 	"github.com/18F/cf-cdn-service-broker/utils"
 )
 
-type Options struct {
+type CreateOptions struct {
+	Domain         string   `json:"domain"`
+	Origin         string   `json:"origin"`
+	Path           string   `json:"path"`
+	DefaultTTL     int64    `json:"default_ttl"`
+	InsecureOrigin bool     `json:"insecure_origin"`
+	Cookies        bool     `json:"cookies"`
+	Headers        []string `json:"headers"`
+}
+
+type UpdateOptions struct {
 	Domain         string   `json:"domain"`
 	Origin         string   `json:"origin"`
 	Path           string   `json:"path"`
@@ -117,7 +127,8 @@ func (b *CdnServiceBroker) Provision(
 		return spec, brokerapi.ErrInstanceAlreadyExists
 	}
 
-	headers, err := b.getHeaders(options)
+	originIsDefault := options.Origin == b.settings.DefaultOrigin
+	headers, err := b.getHeaders(options.Headers, originIsDefault)
 	if err != nil {
 		lsession.Error("get-headers-err", err)
 		return spec, err
@@ -395,7 +406,8 @@ func (b *CdnServiceBroker) Update(
 	}
 	b.logger.Info("update-options", lager.Data{"instance_id": instanceID, "options": options})
 
-	headers, err := b.getHeaders(options)
+	originIsDefault := options.Origin == b.settings.DefaultOrigin
+	headers, err := b.getHeaders(options.Headers, originIsDefault)
 	if err != nil {
 		return brokerapi.UpdateServiceSpec{}, err
 	}
@@ -416,8 +428,8 @@ func (b *CdnServiceBroker) Update(
 
 // parseProvisionDetails will attempt to parse the update details and then verify that BOTH least "domain" and "origin"
 // are provided.
-func (b *CdnServiceBroker) parseProvisionDetails(details brokerapi.ProvisionDetails) (options Options, err error) {
-	options = Options{
+func (b *CdnServiceBroker) parseProvisionDetails(details brokerapi.ProvisionDetails) (options CreateOptions, err error) {
+	options = CreateOptions{
 		Origin:     b.settings.DefaultOrigin,
 		Cookies:    true,
 		Headers:    []string{},
@@ -450,8 +462,8 @@ func (b *CdnServiceBroker) parseProvisionDetails(details brokerapi.ProvisionDeta
 
 // parseUpdateDetails will attempt to parse the update details and then verify that at least "domain" or "origin"
 // are provided.
-func (b *CdnServiceBroker) parseUpdateDetails(details brokerapi.UpdateDetails) (options Options, err error) {
-	options = Options{
+func (b *CdnServiceBroker) parseUpdateDetails(details brokerapi.UpdateDetails) (options UpdateOptions, err error) {
+	options = UpdateOptions{
 		Origin:     b.settings.DefaultOrigin,
 		Cookies:    true,
 		Headers:    []string{},
@@ -512,9 +524,9 @@ func (b *CdnServiceBroker) checkDomain(domain, orgGUID string) error {
 	return nil
 }
 
-func (b *CdnServiceBroker) getHeaders(options Options) (headers utils.Headers, err error) {
+func (b *CdnServiceBroker) getHeaders(headerNames []string, originIsDefault bool) (headers utils.Headers, err error) {
 	headers = utils.Headers{}
-	for _, header := range options.Headers {
+	for _, header := range headerNames {
 		if headers.Contains(header) {
 			err = fmt.Errorf("must not pass duplicated header '%s'", header)
 			return
@@ -529,7 +541,7 @@ func (b *CdnServiceBroker) getHeaders(options Options) (headers utils.Headers, e
 	}
 
 	// Ensure the Host header is forwarded if using a CloudFoundry origin.
-	if options.Origin == b.settings.DefaultOrigin && !headers.Contains("*") {
+	if originIsDefault && !headers.Contains("*") {
 		headers.Add("Host")
 	}
 
