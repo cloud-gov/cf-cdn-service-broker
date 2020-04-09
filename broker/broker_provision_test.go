@@ -33,7 +33,7 @@ type ProvisionSuite struct {
 
 func (s *ProvisionSuite) allowCreateWithExpectedHeaders(expectedHeaders utils.Headers) {
 	route := &models.Route{State: models.Provisioning}
-	s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", "", s.settings.DefaultDefaultTTL, expectedHeaders, true,
+	s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", s.settings.DefaultDefaultTTL, expectedHeaders, true,
 		map[string]string{
 			"Organization":    "",
 			"Space":           "",
@@ -44,7 +44,7 @@ func (s *ProvisionSuite) allowCreateWithExpectedHeaders(expectedHeaders utils.He
 }
 
 func (s *ProvisionSuite) failCreateWithExpectedHeaders(expectedHeaders utils.Headers) {
-	s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", "", s.settings.DefaultDefaultTTL, expectedHeaders, true,
+	s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", s.settings.DefaultDefaultTTL, expectedHeaders, true,
 		map[string]string{
 			"Organization":    "",
 			"Space":           "",
@@ -120,7 +120,7 @@ var _ = Describe("Last operation", func() {
 		s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
 		route := &models.Route{State: models.Provisioning}
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
-		s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", "", s.settings.DefaultDefaultTTL, utils.Headers{"Host": true}, true,
+		s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", s.settings.DefaultDefaultTTL, utils.Headers{"Host": true}, true,
 			map[string]string{
 				"Organization":    "",
 				"Space":           "",
@@ -141,7 +141,7 @@ var _ = Describe("Last operation", func() {
 		s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
 		route := &models.Route{State: models.Provisioning}
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
-		s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", "", int64(52), utils.Headers{"Host": true}, true,
+		s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", int64(52), utils.Headers{"Host": true}, true,
 			map[string]string{
 				"Organization":    "",
 				"Space":           "",

@@ -102,15 +102,6 @@ $ cf create-service cdn-route cdn-route my-cdn-route \
 Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
 ```
 
-If you need to add a path to your origin, you can pass it in as a parameter:
-
-```bash
-$ cf create-service cdn-route cdn-route my-cdn-route \
-    -c '{"domain": "my.domain.gov", "origin": "my-app.apps.cloud.gov", "path": "/myfolder"}'
-
-Create in progress. Use 'cf services' or 'cf service my-cdn-route' to check operation status.
-```
-
 If your origin is non-HTTPS, you'll need to add another parameter:
 
 ```bash

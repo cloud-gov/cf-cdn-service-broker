@@ -182,8 +182,8 @@ type Route struct {
 	DomainInternal string
 	DistId         string
 	Origin         string
-	Path           string
-	InsecureOrigin bool // Always false, should not remove because it is in DB
+	Path           string // Always empty, should not remove because it is in DB
+	InsecureOrigin bool   // Always false, should not remove because it is in DB
 	Certificate    Certificate
 	UserData       UserData
 	UserDataID     int
@@ -218,7 +218,6 @@ type RouteManagerIface interface {
 		instanceId string,
 		domain string,
 		origin string,
-		path string,
 		defaultTTL int64,
 		forwardedHeaders utils.Headers,
 		forwardCookies bool,
@@ -229,7 +228,6 @@ type RouteManagerIface interface {
 		instanceId string,
 		domain string,
 		origin string,
-		path string,
 		defaultTTL int64,
 		forwardedHeaders utils.Headers,
 		forwardCookies bool,
@@ -279,9 +277,8 @@ func NewManager(
 
 func (m *RouteManager) Create(
 	instanceId,
-	domain,
-	origin,
-	path string,
+	domain string,
+	origin string,
 	defaultTTL int64,
 	forwardedHeaders utils.Headers,
 	forwardCookies bool,
@@ -293,7 +290,7 @@ func (m *RouteManager) Create(
 		State:          Provisioning,
 		DomainExternal: domain,
 		Origin:         origin,
-		Path:           path,
+		Path:           "",
 		DefaultTTL:     defaultTTL,
 		InsecureOrigin: false,
 	}
@@ -336,7 +333,6 @@ func (m *RouteManager) Create(
 		instanceId,
 		make([]string, 0),
 		origin,
-		path,
 		defaultTTL,
 		forwardedHeaders,
 		forwardCookies,
@@ -384,9 +380,8 @@ func (m *RouteManager) Get(instanceId string) (*Route, error) {
 // performed asynchronously or not
 func (m *RouteManager) Update(
 	instanceId string,
-	domain,
+	domain string,
 	origin string,
-	path string,
 	defaultTTL int64,
 	forwardedHeaders utils.Headers,
 	forwardCookies bool,
@@ -419,10 +414,6 @@ func (m *RouteManager) Update(
 		lsession.Info("param-update-origin")
 		route.Origin = origin
 	}
-	if path != route.Path {
-		lsession.Info("param-update-path")
-		route.Path = path
-	}
 	if defaultTTL != route.DefaultTTL {
 		lsession.Info("param-update-default-ttl")
 		route.DefaultTTL = defaultTTL
@@ -433,7 +424,7 @@ func (m *RouteManager) Update(
 	dist, err := m.cloudFront.Update(
 		route.DistId,
 		oldDomainsForCloudFront,
-		route.Origin, route.Path,
+		route.Origin,
 		route.DefaultTTL,
 		forwardedHeaders, forwardCookies,
 	)

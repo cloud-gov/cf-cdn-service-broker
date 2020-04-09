@@ -10,8 +10,8 @@ import (
 )
 
 type DistributionIface interface {
-	Create(callerReference string, domains []string, origin, path string, defaultTTL int64, forwardedHeaders Headers, forwardCookies bool, tags map[string]string) (*cloudfront.Distribution, error)
-	Update(distId string, domains []string, origin, path string, defaultTTL int64, forwardedHeaders Headers, forwardCookies bool) (*cloudfront.Distribution, error)
+	Create(callerReference string, domains []string, origin string, defaultTTL int64, forwardedHeaders Headers, forwardCookies bool, tags map[string]string) (*cloudfront.Distribution, error)
+	Update(distId string, domains []string, origin string, defaultTTL int64, forwardedHeaders Headers, forwardCookies bool) (*cloudfront.Distribution, error)
 	Get(distId string) (*cloudfront.Distribution, error)
 	SetCertificateAndCname(distId, certId string, domains []string) error
 	Disable(distId string) error
@@ -193,7 +193,6 @@ func (d *Distribution) configureDistributionConfig(
 	config *cloudfront.DistributionConfig,
 	domains []string,
 	origin string,
-	path string,
 	defaultTTL int64,
 	forwardedHeaders Headers,
 	forwardCookies bool,
@@ -203,7 +202,6 @@ func (d *Distribution) configureDistributionConfig(
 	}
 
 	config.Origins.Items[0].DomainName = aws.String(origin)
-	config.Origins.Items[0].OriginPath = aws.String(path)
 	config.Origins.Items[0].CustomOriginConfig.OriginProtocolPolicy = aws.String("https-only")
 
 	config.Aliases = d.getAliases(domains)
@@ -212,7 +210,7 @@ func (d *Distribution) configureDistributionConfig(
 	config.DefaultCacheBehavior.DefaultTTL = aws.Int64(defaultTTL)
 }
 
-func (d *Distribution) Create(callerReference string, domains []string, origin, path string, defaultTTL int64, forwardedHeaders Headers, forwardCookies bool, tags map[string]string) (*cloudfront.Distribution, error) {
+func (d *Distribution) Create(callerReference string, domains []string, origin string, defaultTTL int64, forwardedHeaders Headers, forwardCookies bool, tags map[string]string) (*cloudfront.Distribution, error) {
 	distConfig := new(cloudfront.DistributionConfig)
 
 	distConfig.DefaultCacheBehavior = &cloudfront.DefaultCacheBehavior{
@@ -239,7 +237,6 @@ func (d *Distribution) Create(callerReference string, domains []string, origin, 
 		distConfig,
 		domains,
 		origin,
-		path,
 		defaultTTL,
 		forwardedHeaders,
 		forwardCookies,
@@ -259,7 +256,7 @@ func (d *Distribution) Create(callerReference string, domains []string, origin, 
 	return resp.Distribution, nil
 }
 
-func (d *Distribution) Update(distId string, domains []string, origin, path string, defaultTTL int64, forwardedHeaders Headers, forwardCookies bool) (*cloudfront.Distribution, error) {
+func (d *Distribution) Update(distId string, domains []string, origin string, defaultTTL int64, forwardedHeaders Headers, forwardCookies bool) (*cloudfront.Distribution, error) {
 	// Get the current distribution
 	dist, err := d.Service.GetDistributionConfig(&cloudfront.GetDistributionConfigInput{
 		Id: aws.String(distId),
@@ -279,7 +276,6 @@ func (d *Distribution) Update(distId string, domains []string, origin, path stri
 		dist.DistributionConfig,
 		domains,
 		origin,
-		path,
 		defaultTTL,
 		forwardedHeaders,
 		forwardCookies,

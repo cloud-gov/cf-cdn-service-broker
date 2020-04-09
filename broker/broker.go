@@ -20,7 +20,6 @@ import (
 
 type CreateOptions struct {
 	Domain     string   `json:"domain"`
-	Path       string   `json:"path"`
 	DefaultTTL int64    `json:"default_ttl"`
 	Cookies    bool     `json:"cookies"`
 	Headers    []string `json:"headers"`
@@ -28,7 +27,6 @@ type CreateOptions struct {
 
 type UpdateOptions struct {
 	Domain     string   `json:"domain"`
-	Path       string   `json:"path"`
 	DefaultTTL int64    `json:"default_ttl"`
 	Cookies    bool     `json:"cookies"`
 	Headers    []string `json:"headers"`
@@ -141,7 +139,6 @@ func (b *CdnServiceBroker) Provision(
 		instanceID,
 		options.Domain,
 		b.settings.DefaultOrigin,
-		options.Path,
 		options.DefaultTTL,
 		headers,
 		options.Cookies,
@@ -409,7 +406,6 @@ func (b *CdnServiceBroker) Update(
 		instanceID,
 		options.Domain,
 		b.settings.DefaultOrigin,
-		options.Path,
 		options.DefaultTTL,
 		headers, options.Cookies,
 	)

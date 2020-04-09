@@ -32,11 +32,11 @@ type UpdateSuite struct {
 }
 
 func (s *UpdateSuite) allowUpdateWithExpectedHeaders(expectedHeaders utils.Headers) {
-	s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", ".", s.settings.DefaultDefaultTTL, expectedHeaders, true).Return(nil)
+	s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", s.settings.DefaultDefaultTTL, expectedHeaders, true).Return(nil)
 }
 
 func (s *UpdateSuite) failOnUpdateWithExpectedHeaders(expectedHeaders utils.Headers) {
-	s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", ".", s.settings.DefaultDefaultTTL, expectedHeaders, true).Return(errors.New("fail"))
+	s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", s.settings.DefaultDefaultTTL, expectedHeaders, true).Return(errors.New("fail"))
 }
 
 var _ = Describe("Update", func() {
@@ -73,21 +73,7 @@ var _ = Describe("Update", func() {
 		details := brokerapi.UpdateDetails{
 			RawParameters: json.RawMessage(`{"domain": "domain.gov"}`),
 		}
-		s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", "", s.settings.DefaultDefaultTTL, utils.Headers{"Host": true}, true).Return(nil)
-		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
-		_, err := s.Broker.Update(s.ctx, "", details, true)
-
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	It("Should succeed when given path", func() {
-		details := brokerapi.UpdateDetails{
-			RawParameters: json.RawMessage(`{
-				"domain": "domain.gov",
-				"path": "."
-			}`),
-		}
-		s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", ".", s.settings.DefaultDefaultTTL, utils.Headers{"Host": true}, true).Return(nil)
+		s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", s.settings.DefaultDefaultTTL, utils.Headers{"Host": true}, true).Return(nil)
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 		_, err := s.Broker.Update(s.ctx, "", details, true)
 
@@ -101,7 +87,7 @@ var _ = Describe("Update", func() {
 			},
 			RawParameters: json.RawMessage(`{"domain": "domain.gov"}`),
 		}
-		s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", ".", utils.Headers{"Host": true}, true).Return(nil)
+		s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", s.settings.DefaultDefaultTTL, utils.Headers{"Host": true}, true).Return(nil)
 		s.cfclient.On("GetOrgByGuid", "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5").Return(cfclient.Org{Name: "my-org"}, nil)
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, errors.New("bad"))
 		_, err := s.Broker.Update(s.ctx, "", details, true)
@@ -122,7 +108,6 @@ var _ = Describe("Update", func() {
 				RawParameters: json.RawMessage(`{
 			"insecure_origin": true,
 			"domain": "domain.gov",
-			"path": ".",
 			"headers": ["Host"]
 		}`),
 			}
@@ -138,7 +123,6 @@ var _ = Describe("Update", func() {
 				RawParameters: json.RawMessage(`{
 "insecure_origin": true,
 			"domain": "domain.gov",
-			"path": ".",
 			"headers": ["User-Agent"]
 		}`),
 			}
@@ -154,7 +138,6 @@ var _ = Describe("Update", func() {
 				RawParameters: json.RawMessage(`{
 "insecure_origin": true,
 			"domain": "domain.gov",
-			"path": ".",
 			"headers": ["*"]
 		}`),
 			}
@@ -170,7 +153,6 @@ var _ = Describe("Update", func() {
 				RawParameters: json.RawMessage(`{
 "insecure_origin": true,
 			"domain": "domain.gov",
-			"path": ".",
 			"headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"]
 		}`),
 			}
@@ -186,7 +168,6 @@ var _ = Describe("Update", func() {
 				RawParameters: json.RawMessage(`{
 "insecure_origin": true,
 			"domain": "domain.gov",
-			"path": ".",
 			"headers": ["*", "User-Agent"]
 		}`),
 			}
@@ -203,7 +184,6 @@ var _ = Describe("Update", func() {
 				RawParameters: json.RawMessage(`{
 			"insecure_origin": true,
 			"domain": "domain.gov",
-			"path": ".",
 			"headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"]
 		}`),
 			}

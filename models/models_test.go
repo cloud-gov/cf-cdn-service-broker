@@ -436,7 +436,6 @@ var _ = Describe("Models", func() {
 			instanceID := "cloudfoundry-instance-id"
 			domain := "foo.paas.gov.uk"
 			origin := "foo.cloudapps.digital"
-			path := "/"
 			defaultTTL := int64(0)
 			forwardedHeaders := utils.Headers{}
 			forwardCookies := false
@@ -485,7 +484,7 @@ var _ = Describe("Models", func() {
 			)
 
 			_, err := manager.Create(
-				instanceID, domain, origin, path, defaultTTL,
+				instanceID, domain, origin, defaultTTL,
 				forwardedHeaders, forwardCookies, tags,
 			)
 			Expect(acmeProviderMock.GetHTTP01ClientCallCount()).To(
@@ -507,7 +506,6 @@ var _ = Describe("Models", func() {
 			instanceID := "cloudfoundry-instance-id"
 			domain := "foo.paas.gov.uk"
 			origin := "foo.cloudapps.digital"
-			path := "/"
 			defaultTTL := int64(0)
 
 			settings, _ := config.NewSettings()
@@ -586,7 +584,7 @@ var _ = Describe("Models", func() {
 				State:          models.Provisioning,
 				DomainExternal: domain,
 				Origin:         origin,
-				Path:           path,
+				Path:           "",
 				DefaultTTL:     defaultTTL,
 				InsecureOrigin: false,
 			}
@@ -693,7 +691,6 @@ var _ = Describe("Models", func() {
 			instanceID := "cloudfoundry-instance-id"
 			domain := "foo.paas.gov.uk"
 			origin := "foo.cloudapps.digital"
-			path := "/"
 			defaultTTL := int64(0)
 
 			settings, _ := config.NewSettings()
@@ -721,7 +718,7 @@ var _ = Describe("Models", func() {
 				State:          models.Provisioning,
 				DomainExternal: domain,
 				Origin:         origin,
-				Path:           path,
+				Path:           "",
 				DefaultTTL:     defaultTTL,
 				InsecureOrigin: false,
 			}
@@ -766,7 +763,6 @@ var _ = Describe("Models", func() {
 			cloudfrontDistID = "cloudfoundry-instance-id"
 			domain           = "foo.paas.gov.uk"
 			origin           = "foo.cloudapps.digital"
-			path             = "/"
 			defaultTTL       = int64(0)
 			forwardedHeaders = utils.Headers{"X-Forwarded-Five": true}
 			forwardCookies   = false
@@ -892,7 +888,7 @@ var _ = Describe("Models", func() {
 					time.Now(), time.Now(), nil,
 					routeID, "[]",
 					domain, "foo.cloudfront.net",
-					cloudfrontDistID, origin, path,
+					cloudfrontDistID, origin, "",
 					defaultTTL, false, certificateID,
 					userDataID, "Provisioned",
 				),
@@ -935,7 +931,6 @@ var _ = Describe("Models", func() {
 				cloudfrontDistID,
 				brokerAPICallDomainArgument,
 				origin,
-				path,
 				defaultTTL,
 				forwardedHeaders,
 				forwardCookies,
@@ -994,7 +989,7 @@ var _ = Describe("Models", func() {
 					time.Now(), time.Now(), nil,
 					routeID, "[]",
 					domain, "foo.cloudfront.net",
-					cloudfrontDistID, origin, path,
+					cloudfrontDistID, origin, "",
 					defaultTTL, false, certificateID,
 					userDataID, "Provisioned",
 				),
@@ -1037,7 +1032,6 @@ var _ = Describe("Models", func() {
 				cloudfrontDistID,
 				brokerAPICallDomainArgument,
 				origin,
-				path,
 				defaultTTL,
 				forwardedHeaders,
 				forwardCookies,
