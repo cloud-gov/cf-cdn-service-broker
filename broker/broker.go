@@ -19,21 +19,19 @@ import (
 )
 
 type CreateOptions struct {
-	Domain         string   `json:"domain"`
-	Path           string   `json:"path"`
-	DefaultTTL     int64    `json:"default_ttl"`
-	InsecureOrigin bool     `json:"insecure_origin"`
-	Cookies        bool     `json:"cookies"`
-	Headers        []string `json:"headers"`
+	Domain     string   `json:"domain"`
+	Path       string   `json:"path"`
+	DefaultTTL int64    `json:"default_ttl"`
+	Cookies    bool     `json:"cookies"`
+	Headers    []string `json:"headers"`
 }
 
 type UpdateOptions struct {
-	Domain         string   `json:"domain"`
-	Path           string   `json:"path"`
-	DefaultTTL     int64    `json:"default_ttl"`
-	InsecureOrigin bool     `json:"insecure_origin"`
-	Cookies        bool     `json:"cookies"`
-	Headers        []string `json:"headers"`
+	Domain     string   `json:"domain"`
+	Path       string   `json:"path"`
+	DefaultTTL int64    `json:"default_ttl"`
+	Cookies    bool     `json:"cookies"`
+	Headers    []string `json:"headers"`
 }
 
 type CdnServiceBroker struct {
@@ -145,7 +143,6 @@ func (b *CdnServiceBroker) Provision(
 		b.settings.DefaultOrigin,
 		options.Path,
 		options.DefaultTTL,
-		options.InsecureOrigin,
 		headers,
 		options.Cookies,
 		tags,
@@ -414,7 +411,6 @@ func (b *CdnServiceBroker) Update(
 		b.settings.DefaultOrigin,
 		options.Path,
 		options.DefaultTTL,
-		options.InsecureOrigin,
 		headers, options.Cookies,
 	)
 	if err != nil {

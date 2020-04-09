@@ -183,7 +183,7 @@ type Route struct {
 	DistId         string
 	Origin         string
 	Path           string
-	InsecureOrigin bool
+	InsecureOrigin bool // Always false, should not remove because it is in DB
 	Certificate    Certificate
 	UserData       UserData
 	UserDataID     int
@@ -220,7 +220,6 @@ type RouteManagerIface interface {
 		origin string,
 		path string,
 		defaultTTL int64,
-		insecureOrigin bool,
 		forwardedHeaders utils.Headers,
 		forwardCookies bool,
 		tags map[string]string,
@@ -232,7 +231,6 @@ type RouteManagerIface interface {
 		origin string,
 		path string,
 		defaultTTL int64,
-		insecureOrigin bool,
 		forwardedHeaders utils.Headers,
 		forwardCookies bool,
 	) (bool, error)
@@ -285,7 +283,6 @@ func (m *RouteManager) Create(
 	origin,
 	path string,
 	defaultTTL int64,
-	insecureOrigin bool,
 	forwardedHeaders utils.Headers,
 	forwardCookies bool,
 	tags map[string]string,
@@ -298,7 +295,7 @@ func (m *RouteManager) Create(
 		Origin:         origin,
 		Path:           path,
 		DefaultTTL:     defaultTTL,
-		InsecureOrigin: insecureOrigin,
+		InsecureOrigin: false,
 	}
 
 	lsession := m.logger.Session("route-manager-create-route", lager.Data{
@@ -341,7 +338,6 @@ func (m *RouteManager) Create(
 		origin,
 		path,
 		defaultTTL,
-		insecureOrigin,
 		forwardedHeaders,
 		forwardCookies,
 		tags,
@@ -392,7 +388,6 @@ func (m *RouteManager) Update(
 	origin string,
 	path string,
 	defaultTTL int64,
-	insecureOrigin bool,
 	forwardedHeaders utils.Headers,
 	forwardCookies bool,
 ) (bool, error) {
@@ -432,10 +427,6 @@ func (m *RouteManager) Update(
 		lsession.Info("param-update-default-ttl")
 		route.DefaultTTL = defaultTTL
 	}
-	if insecureOrigin != route.InsecureOrigin {
-		lsession.Info("param-update-insecure-origin")
-		route.InsecureOrigin = insecureOrigin
-	}
 
 	// Update the distribution
 	lsession.Info("cloudfront-update-excluding-domains")
@@ -444,7 +435,6 @@ func (m *RouteManager) Update(
 		oldDomainsForCloudFront,
 		route.Origin, route.Path,
 		route.DefaultTTL,
-		route.InsecureOrigin,
 		forwardedHeaders, forwardCookies,
 	)
 	if err != nil {

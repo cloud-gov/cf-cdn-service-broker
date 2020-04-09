@@ -438,7 +438,6 @@ var _ = Describe("Models", func() {
 			origin := "foo.cloudapps.digital"
 			path := "/"
 			defaultTTL := int64(0)
-			insecureOrigin := false
 			forwardedHeaders := utils.Headers{}
 			forwardCookies := false
 			tags := map[string]string{}
@@ -487,7 +486,7 @@ var _ = Describe("Models", func() {
 
 			_, err := manager.Create(
 				instanceID, domain, origin, path, defaultTTL,
-				insecureOrigin, forwardedHeaders, forwardCookies, tags,
+				forwardedHeaders, forwardCookies, tags,
 			)
 			Expect(acmeProviderMock.GetHTTP01ClientCallCount()).To(
 				Equal(0), "Creating a CDN service should never use HTTP challenges",
@@ -510,7 +509,6 @@ var _ = Describe("Models", func() {
 			origin := "foo.cloudapps.digital"
 			path := "/"
 			defaultTTL := int64(0)
-			insecureOrigin := false
 
 			settings, _ := config.NewSettings()
 			awsSession := session.New(nil)
@@ -590,7 +588,7 @@ var _ = Describe("Models", func() {
 				Origin:         origin,
 				Path:           path,
 				DefaultTTL:     defaultTTL,
-				InsecureOrigin: insecureOrigin,
+				InsecureOrigin: false,
 			}
 
 			rsaTestKey, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -697,7 +695,6 @@ var _ = Describe("Models", func() {
 			origin := "foo.cloudapps.digital"
 			path := "/"
 			defaultTTL := int64(0)
-			insecureOrigin := false
 
 			settings, _ := config.NewSettings()
 			awsSession := session.New(nil)
@@ -726,7 +723,7 @@ var _ = Describe("Models", func() {
 				Origin:         origin,
 				Path:           path,
 				DefaultTTL:     defaultTTL,
-				InsecureOrigin: insecureOrigin,
+				InsecureOrigin: false,
 			}
 		})
 
@@ -771,7 +768,6 @@ var _ = Describe("Models", func() {
 			origin           = "foo.cloudapps.digital"
 			path             = "/"
 			defaultTTL       = int64(0)
-			insecureOrigin   = false
 			forwardedHeaders = utils.Headers{"X-Forwarded-Five": true}
 			forwardCookies   = false
 
@@ -941,7 +937,6 @@ var _ = Describe("Models", func() {
 				origin,
 				path,
 				defaultTTL,
-				insecureOrigin,
 				forwardedHeaders,
 				forwardCookies,
 			)
@@ -1044,7 +1039,6 @@ var _ = Describe("Models", func() {
 				origin,
 				path,
 				defaultTTL,
-				insecureOrigin,
 				forwardedHeaders,
 				forwardCookies,
 			)
