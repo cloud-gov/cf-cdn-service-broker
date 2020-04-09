@@ -414,56 +414,64 @@ func (b *CdnServiceBroker) Update(
 	return brokerapi.UpdateServiceSpec{IsAsync: provisioningAsync}, nil
 }
 
-// createBrokerOptions will attempt to take raw json and convert it into the "Options" struct.
-func (b *CdnServiceBroker) createBrokerOptions(details []byte) (options Options, err error) {
-	if len(details) == 0 {
-		err = errors.New("must be invoked with configuration parameters")
-		return
-	}
+// parseProvisionDetails will attempt to parse the update details and then verify that BOTH least "domain" and "origin"
+// are provided.
+func (b *CdnServiceBroker) parseProvisionDetails(details brokerapi.ProvisionDetails) (options Options, err error) {
 	options = Options{
 		Origin:     b.settings.DefaultOrigin,
 		Cookies:    true,
 		Headers:    []string{},
 		DefaultTTL: b.settings.DefaultDefaultTTL,
 	}
-	err = json.Unmarshal(details, &options)
-	if err != nil {
-		return
-	}
-	return
-}
 
-// parseProvisionDetails will attempt to parse the update details and then verify that BOTH least "domain" and "origin"
-// are provided.
-func (b *CdnServiceBroker) parseProvisionDetails(details brokerapi.ProvisionDetails) (options Options, err error) {
-	options, err = b.createBrokerOptions(details.RawParameters)
+	if len(details.RawParameters) == 0 {
+		return options, errors.New("must be invoked with configuration parameters")
+	}
+
+	err = json.Unmarshal(details.RawParameters, &options)
 	if err != nil {
 		return
 	}
+
 	if options.Domain == "" {
 		err = errors.New("must pass non-empty `domain`")
 		return
 	}
+
 	if options.Origin == b.settings.DefaultOrigin {
 		err = b.checkDomain(options.Domain, details.OrganizationGUID)
 		if err != nil {
 			return
 		}
 	}
+
 	return
 }
 
 // parseUpdateDetails will attempt to parse the update details and then verify that at least "domain" or "origin"
 // are provided.
 func (b *CdnServiceBroker) parseUpdateDetails(details brokerapi.UpdateDetails) (options Options, err error) {
-	options, err = b.createBrokerOptions(details.RawParameters)
+	options = Options{
+		Origin:     b.settings.DefaultOrigin,
+		Cookies:    true,
+		Headers:    []string{},
+		DefaultTTL: b.settings.DefaultDefaultTTL,
+	}
+
+	if len(details.RawParameters) == 0 {
+		return options, errors.New("must be invoked with configuration parameters")
+	}
+
+	err = json.Unmarshal(details.RawParameters, &options)
 	if err != nil {
 		return
 	}
+
 	if options.Domain == "" && options.Origin == "" {
 		err = errors.New("must pass non-empty `domain` or `origin`")
 		return
 	}
+
 	if options.Domain != "" && options.Origin == b.settings.DefaultOrigin {
 		err = b.checkDomain(options.Domain, details.PreviousValues.OrgID)
 		if err != nil {
