@@ -256,7 +256,14 @@ func (d *Distribution) Create(callerReference string, domains []string, origin s
 	return resp.Distribution, nil
 }
 
-func (d *Distribution) Update(distId string, domains []string, origin string, defaultTTL int64, forwardedHeaders Headers, forwardCookies bool) (*cloudfront.Distribution, error) {
+func (d *Distribution) Update(
+	distId string,
+	domains []string,
+	origin string,
+	defaultTTL int64,
+	forwardedHeaders Headers,
+	forwardCookies bool,
+) (*cloudfront.Distribution, error) {
 	// Get the current distribution
 	dist, err := d.Service.GetDistributionConfig(&cloudfront.GetDistributionConfigInput{
 		Id: aws.String(distId),
