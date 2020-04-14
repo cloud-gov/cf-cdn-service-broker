@@ -227,7 +227,6 @@ type RouteManagerIface interface {
 	Update(
 		instanceId string,
 		domain string,
-		origin string,
 		defaultTTL int64,
 		forwardedHeaders utils.Headers,
 		forwardCookies bool,
@@ -381,7 +380,6 @@ func (m *RouteManager) Get(instanceId string) (*Route, error) {
 func (m *RouteManager) Update(
 	instanceId string,
 	domain string,
-	origin string,
 	defaultTTL int64,
 	forwardedHeaders utils.Headers,
 	forwardCookies bool,
@@ -409,10 +407,6 @@ func (m *RouteManager) Update(
 	if domain != "" {
 		lsession.Info("param-update-domain")
 		route.DomainExternal = domain
-	}
-	if origin != "" {
-		lsession.Info("param-update-origin")
-		route.Origin = origin
 	}
 	if defaultTTL != route.DefaultTTL {
 		lsession.Info("param-update-default-ttl")

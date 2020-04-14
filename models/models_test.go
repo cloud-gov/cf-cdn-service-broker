@@ -930,7 +930,6 @@ var _ = Describe("Models", func() {
 			performedAsynchronously, err := manager.Update(
 				cloudfrontDistID,
 				brokerAPICallDomainArgument,
-				origin,
 				defaultTTL,
 				forwardedHeaders,
 				forwardCookies,
@@ -1031,7 +1030,6 @@ var _ = Describe("Models", func() {
 			performedAsynchronously, err := manager.Update(
 				cloudfrontDistID,
 				brokerAPICallDomainArgument,
-				origin,
 				defaultTTL,
 				forwardedHeaders,
 				forwardCookies,

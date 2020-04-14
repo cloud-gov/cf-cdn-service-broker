@@ -405,7 +405,6 @@ func (b *CdnServiceBroker) Update(
 	provisioningAsync, err := b.manager.Update(
 		instanceID,
 		options.Domain,
-		b.settings.DefaultOrigin,
 		options.DefaultTTL,
 		headers, options.Cookies,
 	)
