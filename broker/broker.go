@@ -26,10 +26,10 @@ type CreateOptions struct {
 }
 
 type UpdateOptions struct {
-	Domain     string   `json:"domain"`
-	DefaultTTL int64    `json:"default_ttl"`
-	Cookies    bool     `json:"cookies"`
-	Headers    []string `json:"headers"`
+	Domain     *string   `json:"domain,omitempty"`
+	DefaultTTL *int64    `json:"default_ttl,omitempty"`
+	Cookies    *bool     `json:"cookies,omitempty"`
+	Headers    *[]string `json:"headers,omitempty"`
 }
 
 type CdnServiceBroker struct {
@@ -397,16 +397,22 @@ func (b *CdnServiceBroker) Update(
 	}
 	b.logger.Info("update-options", lager.Data{"instance_id": instanceID, "options": options})
 
-	headers, err := b.getHeaders(options.Headers)
-	if err != nil {
-		return brokerapi.UpdateServiceSpec{}, err
+	var headers *utils.Headers
+
+	if options.Headers != nil {
+		parsedHeaders, err := b.getHeaders(*options.Headers)
+		if err != nil {
+			return brokerapi.UpdateServiceSpec{}, err
+		}
+		headers = &parsedHeaders
 	}
 
 	provisioningAsync, err := b.manager.Update(
 		instanceID,
 		options.Domain,
 		options.DefaultTTL,
-		headers, options.Cookies,
+		headers,
+		options.Cookies,
 	)
 	if err != nil {
 		return brokerapi.UpdateServiceSpec{}, err
@@ -449,11 +455,7 @@ func (b *CdnServiceBroker) parseProvisionDetails(details brokerapi.ProvisionDeta
 // parseUpdateDetails will attempt to parse the update details and then verify that at least "domain" or "origin"
 // are provided.
 func (b *CdnServiceBroker) parseUpdateDetails(details brokerapi.UpdateDetails) (options UpdateOptions, err error) {
-	options = UpdateOptions{
-		Cookies:    true,
-		Headers:    []string{},
-		DefaultTTL: b.settings.DefaultDefaultTTL,
-	}
+	options = UpdateOptions{}
 
 	if len(details.RawParameters) == 0 {
 		return options, errors.New("must be invoked with configuration parameters")
@@ -464,13 +466,8 @@ func (b *CdnServiceBroker) parseUpdateDetails(details brokerapi.UpdateDetails) (
 		return
 	}
 
-	if options.Domain == "" {
-		err = errors.New("must pass non-empty `domain`")
-		return
-	}
-
-	if options.Domain != "" {
-		err = b.checkDomain(options.Domain, details.PreviousValues.OrgID)
+	if options.Domain != nil {
+		err = b.checkDomain(*options.Domain, details.PreviousValues.OrgID)
 		if err != nil {
 			return
 		}
