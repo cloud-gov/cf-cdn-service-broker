@@ -226,10 +226,10 @@ type RouteManagerIface interface {
 
 	Update(
 		instanceId string,
-		domain string,
-		defaultTTL int64,
-		forwardedHeaders utils.Headers,
-		forwardCookies bool,
+		domain *string,
+		defaultTTL *int64,
+		forwardedHeaders *utils.Headers,
+		forwardCookies *bool,
 	) (bool, error)
 
 	Get(instanceId string) (*Route, error)
@@ -379,10 +379,10 @@ func (m *RouteManager) Get(instanceId string) (*Route, error) {
 // performed asynchronously or not
 func (m *RouteManager) Update(
 	instanceId string,
-	domain string,
-	defaultTTL int64,
-	forwardedHeaders utils.Headers,
-	forwardCookies bool,
+	domain *string,
+	defaultTTL *int64,
+	forwardedHeaders *utils.Headers,
+	forwardCookies *bool,
 ) (bool, error) {
 
 	lsession := m.logger.Session("route-manager-update", lager.Data{
@@ -397,30 +397,25 @@ func (m *RouteManager) Update(
 		return false, err
 	}
 
-	// When we update the CloudFront distribution we should use the old domains
-	// until we have a valid certificate in IAM.
-	// CloudFront gets updated when we receive new certificates during Poll
-	lsession.Info("get-domains")
-	oldDomainsForCloudFront := route.GetDomains()
-
 	// Override any settings that are new or different.
-	if domain != "" {
+	if domain != nil {
 		lsession.Info("param-update-domain")
-		route.DomainExternal = domain
+		route.DomainExternal = *domain
 	}
-	if defaultTTL != route.DefaultTTL {
+	if defaultTTL != nil {
 		lsession.Info("param-update-default-ttl")
-		route.DefaultTTL = defaultTTL
+		route.DefaultTTL = *defaultTTL
 	}
 
 	// Update the distribution
 	lsession.Info("cloudfront-update-excluding-domains")
 	dist, err := m.cloudFront.Update(
 		route.DistId,
-		oldDomainsForCloudFront,
+		nil,
 		route.Origin,
-		route.DefaultTTL,
-		forwardedHeaders, forwardCookies,
+		defaultTTL,
+		forwardedHeaders,
+		forwardCookies,
 	)
 	if err != nil {
 		lsession.Error("cloudfront-update-excluding-domains", err)
@@ -431,7 +426,7 @@ func (m *RouteManager) Update(
 	route.DomainInternal = *dist.DomainName
 	route.DistId = *dist.Id
 
-	if domain == "" {
+	if domain == nil || *domain == "" {
 		lsession.Info("set-state-provisioned")
 		// CloudFront has been updated with all the configuration
 		// The domains are not being updated so we do not need a new certificate

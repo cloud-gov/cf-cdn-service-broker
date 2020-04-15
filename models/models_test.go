@@ -929,10 +929,10 @@ var _ = Describe("Models", func() {
 
 			performedAsynchronously, err := manager.Update(
 				cloudfrontDistID,
-				brokerAPICallDomainArgument,
-				defaultTTL,
-				forwardedHeaders,
-				forwardCookies,
+				&brokerAPICallDomainArgument,
+				&defaultTTL,
+				&forwardedHeaders,
+				&forwardCookies,
 			)
 
 			Expect(err).NotTo(HaveOccurred())
@@ -1029,10 +1029,10 @@ var _ = Describe("Models", func() {
 
 			performedAsynchronously, err := manager.Update(
 				cloudfrontDistID,
-				brokerAPICallDomainArgument,
-				defaultTTL,
-				forwardedHeaders,
-				forwardCookies,
+				&brokerAPICallDomainArgument,
+				&defaultTTL,
+				&forwardedHeaders,
+				&forwardCookies,
 			)
 
 			Expect(err).NotTo(HaveOccurred())

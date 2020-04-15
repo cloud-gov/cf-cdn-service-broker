@@ -133,11 +133,11 @@ func (_m *RouteManagerIface) RenewAll() {
 }
 
 // Update provides a mock function with given fields: instanceId, domain, forwardedHeaders, forwardCookies
-func (_m *RouteManagerIface) Update(instanceId string, domain string, defaultTTL int64, forwardedHeaders utils.Headers, forwardCookies bool) (bool, error) {
+func (_m *RouteManagerIface) Update(instanceId string, domain *string, defaultTTL *int64, forwardedHeaders *utils.Headers, forwardCookies *bool) (bool, error) {
 	ret := _m.Called(instanceId, domain, defaultTTL, forwardedHeaders, forwardCookies)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, int64, utils.Headers, bool) error); ok {
+	if rf, ok := ret.Get(0).(func(string, *string, *int64, *utils.Headers, *bool) error); ok {
 		r0 = rf(instanceId, domain, defaultTTL, forwardedHeaders, forwardCookies)
 	} else {
 		r0 = ret.Error(0)
