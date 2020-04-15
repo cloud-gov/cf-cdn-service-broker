@@ -11,7 +11,7 @@ import (
 
 type DistributionIface interface {
 	Create(callerReference string, domains []string, origin string, defaultTTL int64, forwardedHeaders Headers, forwardCookies bool, tags map[string]string) (*cloudfront.Distribution, error)
-	Update(distId string, domains []string, origin string, defaultTTL int64, forwardedHeaders Headers, forwardCookies bool) (*cloudfront.Distribution, error)
+	Update(distId string, domains *[]string, origin string, defaultTTL *int64, forwardedHeaders *Headers, forwardCookies *bool) (*cloudfront.Distribution, error)
 	Get(distId string) (*cloudfront.Distribution, error)
 	SetCertificateAndCname(distId, certId string, domains []string) error
 	Disable(distId string) error
@@ -240,11 +240,11 @@ func (d *Distribution) Create(callerReference string, domains []string, origin s
 
 func (d *Distribution) Update(
 	distId string,
-	domains []string,
+	domains *[]string,
 	origin string,
-	defaultTTL int64,
-	forwardedHeaders Headers,
-	forwardCookies bool,
+	defaultTTL *int64,
+	forwardedHeaders *Headers,
+	forwardCookies *bool,
 ) (*cloudfront.Distribution, error) {
 	// Get the current distribution
 	dist, err := d.Service.GetDistributionConfig(&cloudfront.GetDistributionConfigInput{
@@ -261,17 +261,30 @@ func (d *Distribution) Update(
 	d.setDistributionConfigDefaultCacheBehavior(dist.DistributionConfig, callerReference)
 	d.setDistributionConfigOrigins(dist.DistributionConfig, callerReference)
 
-	if forwardCookies == false {
-		dist.DistributionConfig.DefaultCacheBehavior.ForwardedValues.Cookies.Forward = aws.String("none")
-	}
-
 	dist.DistributionConfig.Origins.Items[0].DomainName = aws.String(origin)
 	dist.DistributionConfig.Origins.Items[0].CustomOriginConfig.OriginProtocolPolicy = aws.String("https-only")
 
-	dist.DistributionConfig.Aliases = d.getAliases(domains)
+	if forwardCookies != nil {
+		if *forwardCookies {
+			dist.DistributionConfig.DefaultCacheBehavior.ForwardedValues.Cookies.Forward = aws.String("all")
+		} else {
+			dist.DistributionConfig.DefaultCacheBehavior.ForwardedValues.Cookies.Forward = aws.String("none")
+		}
+	}
 
-	dist.DistributionConfig.DefaultCacheBehavior.ForwardedValues.Headers = d.getHeaders(forwardedHeaders.Strings())
-	dist.DistributionConfig.DefaultCacheBehavior.DefaultTTL = aws.Int64(defaultTTL)
+	if domains != nil {
+		dist.DistributionConfig.Aliases = d.getAliases(*domains)
+	}
+
+	if forwardedHeaders != nil {
+		dist.DistributionConfig.DefaultCacheBehavior.ForwardedValues.Headers = d.getHeaders(
+			(*forwardedHeaders).Strings(),
+		)
+	}
+
+	if defaultTTL != nil {
+		dist.DistributionConfig.DefaultCacheBehavior.DefaultTTL = aws.Int64(*defaultTTL)
+	}
 
 	// Call the UpdateDistribution function
 	resp, err := d.Service.UpdateDistribution(&cloudfront.UpdateDistributionInput{
