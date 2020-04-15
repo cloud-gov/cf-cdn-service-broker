@@ -189,27 +189,6 @@ func (d *Distribution) setDistributionConfigDefaultCacheBehavior(config *cloudfr
 	}
 }
 
-func (d *Distribution) configureDistributionConfig(
-	config *cloudfront.DistributionConfig,
-	domains []string,
-	origin string,
-	defaultTTL int64,
-	forwardedHeaders Headers,
-	forwardCookies bool,
-) {
-	if forwardCookies == false {
-		config.DefaultCacheBehavior.ForwardedValues.Cookies.Forward = aws.String("none")
-	}
-
-	config.Origins.Items[0].DomainName = aws.String(origin)
-	config.Origins.Items[0].CustomOriginConfig.OriginProtocolPolicy = aws.String("https-only")
-
-	config.Aliases = d.getAliases(domains)
-
-	config.DefaultCacheBehavior.ForwardedValues.Headers = d.getHeaders(forwardedHeaders.Strings())
-	config.DefaultCacheBehavior.DefaultTTL = aws.Int64(defaultTTL)
-}
-
 func (d *Distribution) Create(callerReference string, domains []string, origin string, defaultTTL int64, forwardedHeaders Headers, forwardCookies bool, tags map[string]string) (*cloudfront.Distribution, error) {
 	distConfig := new(cloudfront.DistributionConfig)
 
@@ -233,14 +212,17 @@ func (d *Distribution) Create(callerReference string, domains []string, origin s
 	d.setDistributionConfigDefaultCacheBehavior(distConfig, callerReference)
 	d.setDistributionConfigOrigins(distConfig, callerReference)
 
-	d.configureDistributionConfig(
-		distConfig,
-		domains,
-		origin,
-		defaultTTL,
-		forwardedHeaders,
-		forwardCookies,
-	)
+	if forwardCookies == false {
+		distConfig.DefaultCacheBehavior.ForwardedValues.Cookies.Forward = aws.String("none")
+	}
+
+	distConfig.Origins.Items[0].DomainName = aws.String(origin)
+	distConfig.Origins.Items[0].CustomOriginConfig.OriginProtocolPolicy = aws.String("https-only")
+
+	distConfig.Aliases = d.getAliases(domains)
+
+	distConfig.DefaultCacheBehavior.ForwardedValues.Headers = d.getHeaders(forwardedHeaders.Strings())
+	distConfig.DefaultCacheBehavior.DefaultTTL = aws.Int64(defaultTTL)
 
 	resp, err := d.Service.CreateDistributionWithTags(&cloudfront.CreateDistributionWithTagsInput{
 		DistributionConfigWithTags: &cloudfront.DistributionConfigWithTags{
@@ -279,14 +261,17 @@ func (d *Distribution) Update(
 	d.setDistributionConfigDefaultCacheBehavior(dist.DistributionConfig, callerReference)
 	d.setDistributionConfigOrigins(dist.DistributionConfig, callerReference)
 
-	d.configureDistributionConfig(
-		dist.DistributionConfig,
-		domains,
-		origin,
-		defaultTTL,
-		forwardedHeaders,
-		forwardCookies,
-	)
+	if forwardCookies == false {
+		dist.DistributionConfig.DefaultCacheBehavior.ForwardedValues.Cookies.Forward = aws.String("none")
+	}
+
+	dist.DistributionConfig.Origins.Items[0].DomainName = aws.String(origin)
+	dist.DistributionConfig.Origins.Items[0].CustomOriginConfig.OriginProtocolPolicy = aws.String("https-only")
+
+	dist.DistributionConfig.Aliases = d.getAliases(domains)
+
+	dist.DistributionConfig.DefaultCacheBehavior.ForwardedValues.Headers = d.getHeaders(forwardedHeaders.Strings())
+	dist.DistributionConfig.DefaultCacheBehavior.DefaultTTL = aws.Int64(defaultTTL)
 
 	// Call the UpdateDistribution function
 	resp, err := d.Service.UpdateDistribution(&cloudfront.UpdateDistributionInput{
