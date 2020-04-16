@@ -122,7 +122,8 @@ func (d *Distribution) setDistributionConfigOrigins(config *cloudfront.Distribut
 		Quantity: aws.Int64(2),
 		Items: []*cloudfront.Origin{
 			{
-				Id: aws.String(callerReference),
+				Id:         aws.String(callerReference),
+				OriginPath: aws.String(""),
 				CustomHeaders: &cloudfront.CustomHeaders{
 					Quantity: aws.Int64(0),
 				},
