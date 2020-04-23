@@ -43,17 +43,6 @@ func (s *ProvisionSuite) allowCreateWithExpectedHeaders(expectedHeaders utils.He
 		}).Return(route, nil)
 }
 
-func (s *ProvisionSuite) failCreateWithExpectedHeaders(expectedHeaders utils.Headers) {
-	s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", s.settings.DefaultDefaultTTL, expectedHeaders, true,
-		map[string]string{
-			"Organization":    "",
-			"Space":           "",
-			"Service":         "",
-			"ServiceInstance": "123",
-			"Plan":            "",
-		}).Return(nil, errors.New("fail"))
-}
-
 var _ = Describe("Last operation", func() {
 	var s *ProvisionSuite = &ProvisionSuite{}
 
@@ -256,8 +245,6 @@ var _ = Describe("Last operation", func() {
 		})
 
 		It("Should error when forwarding duplicate headers", func() {
-			s.failCreateWithExpectedHeaders(utils.Headers{"User-Agent": true, "Host": true})
-
 			details := brokerapi.ProvisionDetails{
 				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["User-Agent", "Host", "User-Agent"]}`),
 			}
@@ -268,8 +255,6 @@ var _ = Describe("Last operation", func() {
 		})
 
 		It("Should error when forwarding wildcard headers and normal headers", func() {
-			s.failCreateWithExpectedHeaders(utils.Headers{"*": true})
-
 			details := brokerapi.ProvisionDetails{
 				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["*", "User-Agent"]}`),
 			}
@@ -280,8 +265,6 @@ var _ = Describe("Last operation", func() {
 		})
 
 		It("Should error when forwarding ten or more", func() {
-			s.failCreateWithExpectedHeaders(utils.Headers{"One": true, "Two": true, "Three": true, "Four": true, "Five": true, "Six": true, "Seven": true, "Eight": true, "Nine": true, "Ten": true, "Host": true})
-
 			details := brokerapi.ProvisionDetails{
 				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"]}`),
 			}
