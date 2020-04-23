@@ -423,8 +423,9 @@ func (b *CdnServiceBroker) Update(
 
 // parseProvisionDetails will attempt to parse the update details and then verify that BOTH least "domain" and "origin"
 // are provided.
-func (b *CdnServiceBroker) parseProvisionDetails(details brokerapi.ProvisionDetails) (options CreateOptions, err error) {
-	options = CreateOptions{
+func (b *CdnServiceBroker) parseProvisionDetails(details brokerapi.ProvisionDetails) (CreateOptions, error) {
+	var err error
+	options := CreateOptions{
 		Cookies:    true,
 		Headers:    []string{},
 		DefaultTTL: b.settings.DefaultDefaultTTL,
@@ -436,26 +437,27 @@ func (b *CdnServiceBroker) parseProvisionDetails(details brokerapi.ProvisionDeta
 
 	err = json.Unmarshal(details.RawParameters, &options)
 	if err != nil {
-		return
+		return options, err
 	}
 
 	if options.Domain == "" {
 		err = errors.New("must pass non-empty `domain`")
-		return
+		return options, err
 	}
 
 	err = b.checkDomain(options.Domain, details.OrganizationGUID)
 	if err != nil {
-		return
+		return options, err
 	}
 
-	return
+	return options, err
 }
 
 // parseUpdateDetails will attempt to parse the update details and then verify that at least "domain" or "origin"
 // are provided.
-func (b *CdnServiceBroker) parseUpdateDetails(details brokerapi.UpdateDetails) (options UpdateOptions, err error) {
-	options = UpdateOptions{}
+func (b *CdnServiceBroker) parseUpdateDetails(details brokerapi.UpdateDetails) (UpdateOptions, error) {
+	var err error
+	options := UpdateOptions{}
 
 	if len(details.RawParameters) == 0 {
 		return options, errors.New("must be invoked with configuration parameters")
@@ -463,16 +465,17 @@ func (b *CdnServiceBroker) parseUpdateDetails(details brokerapi.UpdateDetails) (
 
 	err = json.Unmarshal(details.RawParameters, &options)
 	if err != nil {
-		return
+		return options, err
 	}
 
 	if options.Domain != nil {
 		err = b.checkDomain(*options.Domain, details.PreviousValues.OrgID)
 		if err != nil {
-			return
+			return options, err
 		}
 	}
-	return
+
+	return options, err
 }
 
 func (b *CdnServiceBroker) checkDomain(domain, orgGUID string) error {
@@ -506,12 +509,13 @@ func (b *CdnServiceBroker) checkDomain(domain, orgGUID string) error {
 	return nil
 }
 
-func (b *CdnServiceBroker) getHeaders(headerNames []string) (headers utils.Headers, err error) {
-	headers = utils.Headers{}
+func (b *CdnServiceBroker) getHeaders(headerNames []string) (utils.Headers, error) {
+	var err error
+	headers := utils.Headers{}
 	for _, header := range headerNames {
 		if headers.Contains(header) {
 			err = fmt.Errorf("must not pass duplicated header '%s'", header)
-			return
+			return headers, err
 		}
 		headers.Add(header)
 	}
@@ -519,7 +523,7 @@ func (b *CdnServiceBroker) getHeaders(headerNames []string) (headers utils.Heade
 	// Forbid accompanying a wildcard with specific headers.
 	if headers.Contains("*") && len(headers) > 1 {
 		err = errors.New("must not pass whitelisted headers alongside wildcard")
-		return
+		return headers, err
 	}
 
 	// Ensure the Host header is forwarded if using a CloudFoundry origin.
@@ -529,8 +533,8 @@ func (b *CdnServiceBroker) getHeaders(headerNames []string) (headers utils.Heade
 
 	if len(headers) > MAX_HEADER_COUNT {
 		err = fmt.Errorf("must not set more than %d headers; got %d", MAX_HEADER_COUNT, len(headers))
-		return
+		return headers, err
 	}
 
-	return
+	return headers, err
 }
