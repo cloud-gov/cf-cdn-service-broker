@@ -182,7 +182,7 @@ var _ = Describe("Update", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("Should error when forwarding wildcard headers and normal headers", func() {
+		It("Should error when specifying a specific header and also wildcard headers", func() {
 			details := brokerapi.UpdateDetails{
 				RawParameters: json.RawMessage(`{
 			"domain": "domain.gov",

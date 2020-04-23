@@ -254,7 +254,7 @@ var _ = Describe("Last operation", func() {
 			Expect(err).To(MatchError(ContainSubstring("must not pass duplicated header 'User-Agent'")))
 		})
 
-		It("Should error when forwarding wildcard headers and normal headers", func() {
+		It("Should error when specifying a specific header and also wildcard headers", func() {
 			details := brokerapi.ProvisionDetails{
 				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["*", "User-Agent"]}`),
 			}
