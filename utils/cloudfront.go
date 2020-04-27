@@ -10,8 +10,8 @@ import (
 )
 
 type DistributionIface interface {
-	Create(callerReference string, domains []string, origin, path string, defaultTTL int64, insecureOrigin bool, forwardedHeaders Headers, forwardCookies bool, tags map[string]string) (*cloudfront.Distribution, error)
-	Update(distId string, domains []string, origin, path string, defaultTTL int64, insecureOrigin bool, forwardedHeaders Headers, forwardCookies bool) (*cloudfront.Distribution, error)
+	Create(callerReference string, domains []string, origin string, defaultTTL int64, forwardedHeaders Headers, forwardCookies bool, tags map[string]string) (*cloudfront.Distribution, error)
+	Update(distId string, domains *[]string, origin string, defaultTTL *int64, forwardedHeaders *Headers, forwardCookies *bool) (*cloudfront.Distribution, error)
 	Get(distId string) (*cloudfront.Distribution, error)
 	SetCertificateAndCname(distId, certId string, domains []string) error
 	Disable(distId string) error
@@ -122,7 +122,8 @@ func (d *Distribution) setDistributionConfigOrigins(config *cloudfront.Distribut
 		Quantity: aws.Int64(2),
 		Items: []*cloudfront.Origin{
 			{
-				Id: aws.String(callerReference),
+				Id:         aws.String(callerReference),
+				OriginPath: aws.String(""),
 				CustomHeaders: &cloudfront.CustomHeaders{
 					Quantity: aws.Int64(0),
 				},
@@ -189,31 +190,7 @@ func (d *Distribution) setDistributionConfigDefaultCacheBehavior(config *cloudfr
 	}
 }
 
-func (d *Distribution) configureDistributionConfig(
-	config *cloudfront.DistributionConfig,
-	domains []string,
-	origin string,
-	path string,
-	defaultTTL int64,
-	insecureOrigin bool,
-	forwardedHeaders Headers,
-	forwardCookies bool,
-) {
-	if forwardCookies == false {
-		config.DefaultCacheBehavior.ForwardedValues.Cookies.Forward = aws.String("none")
-	}
-
-	config.Origins.Items[0].DomainName = aws.String(origin)
-	config.Origins.Items[0].OriginPath = aws.String(path)
-	config.Origins.Items[0].CustomOriginConfig.OriginProtocolPolicy = getOriginProtocolPolicy(insecureOrigin)
-
-	config.Aliases = d.getAliases(domains)
-
-	config.DefaultCacheBehavior.ForwardedValues.Headers = d.getHeaders(forwardedHeaders.Strings())
-	config.DefaultCacheBehavior.DefaultTTL = aws.Int64(defaultTTL)
-}
-
-func (d *Distribution) Create(callerReference string, domains []string, origin, path string, defaultTTL int64, insecureOrigin bool, forwardedHeaders Headers, forwardCookies bool, tags map[string]string) (*cloudfront.Distribution, error) {
+func (d *Distribution) Create(callerReference string, domains []string, origin string, defaultTTL int64, forwardedHeaders Headers, forwardCookies bool, tags map[string]string) (*cloudfront.Distribution, error) {
 	distConfig := new(cloudfront.DistributionConfig)
 
 	distConfig.DefaultCacheBehavior = &cloudfront.DefaultCacheBehavior{
@@ -236,16 +213,17 @@ func (d *Distribution) Create(callerReference string, domains []string, origin, 
 	d.setDistributionConfigDefaultCacheBehavior(distConfig, callerReference)
 	d.setDistributionConfigOrigins(distConfig, callerReference)
 
-	d.configureDistributionConfig(
-		distConfig,
-		domains,
-		origin,
-		path,
-		defaultTTL,
-		insecureOrigin,
-		forwardedHeaders,
-		forwardCookies,
-	)
+	if forwardCookies == false {
+		distConfig.DefaultCacheBehavior.ForwardedValues.Cookies.Forward = aws.String("none")
+	}
+
+	distConfig.Origins.Items[0].DomainName = aws.String(origin)
+	distConfig.Origins.Items[0].CustomOriginConfig.OriginProtocolPolicy = aws.String("https-only")
+
+	distConfig.Aliases = d.getAliases(domains)
+
+	distConfig.DefaultCacheBehavior.ForwardedValues.Headers = d.getHeaders(forwardedHeaders.Strings())
+	distConfig.DefaultCacheBehavior.DefaultTTL = aws.Int64(defaultTTL)
 
 	resp, err := d.Service.CreateDistributionWithTags(&cloudfront.CreateDistributionWithTagsInput{
 		DistributionConfigWithTags: &cloudfront.DistributionConfigWithTags{
@@ -261,7 +239,14 @@ func (d *Distribution) Create(callerReference string, domains []string, origin, 
 	return resp.Distribution, nil
 }
 
-func (d *Distribution) Update(distId string, domains []string, origin, path string, defaultTTL int64, insecureOrigin bool, forwardedHeaders Headers, forwardCookies bool) (*cloudfront.Distribution, error) {
+func (d *Distribution) Update(
+	distId string,
+	domains *[]string,
+	origin string,
+	defaultTTL *int64,
+	forwardedHeaders *Headers,
+	forwardCookies *bool,
+) (*cloudfront.Distribution, error) {
 	// Get the current distribution
 	dist, err := d.Service.GetDistributionConfig(&cloudfront.GetDistributionConfigInput{
 		Id: aws.String(distId),
@@ -277,16 +262,30 @@ func (d *Distribution) Update(distId string, domains []string, origin, path stri
 	d.setDistributionConfigDefaultCacheBehavior(dist.DistributionConfig, callerReference)
 	d.setDistributionConfigOrigins(dist.DistributionConfig, callerReference)
 
-	d.configureDistributionConfig(
-		dist.DistributionConfig,
-		domains,
-		origin,
-		path,
-		defaultTTL,
-		insecureOrigin,
-		forwardedHeaders,
-		forwardCookies,
-	)
+	dist.DistributionConfig.Origins.Items[0].DomainName = aws.String(origin)
+	dist.DistributionConfig.Origins.Items[0].CustomOriginConfig.OriginProtocolPolicy = aws.String("https-only")
+
+	if forwardCookies != nil {
+		if *forwardCookies {
+			dist.DistributionConfig.DefaultCacheBehavior.ForwardedValues.Cookies.Forward = aws.String("all")
+		} else {
+			dist.DistributionConfig.DefaultCacheBehavior.ForwardedValues.Cookies.Forward = aws.String("none")
+		}
+	}
+
+	if domains != nil {
+		dist.DistributionConfig.Aliases = d.getAliases(*domains)
+	}
+
+	if forwardedHeaders != nil {
+		dist.DistributionConfig.DefaultCacheBehavior.ForwardedValues.Headers = d.getHeaders(
+			(*forwardedHeaders).Strings(),
+		)
+	}
+
+	if defaultTTL != nil {
+		dist.DistributionConfig.DefaultCacheBehavior.DefaultTTL = aws.Int64(*defaultTTL)
+	}
 
 	// Call the UpdateDistribution function
 	resp, err := d.Service.UpdateDistribution(&cloudfront.UpdateDistributionInput{
@@ -392,11 +391,4 @@ func (d *Distribution) ListDistributions(callback func(cloudfront.DistributionSu
 
 			return true
 		})
-}
-
-func getOriginProtocolPolicy(insecure bool) *string {
-	if insecure {
-		return aws.String("http-only")
-	}
-	return aws.String("https-only")
 }

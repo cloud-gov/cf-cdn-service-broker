@@ -21,6 +21,13 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+var (
+	defaultTTLNotPassed       *int64
+	domainNotPassed           *string
+	forwardedHeadersNotPassed *utils.Headers
+	forwardCookiesNotPassed   *bool
+)
+
 type UpdateSuite struct {
 	suite.Suite
 	Manager  mocks.RouteManagerIface
@@ -31,14 +38,6 @@ type UpdateSuite struct {
 	ctx      context.Context
 }
 
-func (s *UpdateSuite) allowUpdateWithExpectedHeaders(expectedHeaders utils.Headers) {
-	s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", ".", s.settings.DefaultDefaultTTL, true, expectedHeaders, true).Return(nil)
-}
-
-func (s *UpdateSuite) failOnUpdateWithExpectedHeaders(expectedHeaders utils.Headers) {
-	s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", ".", s.settings.DefaultDefaultTTL, true, expectedHeaders, true).Return(errors.New("fail"))
-}
-
 var _ = Describe("Update", func() {
 	var s *UpdateSuite = &UpdateSuite{}
 
@@ -47,7 +46,7 @@ var _ = Describe("Update", func() {
 		s.cfclient = cfmock.Client{}
 		s.logger = lager.NewLogger("test")
 		s.settings = config.Settings{
-			DefaultOrigin: "origin.cloud.gov",
+			DefaultOrigin:     "origin.cloud.gov",
 			DefaultDefaultTTL: int64(0),
 		}
 		s.Broker = broker.New(
@@ -59,50 +58,22 @@ var _ = Describe("Update", func() {
 		s.ctx = context.Background()
 	})
 
-	It("Should error when not given options", func() {
-		details := brokerapi.UpdateDetails{
-			RawParameters: json.RawMessage(`{"origin": ""}`),
-		}
-		_, err := s.Broker.Update(s.ctx, "", details, true)
-
-		Expect(err).To(HaveOccurred())
-		Expect(err).To(MatchError(ContainSubstring("must pass non-empty `domain` or `origin`")))
-	})
-
 	It("Should succeed when given only a domain", func() {
 		details := brokerapi.UpdateDetails{
 			RawParameters: json.RawMessage(`{"domain": "domain.gov"}`),
 		}
-		s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", "", s.settings.DefaultDefaultTTL, false, utils.Headers{"Host": true}, true).Return(nil)
+
+		domain := "domain.gov"
+		s.Manager.On(
+			"Update", "",
+			&domain,
+			defaultTTLNotPassed,
+			forwardedHeadersNotPassed,
+			forwardCookiesNotPassed,
+		).Return(nil)
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
+
 		_, err := s.Broker.Update(s.ctx, "", details, true)
-
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	It("Should succeed when given only an origin", func() {
-		details := brokerapi.UpdateDetails{
-			RawParameters: json.RawMessage(`{"origin": "origin.gov"}`),
-		}
-		s.Manager.On("Update", "", "", "origin.gov", "", s.settings.DefaultDefaultTTL, false, utils.Headers{}, true).Return(nil)
-		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
-		_, err := s.Broker.Update(s.ctx, "", details, true)
-
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	It("Should succeed when given origin and path and insecure_origin", func() {
-		details := brokerapi.UpdateDetails{
-			RawParameters: json.RawMessage(`{
-				"insecure_origin": true,
-				"domain": "domain.gov",
-				"path": "."
-			}`),
-		}
-		s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", ".", s.settings.DefaultDefaultTTL, true, utils.Headers{"Host": true}, true).Return(nil)
-		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
-		_, err := s.Broker.Update(s.ctx, "", details, true)
-
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -113,7 +84,7 @@ var _ = Describe("Update", func() {
 			},
 			RawParameters: json.RawMessage(`{"domain": "domain.gov"}`),
 		}
-		s.Manager.On("Update", "", "domain.gov", "origin.cloud.gov", ".", true, utils.Headers{"Host": true}, true).Return(nil)
+		s.Manager.On("Update", "", "domain.gov", s.settings.DefaultDefaultTTL, utils.Headers{"Host": true}, true).Return(nil)
 		s.cfclient.On("GetOrgByGuid", "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5").Return(cfclient.Org{Name: "my-org"}, nil)
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, errors.New("bad"))
 		_, err := s.Broker.Update(s.ctx, "", details, true)
@@ -128,77 +99,93 @@ var _ = Describe("Update", func() {
 		})
 
 		It("Should succeed when forwarding duplicated host headers", func() {
-			s.allowUpdateWithExpectedHeaders(utils.Headers{"Host": true})
-
 			details := brokerapi.UpdateDetails{
 				RawParameters: json.RawMessage(`{
-			"insecure_origin": true,
 			"domain": "domain.gov",
-			"path": ".",
 			"headers": ["Host"]
 		}`),
 			}
-			_, err := s.Broker.Update(s.ctx, "", details, true)
 
+			domain := "domain.gov"
+			s.Manager.On(
+				"Update", "",
+				&domain,
+				defaultTTLNotPassed,
+				&utils.Headers{"Host": true},
+				forwardCookiesNotPassed,
+			).Return(nil)
+
+			_, err := s.Broker.Update(s.ctx, "", details, true)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Should succeed when forwarding a single header", func() {
-			s.allowUpdateWithExpectedHeaders(utils.Headers{"User-Agent": true, "Host": true})
-
 			details := brokerapi.UpdateDetails{
 				RawParameters: json.RawMessage(`{
-"insecure_origin": true,
 			"domain": "domain.gov",
-			"path": ".",
 			"headers": ["User-Agent"]
 		}`),
 			}
-			_, err := s.Broker.Update(s.ctx, "", details, true)
 
+			domain := "domain.gov"
+			s.Manager.On(
+				"Update", "",
+				&domain,
+				defaultTTLNotPassed,
+				&utils.Headers{"User-Agent": true, "Host": true},
+				forwardCookiesNotPassed,
+			).Return(nil)
+
+			_, err := s.Broker.Update(s.ctx, "", details, true)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Should succeed when forwarding wildcard headers", func() {
-			s.allowUpdateWithExpectedHeaders(utils.Headers{"*": true})
-
 			details := brokerapi.UpdateDetails{
 				RawParameters: json.RawMessage(`{
-"insecure_origin": true,
 			"domain": "domain.gov",
-			"path": ".",
 			"headers": ["*"]
 		}`),
 			}
-			_, err := s.Broker.Update(s.ctx, "", details, true)
 
+			domain := "domain.gov"
+			s.Manager.On(
+				"Update", "",
+				&domain,
+				defaultTTLNotPassed,
+				&utils.Headers{"*": true},
+				forwardCookiesNotPassed,
+			).Return(nil)
+
+			_, err := s.Broker.Update(s.ctx, "", details, true)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Should succeed when forwarding nine headers", func() {
-			s.allowUpdateWithExpectedHeaders(utils.Headers{"One": true, "Two": true, "Three": true, "Four": true, "Five": true, "Six": true, "Seven": true, "Eight": true, "Nine": true, "Host": true})
-
 			details := brokerapi.UpdateDetails{
 				RawParameters: json.RawMessage(`{
-"insecure_origin": true,
 			"domain": "domain.gov",
-			"path": ".",
 			"headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"]
 		}`),
 			}
-			_, err := s.Broker.Update(s.ctx, "", details, true)
 
+			domain := "domain.gov"
+			s.Manager.On(
+				"Update", "",
+				&domain,
+				defaultTTLNotPassed,
+				&utils.Headers{"One": true, "Two": true, "Three": true, "Four": true, "Five": true, "Six": true, "Seven": true, "Eight": true, "Nine": true, "Host": true},
+				forwardCookiesNotPassed,
+			).Return(nil)
+
+			_, err := s.Broker.Update(s.ctx, "", details, true)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("Should error when forwarding wildcard headers and normal headers", func() {
-			s.failOnUpdateWithExpectedHeaders(utils.Headers{"*": true})
-
+		It("Should error when specifying a specific header and also wildcard headers", func() {
 			details := brokerapi.UpdateDetails{
 				RawParameters: json.RawMessage(`{
-"insecure_origin": true,
 			"domain": "domain.gov",
-			"path": ".",
 			"headers": ["*", "User-Agent"]
 		}`),
 			}
@@ -209,13 +196,9 @@ var _ = Describe("Update", func() {
 		})
 
 		It("Should error when forwarding ten or more headers", func() {
-			s.failOnUpdateWithExpectedHeaders(utils.Headers{"One": true, "Two": true, "Three": true, "Four": true, "Five": true, "Six": true, "Seven": true, "Eight": true, "Nine": true, "Ten": true, "Host": true})
-
 			details := brokerapi.UpdateDetails{
 				RawParameters: json.RawMessage(`{
-			"insecure_origin": true,
 			"domain": "domain.gov",
-			"path": ".",
 			"headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"]
 		}`),
 			}

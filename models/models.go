@@ -182,8 +182,8 @@ type Route struct {
 	DomainInternal string
 	DistId         string
 	Origin         string
-	Path           string
-	InsecureOrigin bool
+	Path           string // Always empty, should not remove because it is in DB
+	InsecureOrigin bool   // Always false, should not remove because it is in DB
 	Certificate    Certificate
 	UserData       UserData
 	UserDataID     int
@@ -215,12 +215,10 @@ type Certificate struct {
 
 type RouteManagerIface interface {
 	Create(
-		instanceId,
-		domain,
-		origin,
-		path string,
+		instanceId string,
+		domain string,
+		origin string,
 		defaultTTL int64,
-		insecureOrigin bool,
 		forwardedHeaders utils.Headers,
 		forwardCookies bool,
 		tags map[string]string,
@@ -228,13 +226,10 @@ type RouteManagerIface interface {
 
 	Update(
 		instanceId string,
-		domain,
-		origin string,
-		path string,
-		defaultTTL int64,
-		insecureOrigin bool,
-		forwardedHeaders utils.Headers,
-		forwardCookies bool,
+		domain *string,
+		defaultTTL *int64,
+		forwardedHeaders *utils.Headers,
+		forwardCookies *bool,
 	) (bool, error)
 
 	Get(instanceId string) (*Route, error)
@@ -281,11 +276,9 @@ func NewManager(
 
 func (m *RouteManager) Create(
 	instanceId,
-	domain,
-	origin,
-	path string,
+	domain string,
+	origin string,
 	defaultTTL int64,
-	insecureOrigin bool,
 	forwardedHeaders utils.Headers,
 	forwardCookies bool,
 	tags map[string]string,
@@ -296,9 +289,9 @@ func (m *RouteManager) Create(
 		State:          Provisioning,
 		DomainExternal: domain,
 		Origin:         origin,
-		Path:           path,
+		Path:           "",
 		DefaultTTL:     defaultTTL,
-		InsecureOrigin: insecureOrigin,
+		InsecureOrigin: false,
 	}
 
 	lsession := m.logger.Session("route-manager-create-route", lager.Data{
@@ -339,9 +332,7 @@ func (m *RouteManager) Create(
 		instanceId,
 		make([]string, 0),
 		origin,
-		path,
 		defaultTTL,
-		insecureOrigin,
 		forwardedHeaders,
 		forwardCookies,
 		tags,
@@ -387,14 +378,11 @@ func (m *RouteManager) Get(instanceId string) (*Route, error) {
 // Update updates the CDN route service and returns whether the update has been
 // performed asynchronously or not
 func (m *RouteManager) Update(
-	instanceId,
-	domain,
-	origin string,
-	path string,
-	defaultTTL int64,
-	insecureOrigin bool,
-	forwardedHeaders utils.Headers,
-	forwardCookies bool,
+	instanceId string,
+	domain *string,
+	defaultTTL *int64,
+	forwardedHeaders *utils.Headers,
+	forwardCookies *bool,
 ) (bool, error) {
 
 	lsession := m.logger.Session("route-manager-update", lager.Data{
@@ -409,43 +397,25 @@ func (m *RouteManager) Update(
 		return false, err
 	}
 
-	// When we update the CloudFront distribution we should use the old domains
-	// until we have a valid certificate in IAM.
-	// CloudFront gets updated when we receive new certificates during Poll
-	lsession.Info("get-domains")
-	oldDomainsForCloudFront := route.GetDomains()
-
 	// Override any settings that are new or different.
-	if domain != "" {
+	if domain != nil {
 		lsession.Info("param-update-domain")
-		route.DomainExternal = domain
+		route.DomainExternal = *domain
 	}
-	if origin != "" {
-		lsession.Info("param-update-origin")
-		route.Origin = origin
-	}
-	if path != route.Path {
-		lsession.Info("param-update-path")
-		route.Path = path
-	}
-	if defaultTTL != route.DefaultTTL {
+	if defaultTTL != nil {
 		lsession.Info("param-update-default-ttl")
-		route.DefaultTTL = defaultTTL
-	}
-	if insecureOrigin != route.InsecureOrigin {
-		lsession.Info("param-update-insecure-origin")
-		route.InsecureOrigin = insecureOrigin
+		route.DefaultTTL = *defaultTTL
 	}
 
 	// Update the distribution
 	lsession.Info("cloudfront-update-excluding-domains")
 	dist, err := m.cloudFront.Update(
 		route.DistId,
-		oldDomainsForCloudFront,
-		route.Origin, route.Path,
-		route.DefaultTTL,
-		route.InsecureOrigin,
-		forwardedHeaders, forwardCookies,
+		nil,
+		route.Origin,
+		defaultTTL,
+		forwardedHeaders,
+		forwardCookies,
 	)
 	if err != nil {
 		lsession.Error("cloudfront-update-excluding-domains", err)
@@ -456,7 +426,7 @@ func (m *RouteManager) Update(
 	route.DomainInternal = *dist.DomainName
 	route.DistId = *dist.Id
 
-	if domain == "" {
+	if domain == nil || *domain == "" {
 		lsession.Info("set-state-provisioned")
 		// CloudFront has been updated with all the configuration
 		// The domains are not being updated so we do not need a new certificate

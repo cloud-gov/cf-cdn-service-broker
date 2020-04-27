@@ -436,9 +436,7 @@ var _ = Describe("Models", func() {
 			instanceID := "cloudfoundry-instance-id"
 			domain := "foo.paas.gov.uk"
 			origin := "foo.cloudapps.digital"
-			path := "/"
 			defaultTTL := int64(0)
-			insecureOrigin := false
 			forwardedHeaders := utils.Headers{}
 			forwardCookies := false
 			tags := map[string]string{}
@@ -486,8 +484,8 @@ var _ = Describe("Models", func() {
 			)
 
 			_, err := manager.Create(
-				instanceID, domain, origin, path, defaultTTL,
-				insecureOrigin, forwardedHeaders, forwardCookies, tags,
+				instanceID, domain, origin, defaultTTL,
+				forwardedHeaders, forwardCookies, tags,
 			)
 			Expect(acmeProviderMock.GetHTTP01ClientCallCount()).To(
 				Equal(0), "Creating a CDN service should never use HTTP challenges",
@@ -508,9 +506,7 @@ var _ = Describe("Models", func() {
 			instanceID := "cloudfoundry-instance-id"
 			domain := "foo.paas.gov.uk"
 			origin := "foo.cloudapps.digital"
-			path := "/"
 			defaultTTL := int64(0)
-			insecureOrigin := false
 
 			settings, _ := config.NewSettings()
 			awsSession := session.New(nil)
@@ -588,9 +584,9 @@ var _ = Describe("Models", func() {
 				State:          models.Provisioning,
 				DomainExternal: domain,
 				Origin:         origin,
-				Path:           path,
+				Path:           "",
 				DefaultTTL:     defaultTTL,
-				InsecureOrigin: insecureOrigin,
+				InsecureOrigin: false,
 			}
 
 			rsaTestKey, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -695,9 +691,7 @@ var _ = Describe("Models", func() {
 			instanceID := "cloudfoundry-instance-id"
 			domain := "foo.paas.gov.uk"
 			origin := "foo.cloudapps.digital"
-			path := "/"
 			defaultTTL := int64(0)
-			insecureOrigin := false
 
 			settings, _ := config.NewSettings()
 			awsSession := session.New(nil)
@@ -724,9 +718,9 @@ var _ = Describe("Models", func() {
 				State:          models.Provisioning,
 				DomainExternal: domain,
 				Origin:         origin,
-				Path:           path,
+				Path:           "",
 				DefaultTTL:     defaultTTL,
-				InsecureOrigin: insecureOrigin,
+				InsecureOrigin: false,
 			}
 		})
 
@@ -769,9 +763,7 @@ var _ = Describe("Models", func() {
 			cloudfrontDistID = "cloudfoundry-instance-id"
 			domain           = "foo.paas.gov.uk"
 			origin           = "foo.cloudapps.digital"
-			path             = "/"
 			defaultTTL       = int64(0)
-			insecureOrigin   = false
 			forwardedHeaders = utils.Headers{"X-Forwarded-Five": true}
 			forwardCookies   = false
 
@@ -896,7 +888,7 @@ var _ = Describe("Models", func() {
 					time.Now(), time.Now(), nil,
 					routeID, "[]",
 					domain, "foo.cloudfront.net",
-					cloudfrontDistID, origin, path,
+					cloudfrontDistID, origin, "",
 					defaultTTL, false, certificateID,
 					userDataID, "Provisioned",
 				),
@@ -937,13 +929,10 @@ var _ = Describe("Models", func() {
 
 			performedAsynchronously, err := manager.Update(
 				cloudfrontDistID,
-				brokerAPICallDomainArgument,
-				origin,
-				path,
-				defaultTTL,
-				insecureOrigin,
-				forwardedHeaders,
-				forwardCookies,
+				&brokerAPICallDomainArgument,
+				&defaultTTL,
+				&forwardedHeaders,
+				&forwardCookies,
 			)
 
 			Expect(err).NotTo(HaveOccurred())
@@ -999,7 +988,7 @@ var _ = Describe("Models", func() {
 					time.Now(), time.Now(), nil,
 					routeID, "[]",
 					domain, "foo.cloudfront.net",
-					cloudfrontDistID, origin, path,
+					cloudfrontDistID, origin, "",
 					defaultTTL, false, certificateID,
 					userDataID, "Provisioned",
 				),
@@ -1040,13 +1029,10 @@ var _ = Describe("Models", func() {
 
 			performedAsynchronously, err := manager.Update(
 				cloudfrontDistID,
-				brokerAPICallDomainArgument,
-				origin,
-				path,
-				defaultTTL,
-				insecureOrigin,
-				forwardedHeaders,
-				forwardCookies,
+				&brokerAPICallDomainArgument,
+				&defaultTTL,
+				&forwardedHeaders,
+				&forwardCookies,
 			)
 
 			Expect(err).NotTo(HaveOccurred())
