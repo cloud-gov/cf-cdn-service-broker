@@ -49,13 +49,18 @@ func main() {
 	c := cron.New()
 
 	c.AddFunc(settings.Schedule, func() {
-		logger.Info("Running renew")
+		logger.Info("run-renew-certs")
 		manager.RenewAll()
 	})
 
 	c.AddFunc(settings.Schedule, func() {
-		logger.Info("Running cert cleanup")
+		logger.Info("run-cert-cleanup")
 		manager.DeleteOrphanedCerts()
+	})
+
+	c.AddFunc("@every 2m", func() {
+		logger.Info("run-provisioning-instance-checks")
+		manager.CheckProvisioningInstances()
 	})
 
 	logger.Info("Starting cron")

@@ -20,13 +20,13 @@ require (
 	github.com/jinzhu/inflection v0.0.0-20170102125226-1c35d901db3d // indirect
 	github.com/jinzhu/now v1.0.1 // indirect
 	github.com/kelseyhightower/envconfig v1.2.0
-	github.com/kr/pretty v0.1.0 // indirect
 	github.com/lib/pq v0.0.0-20170324204654-2704adc878c2
 	github.com/martini-contrib/render v0.0.0-20150707142108-ec18f8345a11 // indirect
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
+	github.com/maxbrunsfeld/counterfeiter/v6 v6.2.3 // indirect
 	github.com/miekg/dns v0.0.0-20170412184748-6ebcb714d369
 	github.com/onsi/ginkgo v1.8.0
-	github.com/onsi/gomega v1.5.0
+	github.com/onsi/gomega v1.9.0
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c // indirect
 	github.com/pborman/uuid v1.2.0 // indirect
 	github.com/pivotal-cf/brokerapi v6.4.2+incompatible
@@ -39,7 +39,6 @@ require (
 	golang.org/x/net v0.0.0-20200202094626-16171245cfb2
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
 	golang.org/x/sys v0.0.0-20200212091648-12a6c2dcc1e4 // indirect
-	golang.org/x/tools v0.0.0-20200213224642-88e652f7a869 // indirect
 	golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/square/go-jose.v1 v1.1.0

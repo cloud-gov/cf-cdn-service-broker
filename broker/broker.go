@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strings"
-	"time"
 
 	"code.cloudfoundry.org/lager"
 	"github.com/pivotal-cf/brokerapi"
@@ -177,51 +176,14 @@ func (b *CdnServiceBroker) LastOperation(
 		}, nil
 	}
 
-	err = b.manager.Poll(route)
-	if err != nil {
-		lsession.Error("manager-poll-err", err, lager.Data{
-			"domain": route.DomainExternal,
-			"state":  route.State,
-		})
-		if strings.Contains(err.Error(), "CNAMEAlreadyExists") {
-			return brokerapi.LastOperation{
-				State:       brokerapi.Failed,
-				Description: "One or more of the CNAMEs you provided are already associated with a different CDN",
-			}, nil
-		}
-	}
-
-	lsession.Info("provisioning-state", lager.Data{
-		"domain": route.DomainExternal,
-		"state":  route.State,
+	lsession.Info("route-state", lager.Data{
+		"instance_id": route.InstanceId,
+		"domain":      route.DomainExternal,
+		"state":       route.State,
 	})
 
 	switch route.State {
 	case models.Provisioning:
-		if route.CreatedAt.Before(time.Now().Add(-24 * time.Hour)) {
-			err = b.manager.Disable(route)
-			if err != nil {
-				lsession.Error("unable-to-expire-unprovisioned-instance", err, lager.Data{
-					"domain":    route.DomainExternal,
-					"state":     route.State,
-					"createdAt": route.CreatedAt,
-				})
-				return brokerapi.LastOperation{
-					State:       brokerapi.Failed,
-					Description: "Couldn't verify in 24h time slot. Self-healing has failed. Please contact support.",
-				}, nil
-			}
-
-			lsession.Info("expiring-unprovisioned-instance", lager.Data{
-				"domain":    route.DomainExternal,
-				"state":     route.State,
-				"createdAt": route.CreatedAt,
-			})
-			return brokerapi.LastOperation{
-				State:       brokerapi.InProgress,
-				Description: "Couldn't verify in 24h time slot. Expiring instance initialisation.",
-			}, nil
-		}
 		instructions, err := b.manager.GetDNSInstructions(route)
 		if err != nil {
 			lsession.Error("get-dns-instructions-err", err, lager.Data{
@@ -294,9 +256,23 @@ func (b *CdnServiceBroker) LastOperation(
 			State:       brokerapi.Succeeded,
 			Description: description,
 		}, nil
+	case models.Conflict:
+		description := "One or more of the CNAMEs you provided are already associated with a different CDN"
+		lsession.Info("conflict", lager.Data{
+			"domain":      route.DomainExternal,
+			"state":       route.State,
+			"description": description,
+		})
+		return brokerapi.LastOperation{
+			State:       brokerapi.Failed,
+			Description: description,
+		}, nil
+
+	case models.Failed:
+		fallthrough
 	default:
 		description := "Service instance stuck in unmanagable state."
-		if route.CreatedAt.Before(time.Now().Add(-24 * time.Hour)) {
+		if route.IsCreationExpired() {
 			description = fmt.Sprintf("Couldn't verify in 24h time slot. %s", description)
 		}
 		lsession.Info("unmanagable-state", lager.Data{

@@ -40,6 +40,8 @@ const (
 	Provisioned          = "provisioned"
 	Deprovisioning       = "deprovisioning"
 	Deprovisioned        = "deprovisioned"
+	Conflict             = "conflict"
+	Failed               = "failed"
 )
 
 var (
@@ -202,6 +204,10 @@ func (r *Route) loadUser(db *gorm.DB) (utils.User, error) {
 	}
 
 	return LoadUser(userData)
+}
+
+func (r *Route) IsCreationExpired() bool {
+	return r.CreatedAt.Before(time.Now().Add(-24 * time.Hour))
 }
 
 type Certificate struct {
@@ -760,6 +766,81 @@ func (m *RouteManager) RenewAll() {
 		}
 	}
 	lsession.Info("finished")
+}
+
+func (m *RouteManager) CheckProvisioningInstances() {
+	lsession := m.logger.Session("check-provisioning-instances")
+
+	routes := m.fetchProvisioningRoutes(lsession)
+
+	if len(routes) == 0 {
+		return
+	}
+
+	for i, route := range routes {
+		r := routes[i]
+		lsession.Info("check", lager.Data{"instance_id": route.InstanceId})
+		err := m.Poll(&r)
+		if err != nil {
+			lsession.Info("check-failed", lager.Data{"instance_id": route.InstanceId})
+
+			if strings.Contains(err.Error(), "CNAMEAlreadyExists") {
+				lsession.Info("cname-conflict", lager.Data{"instance_id": route.InstanceId, "domains": route.GetDomains()})
+
+				route.State = Conflict
+				lsession.Info("set-state", lager.Data{"instance_id": route.InstanceId, "state": route.State})
+				err = m.db.Save(route).Error
+				if err != nil {
+					lsession.Error("db-save-failed", err)
+					continue
+				}
+
+			}
+		}
+
+		if route.IsCreationExpired() {
+			lsession.Info("expiring-unprovisioned-instance", lager.Data{
+				"domain":    route.DomainExternal,
+				"state":     route.State,
+				"createdAt": route.CreatedAt,
+			})
+
+			err = m.Disable(&route)
+			if err != nil {
+				lsession.Error("unable-to-expire-unprovisioned-instance", err, lager.Data{
+					"domain":    route.DomainExternal,
+					"state":     route.State,
+					"createdAt": route.CreatedAt,
+				})
+
+				lsession.Info("set-state", lager.Data{"instance_id": route.InstanceId, "state": route.State})
+				route.State = Failed
+				err = m.db.Save(route).Error
+				if err != nil {
+					lsession.Error("db-save-failed", err)
+					continue
+				}
+			}
+		}
+	}
+}
+
+func (m *RouteManager) fetchProvisioningRoutes(lsession lager.Logger) []Route {
+	routes := []Route{}
+	lsession.Info("find-provisioning-instances")
+	m.db.Where(
+		"state = ?", string(Provisioning),
+	).Group(
+		"routes.id",
+	).Find(&routes)
+
+	affectedDomains := []string{}
+	for _, route := range routes {
+		affectedDomains = append(affectedDomains, route.DomainExternal)
+	}
+	lsession.Info("found-instances", lager.Data{"domains": affectedDomains})
+
+	return routes
 }
 
 func (m *RouteManager) getDNS01Client(
