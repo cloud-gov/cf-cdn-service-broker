@@ -189,6 +189,7 @@ type Route struct {
 	Certificate    Certificate
 	UserData       UserData
 	UserDataID     int
+	User           utils.User `gorm:"-"`
 	DefaultTTL     int64 `gorm:"default:86400"`
 }
 
