@@ -70,7 +70,7 @@ func (d *Distribution) setDistributionConfigCacheBehaviors(config *cloudfront.Di
 		Quantity: aws.Int64(1),
 		Items: []*cloudfront.CacheBehavior{
 			{
-				TargetOriginId:         aws.String(callerReference),
+				TargetOriginId:         aws.String(fmt.Sprintf("s3-%s-%s", d.Settings.Bucket, callerReference)),
 				FieldLevelEncryptionId: aws.String(""),
 				AllowedMethods: &cloudfront.AllowedMethods{
 					CachedMethods: &cloudfront.CachedMethods{
