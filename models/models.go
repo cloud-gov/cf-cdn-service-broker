@@ -88,7 +88,7 @@ func CreateUser(email string) (utils.User, error) {
 	return user, nil
 }
 
-func SaveUser(db *gorm.DB, user utils.User) (UserData, error) {
+func (r *Route) SetUser(user utils.User) error {
 	var err error
 	userData := UserData{Email: user.GetEmail()}
 
@@ -97,20 +97,17 @@ func SaveUser(db *gorm.DB, user utils.User) (UserData, error) {
 	userData.Key, err = savePrivateKey(user.GetPrivateKey())
 	if err != nil {
 		lsession.Error("save-private-key", err)
-		return userData, err
+		return err
 	}
 	userData.Reg, err = json.Marshal(user)
 	if err != nil {
 		lsession.Error("json-marshal-user", err)
-		return userData, err
+		return err
 	}
 
-	if err := db.Save(&userData).Error; err != nil {
-		lsession.Error("db-save-user", err)
-		return userData, err
-	}
+	r.UserData = userData
 
-	return userData, nil
+	return nil
 }
 
 func LoadUser(userData UserData) (utils.User, error) {
@@ -190,7 +187,7 @@ type Route struct {
 	UserData       UserData
 	UserDataID     int
 	User           utils.User `gorm:"-"`
-	DefaultTTL     int64 `gorm:"default:86400"`
+	DefaultTTL     int64      `gorm:"default:86400"`
 }
 
 func (r *Route) GetDomains() []string {
@@ -259,8 +256,8 @@ type RouteManager struct {
 	iam                utils.IamIface
 	cloudFront         utils.DistributionIface
 	settings           config.Settings
-	db                 *gorm.DB
 	acmeClientProvider AcmeClientProviderInterface
+	routeStoreIface    RouteStoreInterface
 }
 
 func NewManager(
@@ -268,16 +265,16 @@ func NewManager(
 	iam utils.IamIface,
 	cloudFront utils.DistributionIface,
 	settings config.Settings,
-	db *gorm.DB,
 	acmeClientProvider AcmeClientProviderInterface,
+	routeStoreIface RouteStoreInterface,
 ) RouteManager {
 	return RouteManager{
 		logger:             logger,
 		iam:                iam,
 		cloudFront:         cloudFront,
 		settings:           settings,
-		db:                 db,
 		acmeClientProvider: acmeClientProvider,
+		routeStoreIface:    routeStoreIface,
 	}
 }
 
@@ -319,14 +316,13 @@ func (m *RouteManager) Create(
 		return nil, err
 	}
 
-	lsession.Info("saving-user")
-	userData, err := SaveUser(m.db, user)
+	//Setting the user
+	lsession.Info("set-user")
+	err = route.SetUser(user)
 	if err != nil {
-		lsession.Error("save-user", err)
+		lsession.Error("set-user", err)
 		return nil, err
 	}
-
-	route.UserData = userData
 
 	lsession.Info("ensure-challenges-dns-01")
 	if err := m.ensureChallenges(route, client); err != nil {
@@ -352,15 +348,17 @@ func (m *RouteManager) Create(
 	route.DomainInternal = *dist.DomainName
 	route.DistId = *dist.Id
 
-	lsession.Info("db-create-route")
-	if err := m.db.Create(route).Error; err != nil {
-		lsession.Error("db-create-route", err)
+	//insert the route object into the database
+	lsession.Info("create-route")
+	if err := m.routeStoreIface.Create(route); err != nil {
+		lsession.Error("create-route", err)
 		return nil, err
 	}
 
 	return route, nil
 }
 
+//Get a Route from a database, by instanceId
 func (m *RouteManager) Get(instanceId string) (*Route, error) {
 	route := Route{}
 
@@ -369,20 +367,22 @@ func (m *RouteManager) Get(instanceId string) (*Route, error) {
 	})
 
 	lsession.Info("db-first-route")
-	result := m.db.First(&route, Route{InstanceId: instanceId})
-	if result.Error == nil {
-		lsession.Error("db-get-first-route", result.Error)
+	route, err := m.routeStoreIface.FindOneMatching(Route{
+		InstanceId: instanceId,
+	})
+
+	if err == nil {
 		return &route, nil
-	} else if result.RecordNotFound() {
+	} else if err == gorm.ErrRecordNotFound {
 		lsession.Error("db-record-not-found", brokerapi.ErrInstanceDoesNotExist)
 		return nil, brokerapi.ErrInstanceDoesNotExist
 	} else {
-		lsession.Error("db-generic-error", result.Error)
-		return nil, result.Error
+		lsession.Error("db-generic-error", err)
+		return nil, err
 	}
 }
 
-// Update updates the CDN route service and returns whether the update has been
+// Update function updates the CDN route service and returns whether the update has been
 // performed asynchronously or not
 func (m *RouteManager) Update(
 	instanceId string,
@@ -448,15 +448,9 @@ func (m *RouteManager) Update(
 		// responsibility of the ACME server to give us what challenges are
 		// supported. I.e. LetsEncrypt will return ALPN01, HTTP01, DNS01 regardless
 		// of which client is used
-		lsession.Info("load-user")
-		user, err := route.loadUser(m.db)
-		if err != nil {
-			lsession.Error("load-user", err)
-			return false, err
-		}
 
 		lsession.Info("get-dns01-client")
-		client, err := m.getDNS01Client(&user, m.settings)
+		client, err := m.getDNS01Client(&route.User, m.settings)
 		if err != nil {
 			lsession.Error("get-dns01-client", err)
 			return false, err
@@ -470,12 +464,11 @@ func (m *RouteManager) Update(
 		}
 	}
 
-	// Save the database.
-	lsession.Info("db-save-route")
-	result := m.db.Save(route)
-	if result.Error != nil {
-		lsession.Error("db-save-route", err)
-		return false, result.Error
+	//save route object into the database
+	lsession.Info("save-route")
+	if err = m.routeStoreIface.Save(route); err != nil {
+		lsession.Error("save-route", err)
+		return false, err
 	}
 
 	performedAsynchronously := route.State == Provisioning
@@ -510,10 +503,10 @@ func (m *RouteManager) Disable(r *Route) error {
 		return err
 	}
 
-	lsession.Info("db-save")
+	lsession.Info("save-route")
 	r.State = Deprovisioning
-	if err := m.db.Save(r).Error; err != nil {
-		lsession.Error("db-save-error", err)
+	if err := m.routeStoreIface.Save(r); err != nil {
+		lsession.Error("save-route", err)
 	}
 
 	return nil
@@ -619,23 +612,11 @@ func (m *RouteManager) Renew(r *Route) error {
 		return err
 	}
 
-	var certRow Certificate
-	lsession.Info("db-find-related-cert")
-	err = m.db.Model(r).Related(&certRow, "Certificate").Error
-	if err != nil {
-		lsession.Error("db-find-related-cert", err)
-		return err
-	}
-
-	lsession.Info("db-load-user")
-	user, err := r.loadUser(m.db)
-	if err != nil {
-		lsession.Error("db-load-user", err)
-		return err
-	}
-
+	// During Renew of the certificate we are using HTTP challange since we already
+	// have control over the path used to prove the validity and 'ownership'  of the
+	// domain (e.g. on behalf of the tenant)
 	lsession.Info("get-http01-client")
-	client, err := m.getHTTP01Client(&user, m.settings)
+	client, err := m.getHTTP01Client(&r.User, m.settings)
 	if err != nil {
 		lsession.Error("get-http01-client", err)
 		return err
@@ -662,17 +643,18 @@ func (m *RouteManager) Renew(r *Route) error {
 		return err
 	}
 
-	certRow.Domain = certResource.Domain
-	certRow.CertURL = certResource.CertURL
-	certRow.Certificate = certResource.Certificate
-	certRow.Expires = expires
-	lsession.Info("db-save-cert", lager.Data{
-		"domain":   certResource.Domain,
-		"cert-url": certResource.CertURL,
-		"expires":  expires,
+	r.Certificate.Domain = certResource.Domain
+	r.Certificate.CertURL = certResource.CertURL
+	r.Certificate.Certificate = certResource.Certificate
+	r.Certificate.Expires = expires
+
+	lsession.Info("save-route-cert", lager.Data{
+		"domain":   r.Certificate.Domain,
+		"cert-url": r.Certificate.CertURL,
+		"expires":  r.Certificate.Expires,
 	})
-	if err := m.db.Save(&certRow).Error; err != nil {
-		lsession.Error("db-save-cert", err)
+	if err := m.routeStoreIface.Save(r); err != nil {
+		lsession.Error("save-route-cert", err)
 		return err
 	}
 
@@ -736,17 +718,14 @@ func (m *RouteManager) RenewAll() {
 
 	routes := []Route{}
 
-	lsession.Info("Looking for routes that are expiring soon")
+	lsession.Info("Find routes that are expiring soon")
 
-	m.db.Having(
-		"max(expires) < now() + interval '30 days'",
-	).Group(
-		"routes.id",
-	).Where(
-		"state = ?", string(Provisioned),
-	).Joins(
-		"join certificates on routes.id = certificates.route_id",
-	).Find(&routes)
+	routes, err := m.routeStoreIface.FindWithExpiringCerts()
+
+	if err != nil {
+		lsession.Error("find-certs-expiring-soon-error", err)
+		return
+	}
 
 	lsession.Info("routes-needing-renewal", lager.Data{
 		"num-routes": len(routes),
@@ -772,16 +751,21 @@ func (m *RouteManager) RenewAll() {
 func (m *RouteManager) CheckProvisioningInstances() {
 	lsession := m.logger.Session("check-provisioning-instances")
 
-	routes := m.fetchProvisioningRoutes(lsession)
+	lsession.Info("fetch-provisioning-routes")
+	routes, err := m.fetchProvisioningRoutes(lsession)
+
+	if err != nil {
+		lsession.Error("fetch-provisioning-routes-failed", err)
+		return
+	}
 
 	if len(routes) == 0 {
 		return
 	}
 
-	for i, route := range routes {
-		r := routes[i]
+	for _, route := range routes {
 		lsession.Info("check", lager.Data{"instance_id": route.InstanceId})
-		err := m.Poll(&r)
+		err := m.Poll(&route)
 		if err != nil {
 			lsession.Info("check-failed", lager.Data{"instance_id": route.InstanceId})
 
@@ -790,9 +774,9 @@ func (m *RouteManager) CheckProvisioningInstances() {
 
 				route.State = Conflict
 				lsession.Info("set-state", lager.Data{"instance_id": route.InstanceId, "state": route.State})
-				err = m.db.Save(route).Error
+				err = m.routeStoreIface.Save(&route)
 				if err != nil {
-					lsession.Error("db-save-failed", err)
+					lsession.Error("route-save-failed", err)
 					continue
 				}
 
@@ -816,9 +800,9 @@ func (m *RouteManager) CheckProvisioningInstances() {
 
 				lsession.Info("set-state", lager.Data{"instance_id": route.InstanceId, "state": route.State})
 				route.State = Failed
-				err = m.db.Save(route).Error
+				err = m.routeStoreIface.Save(&route)
 				if err != nil {
-					lsession.Error("db-save-failed", err)
+					lsession.Error("route-save-failed", err)
 					continue
 				}
 			}
@@ -826,14 +810,15 @@ func (m *RouteManager) CheckProvisioningInstances() {
 	}
 }
 
-func (m *RouteManager) fetchProvisioningRoutes(lsession lager.Logger) []Route {
+func (m *RouteManager) fetchProvisioningRoutes(lsession lager.Logger) ([]Route, error) {
 	routes := []Route{}
 	lsession.Info("find-provisioning-instances")
-	m.db.Where(
-		"state = ?", string(Provisioning),
-	).Group(
-		"routes.id",
-	).Find(&routes)
+
+	routes, err := m.routeStoreIface.FindAllMatching(Route{State: Provisioning})
+	if err != nil {
+		lsession.Error("find-provisioning-instances", err)
+		return []Route{}, err
+	}
 
 	affectedDomains := []string{}
 	for _, route := range routes {
@@ -841,7 +826,7 @@ func (m *RouteManager) fetchProvisioningRoutes(lsession lager.Logger) []Route {
 	}
 	lsession.Info("found-instances", lager.Data{"domains": affectedDomains})
 
-	return routes
+	return routes, nil
 }
 
 func (m *RouteManager) getDNS01Client(
@@ -893,12 +878,13 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 		return nil
 	}
 
-	lsession.Info("load-user")
-	user, err := r.loadUser(m.db)
-	if err != nil {
-		lsession.Error("load-user", err)
-		return err
-	}
+	// lsession.Info("load-user")
+	// user, err := r.loadUser(m.db)
+	// if err != nil {
+	// 	lsession.Error("load-user", err)
+	// 	return err
+	// }
+	user := r.User
 
 	desiredDomains := r.GetDomains()
 	lsession.Info("get-currently-deployed-domains")
@@ -931,7 +917,8 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 
 	// Ensure the challenges from LetsEncrypt are persisted in the database
 	lsession.Info("db-save-route-challenge")
-	err = m.db.Save(r).Error
+	err = m.routeStoreIface.Save(r) //WIP
+	// err = m.db.Save(r).Error
 	if err != nil {
 		lsession.Error("db-save-route-challenge-err", err)
 	}
@@ -978,18 +965,18 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 		Expires:     expires,
 	}
 
-	lsession.Info("db-create-cert")
-	if err := m.db.Create(&certRow).Error; err != nil {
-		lsession.Error("db-create-cert", err)
-		return err
-	}
+	// lsession.Info("db-create-cert")
+	// if err := m.db.Create(&certRow).Error; err != nil {
+	// 	lsession.Error("db-create-cert", err)
+	// 	return err
+	// }
 
 	lsession.Info("set-provisioned")
 	r.State = Provisioned
 	r.Certificate = certRow
-	lsession.Info("db-save-cert")
-	if err := m.db.Save(r).Error; err != nil {
-		lsession.Error("db-save-cert", err)
+	lsession.Info("save-route-provisioned")
+	if err := m.routeStoreIface.Save(r); err != nil {
+		lsession.Error("save-route-provisioned", err)
 		return err
 	}
 
@@ -1009,9 +996,9 @@ func (m *RouteManager) updateDeprovisioning(r *Route) error {
 
 	if deleted {
 		r.State = Deprovisioned
-		lsession.Info("db-save-deprovisioned")
-		if err := m.db.Save(r).Error; err != nil {
-			lsession.Error("db-save-deprovisioned", err)
+		lsession.Info("save-route-deprovisioned")
+		if err := m.routeStoreIface.Save(r); err != nil {
+			lsession.Error("save-route-deprovisioned", err)
 		}
 	}
 
@@ -1167,12 +1154,17 @@ func (m *RouteManager) GetDNSInstructions(route *Route) ([]string, error) {
 		"domains":     route.GetDomains(),
 	})
 
-	lsession.Info("load-user")
-	user, err := route.loadUser(m.db)
-	if err != nil {
-		lsession.Error("load-user-err", err)
-		return instructions, err
-	}
+	// lsession.Info("load-user")
+	// user, err := route.loadUser(m.db)
+	// if err != nil {
+	// 	lsession.Error("load-user-err", err)
+	// 	return instructions, err
+	// }
+	// Maxim - WIP - the user data should be already in the Route obj
+	// since we are hydrating all the data from all related tables into the route object
+
+	// Maxim - WIP - instead of using additional variable 'user', we could just use route.User (line 1196)
+	//user := route.User
 
 	lsession.Info("json-unmarshal-challenge")
 	if err := json.Unmarshal(route.ChallengeJSON, &challenges); err != nil {
@@ -1192,7 +1184,7 @@ func (m *RouteManager) GetDNSInstructions(route *Route) ([]string, error) {
 				)
 				keyAuth, err := acme.GetKeyAuthorization(
 					challenge.Token,
-					user.GetPrivateKey(),
+					route.User.GetPrivateKey(),
 				)
 				if err != nil {
 					lsession.Error("get-key-authorization-err", err)

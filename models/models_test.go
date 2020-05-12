@@ -5,14 +5,12 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"database/sql"
 	"encoding/pem"
 	"errors"
 	"time"
 
 	"code.cloudfoundry.org/lager"
 	"github.com/18F/cf-cdn-service-broker/lego/acme"
-	"github.com/jinzhu/gorm"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/request"
@@ -25,7 +23,6 @@ import (
 	"github.com/18F/cf-cdn-service-broker/models/mocks"
 	"github.com/18F/cf-cdn-service-broker/utils"
 
-	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/mock"
 
 	. "github.com/onsi/ginkgo"
@@ -79,24 +76,6 @@ VZZ3cRRY1RvyqlEyjRqlO9pJSp7RQYB4dwNg/MpXArE=
 )
 
 var _ = Describe("Models", func() {
-	var gormDB *gorm.DB
-	var mockDB sqlmock.Sqlmock
-	var mockDBDB *sql.DB
-
-	BeforeEach(func() {
-		var err error
-
-		mockDBDB, mockDB, err = sqlmock.NewWithDSN("sqlmock_db_0")
-		Expect(err).NotTo(HaveOccurred(), "Could not sqlmock")
-
-		gormDB, err = gorm.Open("sqlmock", "sqlmock_db_0")
-		Expect(err).NotTo(HaveOccurred(), "Could not open sqlmock")
-	})
-
-	AfterEach(func() {
-		gormDB.Close()
-		mockDBDB.Close()
-	})
 
 	It("should delete orphaned certs", func() {
 		logger := lager.NewLogger("cdn-cron-test")
@@ -199,8 +178,8 @@ var _ = Describe("Models", func() {
 			mui,
 			&utils.Distribution{settings, fakecf},
 			settings,
-			&gorm.DB{},
 			acmeProviderMock,
+			&mocks.FakeRouteStore{},
 		)
 
 		//run the test
@@ -271,8 +250,8 @@ var _ = Describe("Models", func() {
 			mui,
 			&utils.Distribution{settings, fakecf},
 			settings,
-			&gorm.DB{},
 			acmeProviderMock,
+			&mocks.FakeRouteStore{},
 		)
 
 		//run the test
@@ -344,8 +323,8 @@ var _ = Describe("Models", func() {
 			mui,
 			&utils.Distribution{settings, fakecf},
 			settings,
-			&gorm.DB{},
 			acmeProviderMock,
+			&mocks.FakeRouteStore{},
 		)
 
 		//run the test
@@ -411,8 +390,8 @@ var _ = Describe("Models", func() {
 			mui,
 			&utils.Distribution{settings, fakecf},
 			settings,
-			&gorm.DB{},
 			acmeProviderMock,
+			&mocks.FakeRouteStore{},
 		)
 
 		//run the test
@@ -464,23 +443,16 @@ var _ = Describe("Models", func() {
 
 			acmeProviderMock := StubAcmeClientProvider()
 
-			mockDB.ExpectExec(
-				`INSERT INTO "user_data"`,
-			).WillReturnResult(sqlmock.NewResult(1, 1))
-			mockDB.ExpectExec(
-				`UPDATE "user_data"`,
-			).WillReturnResult(sqlmock.NewResult(1, 1))
-			mockDB.ExpectExec(
-				`INSERT INTO "routes"`,
-			).WillReturnResult(sqlmock.NewResult(1, 1))
+			routeStoreIfaceMock := mocks.FakeRouteStore{}
+			routeStoreIfaceMock.CreateReturns(nil)
 
 			manager := models.NewManager(
 				logger,
 				mui,
 				&utils.Distribution{settings, fakecf},
 				settings,
-				gormDB,
 				acmeProviderMock,
+				&routeStoreIfaceMock,
 			)
 
 			_, err := manager.Create(
@@ -570,13 +542,15 @@ var _ = Describe("Models", func() {
 			acmeProviderMock.GetHTTP01ClientReturns(&mocks.FakeAcmeClient{}, nil)
 			acmeProviderMock.GetDNS01ClientReturns(fakeDNS01Client, nil)
 
+			routeStoreIface := mocks.FakeRouteStore{}
+
 			manager := models.NewManager(
 				logger,
 				mui,
 				&utils.Distribution{settings, fakecf},
 				settings,
-				gormDB,
 				&acmeProviderMock,
+				&routeStoreIface,
 			)
 
 			route := &models.Route{
@@ -598,29 +572,9 @@ var _ = Describe("Models", func() {
 				},
 			)
 
-			mockDB.ExpectQuery(
-				`SELECT \* FROM "user_data"`,
-			).WillReturnRows(
-				sqlmock.NewRows(
-					[]string{
-						"id", "created_at", "updated_at", "deleted_at",
-						"email", "key", "reg",
-					},
-				).AddRow(
-					1, time.Now(), time.Now(), nil,
-					"the-mocky-cloud-paas-team@digital.cabinet-office.gov.uk",
-					string(pemdata),
-					`{
-						"Email": "the-mocky-cloud-paas-team@digital.cabinet-office.gov.uk",
-						"Registration": null
-					}`,
-				),
-			)
+			route.UserData.Key = pemdata
 
-			mockDB.ExpectExec(`INSERT INTO "routes"`).WillReturnResult(sqlmock.NewResult(1, 1))
-			mockDB.ExpectExec(`INSERT INTO "certificates"`).WillReturnResult(sqlmock.NewResult(1, 1))
-			mockDB.ExpectExec(`UPDATE "routes"`).WillReturnResult(sqlmock.NewResult(1, 1))
-			mockDB.ExpectExec(`UPDATE "certificates"`).WillReturnResult(sqlmock.NewResult(1, 1))
+			routeStoreIface.SaveReturns(nil)
 
 			err = manager.Poll(route)
 			Expect(err).NotTo(HaveOccurred())
@@ -709,8 +663,8 @@ var _ = Describe("Models", func() {
 				mui,
 				&utils.Distribution{settings, fakecf},
 				settings,
-				gormDB,
 				StubAcmeClientProvider(),
+				&mocks.FakeRouteStore{},
 			)
 
 			route = &models.Route{
@@ -762,12 +716,9 @@ var _ = Describe("Models", func() {
 		var (
 			cloudfrontDistID = "cloudfoundry-instance-id"
 			domain           = "foo.paas.gov.uk"
-			origin           = "foo.cloudapps.digital"
 			defaultTTL       = int64(0)
 			forwardedHeaders = utils.Headers{"X-Forwarded-Five": true}
 			forwardCookies   = false
-
-			pemdata []byte
 
 			fakecf   *cloudfront.CloudFront
 			fakeiam  *iam.IAM
@@ -776,15 +727,6 @@ var _ = Describe("Models", func() {
 		)
 
 		BeforeEach(func() {
-			rsaTestKey, err := rsa.GenerateKey(rand.Reader, 2048)
-			Expect(err).NotTo(HaveOccurred(), "Generating test key")
-			pemdata = pem.EncodeToMemory(
-				&pem.Block{
-					Type:  "RSA PRIVATE KEY",
-					Bytes: x509.MarshalPKCS1PrivateKey(rsaTestKey),
-				},
-			)
-
 			settings, _ = config.NewSettings()
 			awsSession := session.New(nil)
 
@@ -843,7 +785,7 @@ var _ = Describe("Models", func() {
 			mui.Service = fakeiam
 		})
 
-		It("should not perform any ACME challenges when domains are updated", func() {
+		It("should not perform any ACME challenges when domains are not updated", func() {
 			logger := lager.NewLogger("no-challenge-test-only")
 			logger.RegisterSink(lager.NewWriterSink(GinkgoWriter, lager.ERROR))
 
@@ -859,72 +801,50 @@ var _ = Describe("Models", func() {
 
 			acmeProviderMock := StubAcmeClientProvider()
 
+			fakeRoute := models.Route{
+				InstanceId:     "route-one",
+				State:          "provisioned",
+				ChallengeJSON:  []byte(`{}`),
+				DomainExternal: domain,
+				DomainInternal: "foo.london.cloudapps.digital",
+				DistId:         "cloudfront-dist-one",
+				Origin:         "foo.london.cloudapps.digital",
+				Path:           "",
+				InsecureOrigin: false,
+				UserDataID:     1,
+				DefaultTTL:     0,
+				Certificate:    models.Certificate{Domain: "foo.bar", CertURL: "this is a cert url"},
+			}
+
+			fakeUserData := models.UserData{
+				Email: "foo@bar.org",
+				Reg: []byte(`
+					{
+						"Email": "the-mocky-cloud-paas-team@digital.cabinet-office.gov.uk",
+						"Registration": null
+					}
+				`),
+				Key: generateKey(),
+			}
+
+			fakeRoute.UserData = fakeUserData
+
+			fakeRouteStoreIface := mocks.FakeRouteStore{}
+
+			fakeRouteStoreIface.SaveReturns(nil)
+			fakeRouteStoreIface.FindOneMatchingReturns(fakeRoute, nil)
+
+			// we are simulating that someone is updating the distribution, but does
+			// not want to change the currently configured domain
 			manager := models.NewManager(
 				logger,
 				mui,
 				&utils.Distribution{settings, fakecf},
 				settings,
-				gormDB,
 				acmeProviderMock,
+				&fakeRouteStoreIface,
 			)
 
-			routeID := 101
-			certificateID := 202
-			userDataID := 303
-
-			mockDB.ExpectQuery(
-				`SELECT \* FROM "routes"`,
-			).WillReturnRows(
-				sqlmock.NewRows(
-					[]string{
-						"created_at", "updated_at", "deleted_at",
-						"id", "challenge_json",
-						"domain_external", "domain_internal",
-						"dist_id", "origin", "path", "default_ttl",
-						"insecure_origin", "certificate_id", "user_data_id",
-						"state",
-					},
-				).AddRow(
-					time.Now(), time.Now(), nil,
-					routeID, "[]",
-					domain, "foo.cloudfront.net",
-					cloudfrontDistID, origin, "",
-					defaultTTL, false, certificateID,
-					userDataID, "Provisioned",
-				),
-			)
-
-			mockDB.ExpectExec(
-				`UPDATE "routes"`,
-			).WithArgs(
-				sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-				"provisioned", // Expect new state to be Provisioned
-				sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-				sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-				sqlmock.AnyArg(), sqlmock.AnyArg(),
-			).WillReturnResult(sqlmock.NewResult(1, 1))
-
-			mockDB.ExpectQuery(
-				`SELECT \* FROM "user_data"`,
-			).WillReturnRows(
-				sqlmock.NewRows(
-					[]string{
-						"id", "created_at", "updated_at", "deleted_at",
-						"email", "key", "reg",
-					},
-				).AddRow(
-					1, time.Now(), time.Now(), nil,
-					"the-mocky-cloud-paas-team@digital.cabinet-office.gov.uk",
-					string(pemdata),
-					`{
-						"Email": "the-mocky-cloud-paas-team@digital.cabinet-office.gov.uk",
-						"Registration": null
-					}`,
-				),
-			)
-
-			// we are simulating that someone is updating the distribution, but does
-			// not want to change the currently configured domain
 			brokerAPICallDomainArgument := ""
 
 			performedAsynchronously, err := manager.Update(
@@ -959,72 +879,50 @@ var _ = Describe("Models", func() {
 			acmeProviderMock.GetHTTP01ClientReturns(&mocks.FakeAcmeClient{}, nil)
 			acmeProviderMock.GetDNS01ClientReturns(fakeDNS01Client, nil)
 
+			fakeRoute := models.Route{
+				InstanceId:     "route-one",
+				State:          "provisioned",
+				ChallengeJSON:  []byte(`{}`),
+				DomainExternal: domain,
+				DomainInternal: "foo.london.cloudapps.digital",
+				DistId:         "cloudfront-dist-one",
+				Origin:         "foo.london.cloudapps.digital",
+				Path:           "",
+				InsecureOrigin: false,
+				UserDataID:     1,
+				DefaultTTL:     0,
+				Certificate:    models.Certificate{Domain: "foo.bar", CertURL: "this is a cert url"},
+			}
+
+			fakeUserData := models.UserData{
+				Email: "foo@bar.org",
+				Reg: []byte(`
+					{
+						"Email": "the-mocky-cloud-paas-team@digital.cabinet-office.gov.uk",
+						"Registration": null
+					}
+				`),
+				Key: generateKey(),
+			}
+
+			fakeRoute.UserData = fakeUserData
+
+			fakeRouteStoreIface := mocks.FakeRouteStore{}
+
+			fakeRouteStoreIface.SaveReturns(nil)
+			fakeRouteStoreIface.FindOneMatchingReturns(fakeRoute, nil)
+
+			// we are simulating that someone is updating the distribution, and DOES
+			// want to change the currently configured domain
 			manager := models.NewManager(
 				logger,
 				mui,
 				&utils.Distribution{settings, fakecf},
 				settings,
-				gormDB,
 				&acmeProviderMock,
+				&fakeRouteStoreIface,
 			)
 
-			routeID := 101
-			certificateID := 202
-			userDataID := 303
-
-			mockDB.ExpectQuery(
-				`SELECT \* FROM "routes"`,
-			).WillReturnRows(
-				sqlmock.NewRows(
-					[]string{
-						"created_at", "updated_at", "deleted_at",
-						"id", "challenge_json",
-						"domain_external", "domain_internal",
-						"dist_id", "origin", "path",
-						"default_ttl", "insecure_origin", "certificate_id",
-						"user_data_id", "state",
-					},
-				).AddRow(
-					time.Now(), time.Now(), nil,
-					routeID, "[]",
-					domain, "foo.cloudfront.net",
-					cloudfrontDistID, origin, "",
-					defaultTTL, false, certificateID,
-					userDataID, "Provisioned",
-				),
-			)
-
-			mockDB.ExpectQuery(
-				`SELECT \* FROM "user_data"`,
-			).WillReturnRows(
-				sqlmock.NewRows(
-					[]string{
-						"id", "created_at", "updated_at", "deleted_at",
-						"email", "key", "reg",
-					},
-				).AddRow(
-					1, time.Now(), time.Now(), nil,
-					"the-mocky-cloud-paas-team@digital.cabinet-office.gov.uk",
-					string(pemdata),
-					`{
-						"Email": "the-mocky-cloud-paas-team@digital.cabinet-office.gov.uk",
-						"Registration": null
-					}`,
-				),
-			)
-
-			mockDB.ExpectExec(
-				`UPDATE "routes"`,
-			).WithArgs(
-				sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-				"provisioning", // Expect new state to be Provisioning
-				sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-				sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-				sqlmock.AnyArg(), sqlmock.AnyArg(),
-			).WillReturnResult(sqlmock.NewResult(1, 1))
-
-			// we are simulating that someone is updating the distribution, and DOES
-			// want to change the currently configured domain
 			brokerAPICallDomainArgument := "foo.paas.gov.uk,bar.paas.gov.uk"
 
 			performedAsynchronously, err := manager.Update(
