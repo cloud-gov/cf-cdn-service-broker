@@ -194,16 +194,6 @@ func (r *Route) GetDomains() []string {
 	return strings.Split(r.DomainExternal, ",")
 }
 
-func (r *Route) loadUser(db *gorm.DB) (utils.User, error) {
-	var userData UserData
-	if err := db.Model(r).Related(&userData).Error; err != nil {
-		helperLogger.Session("route-load-user").Error("load-user-data", err)
-		return utils.User{}, err
-	}
-
-	return LoadUser(userData)
-}
-
 func (r *Route) IsCreationExpired() bool {
 	return r.CreatedAt.Before(time.Now().Add(-24 * time.Hour))
 }
