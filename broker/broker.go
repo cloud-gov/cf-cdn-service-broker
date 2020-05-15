@@ -272,7 +272,7 @@ func (b *CdnServiceBroker) LastOperation(
 		fallthrough
 	default:
 		description := "Service instance stuck in unmanagable state."
-		if route.IsCreationExpired() {
+		if route.IsProvisioningExpired() {
 			description = fmt.Sprintf("Couldn't verify in 24h time slot. %s", description)
 		}
 		lsession.Info("unmanagable-state", lager.Data{

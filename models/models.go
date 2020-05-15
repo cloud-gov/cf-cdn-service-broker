@@ -194,8 +194,9 @@ func (r *Route) GetDomains() []string {
 	return strings.Split(r.DomainExternal, ",")
 }
 
-func (r *Route) IsCreationExpired() bool {
-	return r.CreatedAt.Before(time.Now().Add(-24 * time.Hour))
+func (r *Route) IsProvisioningExpired() bool {
+	return r.State == Provisioning &&
+		r.UpdatedAt.Before(time.Now().Add(-24 * time.Hour))
 }
 
 type Certificate struct {
@@ -768,7 +769,7 @@ func (m *RouteManager) CheckRoutesToUpdate() {
 			}
 		}
 
-		if route.IsCreationExpired() {
+		if route.IsProvisioningExpired() {
 			lsession.Info("expiring-unprovisioned-instance", lager.Data{
 				"domain":    route.DomainExternal,
 				"state":     route.State,
