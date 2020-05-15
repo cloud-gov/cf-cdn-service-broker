@@ -940,4 +940,42 @@ var _ = Describe("Models", func() {
 		})
 	})
 
+	Context("CheckRoutesToUpdate", func(){
+		It("finds routes in both `Provisioning` and `Deprovisioning` states", func(){
+			routeStoreFake := mocks.FakeRouteStore{}
+
+			routeStoreFake.FindAllMatchingReturns([]models.Route{}, nil)
+
+			settings, _ := config.NewSettings()
+			manager := models.NewManager(
+				lager.NewLogger("check-routes-to-update"),
+				new(MockUtilsIam),
+				&utils.Distribution{},
+				settings,
+				StubAcmeClientProvider(),
+				&routeStoreFake,
+			)
+
+			manager.CheckRoutesToUpdate()
+
+			Expect(routeStoreFake.FindAllMatchingCallCount()).To(Equal(2))
+
+			fetchedProvisioning := false
+			fetchedDeprovisioning := false
+
+			firstCallExample := routeStoreFake.FindAllMatchingArgsForCall(0)
+			secondCallExample := routeStoreFake.FindAllMatchingArgsForCall(1)
+
+			if firstCallExample.State == models.Provisioning || secondCallExample.State == models.Provisioning {
+				fetchedProvisioning = true
+			}
+
+			if firstCallExample.State == models.Deprovisioning || secondCallExample.State == models.Deprovisioning {
+				fetchedDeprovisioning = true
+			}
+
+			Expect(fetchedProvisioning).To(BeTrue())
+			Expect(fetchedDeprovisioning).To(BeTrue())
+		})
+	})
 })

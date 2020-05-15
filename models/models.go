@@ -733,14 +733,14 @@ func (m *RouteManager) RenewAll() {
 	lsession.Info("finished")
 }
 
-func (m *RouteManager) CheckProvisioningInstances() {
-	lsession := m.logger.Session("check-provisioning-instances")
+func (m *RouteManager) CheckRoutesToUpdate() {
+	lsession := m.logger.Session("check-routes-to-update")
 
-	lsession.Info("fetch-provisioning-routes")
-	routes, err := m.fetchProvisioningRoutes(lsession)
+	lsession.Info("fetch-routes-to-update")
+	routes, err := m.fetchRoutesToUpdate(lsession)
 
 	if err != nil {
-		lsession.Error("fetch-provisioning-routes-failed", err)
+		lsession.Error("fetch-routes-to-update", err)
 		return
 	}
 
@@ -795,15 +795,28 @@ func (m *RouteManager) CheckProvisioningInstances() {
 	}
 }
 
-func (m *RouteManager) fetchProvisioningRoutes(lsession lager.Logger) ([]Route, error) {
-	routes := []Route{}
-	lsession.Info("find-provisioning-instances")
+func (m *RouteManager) fetchRoutesToUpdate(lsession lager.Logger) ([]Route, error) {
+	provisioning := []Route{}
 
-	routes, err := m.routeStoreIface.FindAllMatching(Route{State: Provisioning})
+	lsession.Info("find-provisioning-instances")
+	provisioning, err := m.routeStoreIface.FindAllMatching(Route{State: Provisioning})
 	if err != nil {
 		lsession.Error("find-provisioning-instances", err)
 		return []Route{}, err
 	}
+
+	deprovisioning := []Route{}
+
+	lsession.Info("find-deprovisioning-instances")
+	deprovisioning, err = m.routeStoreIface.FindAllMatching(Route{State: Deprovisioning})
+	if err != nil {
+		lsession.Error("find-deprovisioning-instances", err)
+		return []Route{}, err
+	}
+
+	routes := []Route{}
+	routes = append(routes, provisioning...)
+	routes = append(routes, deprovisioning...)
 
 	affectedDomains := []string{}
 	for _, route := range routes {

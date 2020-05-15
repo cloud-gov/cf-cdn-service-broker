@@ -59,8 +59,8 @@ func main() {
 	})
 
 	c.AddFunc("@every 2m", func() {
-		logger.Info("run-provisioning-instance-checks")
-		manager.CheckProvisioningInstances()
+		logger.Info("run-updating-routes-check")
+		manager.CheckRoutesToUpdate()
 	})
 
 	logger.Info("Starting cron")
