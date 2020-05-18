@@ -37,11 +37,11 @@ type State string
 
 const (
 	Provisioning   State = "provisioning"
-	Provisioned          = "provisioned"
-	Deprovisioning       = "deprovisioning"
-	Deprovisioned        = "deprovisioned"
-	Conflict             = "conflict"
-	Failed               = "failed"
+	Provisioned    State = "provisioned"
+	Deprovisioning State = "deprovisioning"
+	Deprovisioned  State = "deprovisioned"
+	Conflict       State = "conflict"
+	Failed         State = "failed"
 )
 
 var (
@@ -174,20 +174,57 @@ func savePrivateKey(key crypto.PrivateKey) ([]byte, error) {
 
 type Route struct {
 	gorm.Model
-	InstanceId     string `gorm:"not null;unique_index"`
-	State          State  `gorm:"not null;index"`
-	ChallengeJSON  []byte
-	DomainExternal string
-	DomainInternal string
-	DistId         string
-	Origin         string
-	Path           string // Always empty, should not remove because it is in DB
-	InsecureOrigin bool   // Always false, should not remove because it is in DB
-	Certificate    Certificate
-	UserData       UserData
-	UserDataID     int
-	User           utils.User `gorm:"-"`
-	DefaultTTL     int64      `gorm:"default:86400"`
+	InstanceId        string `gorm:"not null;unique_index"`
+	State             State  `gorm:"not null;index"`
+	ChallengeJSON     []byte
+	DomainExternal    string
+	DomainInternal    string
+	DistId            string
+	Origin            string
+	Path              string // Always empty, should not remove because it is in DB
+	InsecureOrigin    bool   // Always false, should not remove because it is in DB
+	Certificate       Certificate
+	UserData          UserData
+	UserDataID        int
+	User              utils.User `gorm:"-"`
+	DefaultTTL        int64      `gorm:"default:86400"`
+	ProvisioningSince *time.Time //using the same field to measure a time for Provisioning or Deprovisioning
+}
+
+// BeforeCreate hook will change the value of Provisioning_since field to time.Now()
+// if creating a route in 'Provisioning' state
+// if the state is 'Provisioned' then the value should be 'nil'
+func (r *Route) BeforeCreate(tx *gorm.DB) error {
+
+	if r.State == Provisioning {
+		t := time.Now()
+		r.ProvisioningSince = &t
+	}
+	return nil
+}
+
+func (r *Route) BeforeUpdate(tx *gorm.DB) error {
+	var originalStates []State
+	err := tx.Find(&Route{InstanceId: r.InstanceId}).Pluck("state", &originalStates).Error
+
+	if err != nil {
+		return err
+	}
+
+	originalState := originalStates[0]
+
+	if isActivelyChanging(originalState) && !isActivelyChanging(r.State) {
+		r.ProvisioningSince = nil
+	} else if !isActivelyChanging(originalState) && isActivelyChanging(r.State) {
+		t := time.Now()
+		r.ProvisioningSince = &t
+	}
+
+	return nil
+}
+
+func isActivelyChanging(st State) bool {
+	return st == Provisioning || st == Deprovisioning
 }
 
 func (r *Route) GetDomains() []string {
@@ -195,8 +232,13 @@ func (r *Route) GetDomains() []string {
 }
 
 func (r *Route) IsProvisioningExpired() bool {
-	return r.State == Provisioning &&
-		r.UpdatedAt.Before(time.Now().Add(-24 * time.Hour))
+	var provisioningSince *time.Time
+
+	if r.ProvisioningSince != nil {
+		provisioningSince = r.ProvisioningSince
+	}
+	return r.State == Provisioning && provisioningSince != nil &&
+		(*provisioningSince).Before(time.Now().Add(-24*time.Hour))
 }
 
 type Certificate struct {
@@ -771,17 +813,19 @@ func (m *RouteManager) CheckRoutesToUpdate() {
 
 		if route.IsProvisioningExpired() {
 			lsession.Info("expiring-unprovisioned-instance", lager.Data{
-				"domain":    route.DomainExternal,
-				"state":     route.State,
-				"createdAt": route.CreatedAt,
+				"domain":            route.DomainExternal,
+				"state":             route.State,
+				"createdAt":         route.CreatedAt,
+				"provisioningSince": route.ProvisioningSince,
 			})
 
 			err = m.Disable(&route)
 			if err != nil {
 				lsession.Error("unable-to-expire-unprovisioned-instance", err, lager.Data{
-					"domain":    route.DomainExternal,
-					"state":     route.State,
-					"createdAt": route.CreatedAt,
+					"domain":            route.DomainExternal,
+					"state":             route.State,
+					"createdAt":         route.CreatedAt,
+					"provisioningSince": route.ProvisioningSince,
 				})
 
 				lsession.Info("set-state", lager.Data{"instance_id": route.InstanceId, "state": route.State})

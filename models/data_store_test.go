@@ -599,6 +599,65 @@ var _ = Describe("DataStore", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(newRoute.User.Email).To(Equal("the-mocky-cloud-paas-team@digital.cabinet-office.gov.uk"))
 			})
+
+			It("leaves the 'provisioning_since' value 'nil' if creating in 'Provisioned' state", func() {
+				newRoute := models.Route{
+					InstanceId: "new-route",
+					State:      models.Provisioned,
+					UserData: models.UserData{
+						Email: "foo@bar.org",
+						Reg: []byte(`
+							{
+								"Email": "the-mocky-cloud-paas-team@digital.cabinet-office.gov.uk",
+								"Registration": null
+							}
+						`),
+						Key: generateKey(),
+					},
+				}
+
+				Expect(newRoute.ProvisioningSince).To(BeNil())
+
+				routeStore := models.RouteStore{
+					Database: &transaction,
+				}
+
+				err := routeStore.Create(&newRoute)
+
+				Expect(err).ToNot(HaveOccurred())
+				Expect(newRoute.ProvisioningSince).To(BeNil())
+
+			})
+
+			It("Sets the 'provisioning_since' value to 'now()' if creating in 'Provisioning' state", func() {
+				newRoute := models.Route{
+					InstanceId: "new-route",
+					State:      models.Provisioning,
+					UserData: models.UserData{
+						Email: "foo@bar.org",
+						Reg: []byte(`
+							{
+								"Email": "the-mocky-cloud-paas-team@digital.cabinet-office.gov.uk",
+								"Registration": null
+							}
+						`),
+						Key: generateKey(),
+					},
+				}
+
+				Expect(newRoute.ProvisioningSince).To(BeNil())
+
+				routeStore := models.RouteStore{
+					Database: &transaction,
+				}
+
+				err := routeStore.Create(&newRoute)
+
+				Expect(err).ToNot(HaveOccurred())
+				Expect(newRoute.ProvisioningSince).NotTo(BeNil())
+				Expect(*newRoute.ProvisioningSince).Should(BeTemporally("~", time.Now(), time.Second*2))
+			})
+
 		})
 
 		//'Save' is like an 'Update' for a database.
@@ -606,7 +665,7 @@ var _ = Describe("DataStore", func() {
 			It("updates an existing record", func() {
 				route := models.Route{
 					InstanceId: "route-one",
-					State:      "provisioning",
+					State:      models.Provisioning,
 				}
 
 				err := transaction.Create(&route).Error
@@ -625,7 +684,7 @@ var _ = Describe("DataStore", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				Expect(fetchedRoute.InstanceId).To(Equal("route-one"))
-				Expect(string(fetchedRoute.State)).To(Equal("provisioned"))
+				Expect(fetchedRoute.State).To(Equal(models.Provisioned))
 			})
 
 			It("updates user data", func() {
@@ -636,7 +695,7 @@ var _ = Describe("DataStore", func() {
 				}
 				route := models.Route{
 					InstanceId: "route-one",
-					State:      "provisioning",
+					State:      models.Provisioning,
 					UserData:   userData,
 				}
 
@@ -698,6 +757,61 @@ var _ = Describe("DataStore", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				Expect(fetchedCertDetails.CertURL).To(Equal("new.cert.url"))
+			})
+
+			It("Sets the 'provisioning_since' value to 'now()' if updating Route into 'Provisioning' state", func() {
+				route := models.Route{
+					InstanceId: "route-one",
+					State:      models.Provisioned,
+				}
+
+				err := transaction.Create(&route).Error
+				Expect(err).ToNot(HaveOccurred())
+
+				routeStore := models.RouteStore{
+					Database: &transaction,
+				}
+
+				route.State = models.Provisioning
+				err = routeStore.Save(&route)
+				Expect(err).ToNot(HaveOccurred())
+
+				var fetchedRoute models.Route
+				err = transaction.First(&fetchedRoute, models.Route{InstanceId: "route-one"}).Error
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(fetchedRoute.InstanceId).To(Equal("route-one"))
+				Expect(fetchedRoute.State).To(Equal(models.Provisioning))
+				Expect(fetchedRoute.ProvisioningSince).NotTo(BeNil())
+				Expect(*fetchedRoute.ProvisioningSince).Should(BeTemporally("~", time.Now(), time.Second*2))
+			})
+
+			It("Sets the 'provisioning_since' value to 'NIL' if updating Route OUT OF 'Provisioning' state", func() {
+				oneHourBefore := time.Now().Add(-1 * time.Hour)
+				route := models.Route{
+					InstanceId:        "route-one",
+					State:             models.Provisioning,
+					ProvisioningSince: &oneHourBefore,
+				}
+
+				err := transaction.Create(&route).Error
+				Expect(err).ToNot(HaveOccurred())
+
+				routeStore := models.RouteStore{
+					Database: &transaction,
+				}
+
+				route.State = models.Provisioned
+				err = routeStore.Save(&route)
+				Expect(err).ToNot(HaveOccurred())
+
+				var fetchedRoute models.Route
+				err = transaction.First(&fetchedRoute, models.Route{InstanceId: "route-one"}).Error
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(fetchedRoute.InstanceId).To(Equal("route-one"))
+				Expect(fetchedRoute.State).To(Equal(models.Provisioned))
+				Expect(fetchedRoute.ProvisioningSince).To(BeNil())
 			})
 		})
 	})
