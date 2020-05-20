@@ -3,8 +3,6 @@ package broker_test
 import (
 	"context"
 	"errors"
-	"fmt"
-	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/suite"
@@ -94,9 +92,7 @@ var _ = Describe("Last operation", func() {
 			DomainExternal: "cdn.cloud.gov",
 			Origin:         "cdn.apps.cloud.gov",
 			ChallengeJSON:  []byte("[]"),
-			Model: gorm.Model{
-				CreatedAt: time.Now().Add(-5 * time.Minute),
-			},
+			Model:          gorm.Model{},
 		}
 		manager.On("Get", "123").Return(route, nil)
 		manager.On("GetDNSInstructions", route).Return([]string{"token"}, nil)
@@ -112,64 +108,6 @@ var _ = Describe("Last operation", func() {
 		Expect(operation.State).To(Equal(brokerapi.InProgress))
 		Expect(operation.Description).To(ContainSubstring(operation.Description))
 		Expect(operation.Description).To(ContainSubstring("Provisioning in progress [cdn.cloud.gov => cdn.apps.cloud.gov]"))
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	It("Should resolve in deprovisioning if takes more than 24h", func() {
-		manager := mocks.RouteManagerIface{}
-		route := &models.Route{
-			State:          models.Provisioning,
-			DomainExternal: "cdn.cloud.gov",
-			Origin:         "cdn.apps.cloud.gov",
-			ChallengeJSON:  []byte("[]"),
-			Model: gorm.Model{
-				CreatedAt: time.Now().Add(-48 * time.Hour),
-			},
-		}
-		manager.On("Get", "123").Return(route, nil)
-		manager.On("GetDNSInstructions", route).Return([]string{"token"}, nil)
-		manager.On("Poll", route).Return(nil)
-		manager.On("Disable", route).Return(nil)
-		b := broker.New(
-			&manager,
-			&s.cfclient,
-			s.settings,
-			s.logger,
-		)
-
-		operation, err := b.LastOperation(s.ctx, "123", brokerapi.PollDetails{OperationData: ""})
-		Expect(operation.State).To(Equal(brokerapi.InProgress))
-		Expect(operation.Description).To(ContainSubstring(operation.Description))
-		Expect(operation.Description).To(ContainSubstring("Couldn't verify in 24h time slot. Expiring instance initialisation."))
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	It("Should fail if takes more than 24h and is unable to Disable the instance", func() {
-		manager := mocks.RouteManagerIface{}
-		route := &models.Route{
-			State:          models.Provisioning,
-			DomainExternal: "cdn.cloud.gov",
-			Origin:         "cdn.apps.cloud.gov",
-			ChallengeJSON:  []byte("[]"),
-			Model: gorm.Model{
-				CreatedAt: time.Now().Add(-48 * time.Hour),
-			},
-		}
-		manager.On("Get", "123").Return(route, nil)
-		manager.On("GetDNSInstructions", route).Return([]string{"token"}, nil)
-		manager.On("Poll", route).Return(nil)
-		manager.On("Disable", route).Return(fmt.Errorf("TEST_SUITE"))
-		b := broker.New(
-			&manager,
-			&s.cfclient,
-			s.settings,
-			s.logger,
-		)
-
-		operation, err := b.LastOperation(s.ctx, "123", brokerapi.PollDetails{OperationData: ""})
-		Expect(operation.State).To(Equal(brokerapi.Failed))
-		Expect(operation.Description).To(ContainSubstring(operation.Description))
-		Expect(operation.Description).To(ContainSubstring("Couldn't verify in 24h time slot. Self-healing has failed. Please contact support."))
 		Expect(err).NotTo(HaveOccurred())
 	})
 

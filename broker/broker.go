@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strings"
-	"time"
 
 	"code.cloudfoundry.org/lager"
 	"github.com/pivotal-cf/brokerapi"
@@ -198,30 +197,6 @@ func (b *CdnServiceBroker) LastOperation(
 
 	switch route.State {
 	case models.Provisioning:
-		if route.CreatedAt.Before(time.Now().Add(-24 * time.Hour)) {
-			err = b.manager.Disable(route)
-			if err != nil {
-				lsession.Error("unable-to-expire-unprovisioned-instance", err, lager.Data{
-					"domain":    route.DomainExternal,
-					"state":     route.State,
-					"createdAt": route.CreatedAt,
-				})
-				return brokerapi.LastOperation{
-					State:       brokerapi.Failed,
-					Description: "Couldn't verify in 24h time slot. Self-healing has failed. Please contact support.",
-				}, nil
-			}
-
-			lsession.Info("expiring-unprovisioned-instance", lager.Data{
-				"domain":    route.DomainExternal,
-				"state":     route.State,
-				"createdAt": route.CreatedAt,
-			})
-			return brokerapi.LastOperation{
-				State:       brokerapi.InProgress,
-				Description: "Couldn't verify in 24h time slot. Expiring instance initialisation.",
-			}, nil
-		}
 		instructions, err := b.manager.GetDNSInstructions(route)
 		if err != nil {
 			lsession.Error("get-dns-instructions-err", err, lager.Data{
@@ -296,9 +271,6 @@ func (b *CdnServiceBroker) LastOperation(
 		}, nil
 	default:
 		description := "Service instance stuck in unmanagable state."
-		if route.CreatedAt.Before(time.Now().Add(-24 * time.Hour)) {
-			description = fmt.Sprintf("Couldn't verify in 24h time slot. %s", description)
-		}
 		lsession.Info("unmanagable-state", lager.Data{
 			"domain":      route.DomainExternal,
 			"state":       route.State,
