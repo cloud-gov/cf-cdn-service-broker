@@ -107,8 +107,7 @@ var _ = Describe("Last operation", func() {
 
 		operation, err := b.LastOperation(s.ctx, "123", brokerapi.PollDetails{OperationData: ""})
 		Expect(operation.State).To(Equal(brokerapi.InProgress))
-		Expect(operation.Description).To(ContainSubstring(operation.Description))
-		Expect(operation.Description).To(ContainSubstring("Provisioning in progress [cdn.cloud.gov => cdn.apps.cloud.gov]"))
+		Expect(operation.Description).To(ContainSubstring("Provisioning in progress"))
 		Expect(err).NotTo(HaveOccurred())
 	})
 

@@ -11,6 +11,7 @@ import (
 	"github.com/18F/cf-cdn-service-broker/config"
 )
 
+//counterfeiter:generate -o mocks/FakeIAM.go --fake-name FakeIAM iam.go IamIface
 type IamIface interface {
 	UploadCertificate(name string, cert acme.CertificateResource) (string, error)
 	DeleteCertificate(name string) error

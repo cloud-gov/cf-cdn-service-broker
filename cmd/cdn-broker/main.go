@@ -57,6 +57,7 @@ func main() {
 		settings,
 		models.NewAcmeClientProvider(logger),
 		models.RouteStore{Database: db},
+		utils.NewCertificateManager(logger, settings, session),
 	)
 	broker := broker.New(
 		&manager,

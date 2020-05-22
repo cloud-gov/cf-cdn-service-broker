@@ -45,6 +45,18 @@ type FakeCertificateManager struct {
 		result1 bool
 		result2 error
 	}
+	ListIssuedCertificatesStub        func() ([]utils.CertificateDetails, error)
+	listIssuedCertificatesMutex       sync.RWMutex
+	listIssuedCertificatesArgsForCall []struct {
+	}
+	listIssuedCertificatesReturns struct {
+		result1 []utils.CertificateDetails
+		result2 error
+	}
+	listIssuedCertificatesReturnsOnCall map[int]struct {
+		result1 []utils.CertificateDetails
+		result2 error
+	}
 	RequestCertificateStub        func([]string, string) (*string, error)
 	requestCertificateMutex       sync.RWMutex
 	requestCertificateArgsForCall []struct {
@@ -249,6 +261,61 @@ func (fake *FakeCertificateManager) IsCertificateIssuedReturnsOnCall(i int, resu
 	}{result1, result2}
 }
 
+func (fake *FakeCertificateManager) ListIssuedCertificates() ([]utils.CertificateDetails, error) {
+	fake.listIssuedCertificatesMutex.Lock()
+	ret, specificReturn := fake.listIssuedCertificatesReturnsOnCall[len(fake.listIssuedCertificatesArgsForCall)]
+	fake.listIssuedCertificatesArgsForCall = append(fake.listIssuedCertificatesArgsForCall, struct {
+	}{})
+	fake.recordInvocation("ListIssuedCertificates", []interface{}{})
+	fake.listIssuedCertificatesMutex.Unlock()
+	if fake.ListIssuedCertificatesStub != nil {
+		return fake.ListIssuedCertificatesStub()
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	fakeReturns := fake.listIssuedCertificatesReturns
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeCertificateManager) ListIssuedCertificatesCallCount() int {
+	fake.listIssuedCertificatesMutex.RLock()
+	defer fake.listIssuedCertificatesMutex.RUnlock()
+	return len(fake.listIssuedCertificatesArgsForCall)
+}
+
+func (fake *FakeCertificateManager) ListIssuedCertificatesCalls(stub func() ([]utils.CertificateDetails, error)) {
+	fake.listIssuedCertificatesMutex.Lock()
+	defer fake.listIssuedCertificatesMutex.Unlock()
+	fake.ListIssuedCertificatesStub = stub
+}
+
+func (fake *FakeCertificateManager) ListIssuedCertificatesReturns(result1 []utils.CertificateDetails, result2 error) {
+	fake.listIssuedCertificatesMutex.Lock()
+	defer fake.listIssuedCertificatesMutex.Unlock()
+	fake.ListIssuedCertificatesStub = nil
+	fake.listIssuedCertificatesReturns = struct {
+		result1 []utils.CertificateDetails
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeCertificateManager) ListIssuedCertificatesReturnsOnCall(i int, result1 []utils.CertificateDetails, result2 error) {
+	fake.listIssuedCertificatesMutex.Lock()
+	defer fake.listIssuedCertificatesMutex.Unlock()
+	fake.ListIssuedCertificatesStub = nil
+	if fake.listIssuedCertificatesReturnsOnCall == nil {
+		fake.listIssuedCertificatesReturnsOnCall = make(map[int]struct {
+			result1 []utils.CertificateDetails
+			result2 error
+		})
+	}
+	fake.listIssuedCertificatesReturnsOnCall[i] = struct {
+		result1 []utils.CertificateDetails
+		result2 error
+	}{result1, result2}
+}
+
 func (fake *FakeCertificateManager) RequestCertificate(arg1 []string, arg2 string) (*string, error) {
 	var arg1Copy []string
 	if arg1 != nil {
@@ -327,6 +394,8 @@ func (fake *FakeCertificateManager) Invocations() map[string][][]interface{} {
 	defer fake.getDomainValidationChallengesMutex.RUnlock()
 	fake.isCertificateIssuedMutex.RLock()
 	defer fake.isCertificateIssuedMutex.RUnlock()
+	fake.listIssuedCertificatesMutex.RLock()
+	defer fake.listIssuedCertificatesMutex.RUnlock()
 	fake.requestCertificateMutex.RLock()
 	defer fake.requestCertificateMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}

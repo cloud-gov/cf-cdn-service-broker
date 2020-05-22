@@ -1,6 +1,7 @@
 package utils_test
 
 import (
+	"code.cloudfoundry.org/lager"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/request"
 	awsSession "github.com/aws/aws-sdk-go/aws/session"
@@ -9,6 +10,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/18F/cf-cdn-service-broker/config"
+	"github.com/18F/cf-cdn-service-broker/utils"
 	. "github.com/18F/cf-cdn-service-broker/utils"
 )
 
@@ -32,7 +34,11 @@ var _ = Describe("Acm", func() {
 		fakeacm = acm.New(session)
 		fakeacm.Handlers.Clear()
 
-		certsManager = CertificateManager{Settings: settings, Service: fakeacm}
+		logger := lager.NewLogger("test")
+
+		logger.RegisterSink(lager.NewWriterSink(GinkgoWriter, lager.INFO))
+
+		certsManager = CertificateManager{Logger: logger, Settings: settings, Service: fakeacm}
 
 	})
 
@@ -109,20 +115,6 @@ var _ = Describe("Acm", func() {
 			Expect(requestCertInput).NotTo(BeNil())
 			Expect(res).NotTo(BeNil())
 			Expect(*res).To(Equal(ArnString))
-
-		})
-
-		It("When requesting certs from ACM, make sure that it has the idenpotency token set to concat of all domain names sorted", func() {
-			inputDomains := []string{"b", "d", "a", "c"}
-
-			localIdempotencyToken := "a-b-c-d"
-
-			//Request a cert
-			_, err := certsManager.RequestCertificate(inputDomains, SBInstanceID)
-
-			Expect(err).NotTo(HaveOccurred())
-			Expect(requestCertInput).NotTo(BeNil())
-			Expect(*(requestCertInput.IdempotencyToken)).To(Equal(localIdempotencyToken))
 
 		})
 
@@ -316,6 +308,105 @@ var _ = Describe("Acm", func() {
 			Expect(*(describeCertInput.CertificateArn)).To(Equal(ArnString))
 			Expect(res).NotTo(BeNil())
 			Expect(res[0]).To(Equal(domainValidationChallenge))
+		})
+
+		Context("when the domain's validation challenges have not been set by AWS yet", func() {
+			It("sets the challenge values to the empty string", func() {
+				certDetail.SetCertificateArn(ArnString)
+				certDetail.SetStatus(acm.CertificateStatusIssued)
+
+				certDetail.DomainValidationOptions = []*acm.DomainValidation{
+					&acm.DomainValidation{
+						DomainName:       aws.String("example.com"),
+						ValidationStatus: aws.String(acm.DomainStatusSuccess),
+						ResourceRecord:   nil,
+					},
+				}
+
+				res, err := certsManager.GetDomainValidationChallenges(ArnString)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(describeCertInput).NotTo(BeNil())
+				Expect(*(describeCertInput.CertificateArn)).To(Equal(ArnString))
+				Expect(res).NotTo(BeNil())
+				Expect(res[0].RecordName).To(BeEmpty())
+				Expect(res[0].RecordType).To(BeEmpty())
+				Expect(res[0].RecordValue).To(BeEmpty())
+			})
+		})
+
+	})
+
+	Context("ListIssuedCertificates", func() {
+
+		It("Looks up a full description of each certificate in the ISSUED state", func() {
+
+			var listCertInput *acm.ListCertificatesInput
+			var listCertOutput *acm.ListCertificatesOutput
+			var listCertCallCount = 0
+
+			var describeCertInput *acm.DescribeCertificateInput
+			var describeCertOutput *acm.DescribeCertificateOutput
+			var describeCertCallCount = 0
+
+			var listTagsForCertInput *acm.ListTagsForCertificateInput
+			var listTagsForCertOuput *acm.ListTagsForCertificateOutput
+			var listTagsForCertCallCount = 0
+
+			var certDescriptions map[string]acm.CertificateDetail
+
+			certDescriptions = map[string]acm.CertificateDetail{}
+
+			const IssuedCertificateArn1 string = "IssuedCertificateArn1"
+			const IssuedCertificateArn2 string = "IssuedCertificateArn2"
+
+			var tags map[string][]*acm.Tag
+			tags = map[string][]*acm.Tag{}
+
+			fakeacm.Handlers.Send.PushBack(func(r *request.Request) {
+				if r.Operation.Name == "ListCertificates" {
+					listCertInput = r.Params.(*acm.ListCertificatesInput)
+					listCertOutput = r.Data.(*acm.ListCertificatesOutput)
+					listCertOutput.CertificateSummaryList = []*acm.CertificateSummary{
+						{CertificateArn: aws.String(IssuedCertificateArn1)},
+						{CertificateArn: aws.String(IssuedCertificateArn2)},
+					}
+					listCertCallCount++
+				}
+
+				if r.Operation.Name == "DescribeCertificate" {
+					describeCertInput = r.Params.(*acm.DescribeCertificateInput)
+					describeCertOutput = r.Data.(*acm.DescribeCertificateOutput)
+					tempCert := certDescriptions[*describeCertInput.CertificateArn]
+					describeCertOutput.Certificate = &tempCert
+					describeCertCallCount++
+				}
+
+				if r.Operation.Name == "ListTagsForCertificate" {
+
+					listTagsForCertInput = r.Params.(*acm.ListTagsForCertificateInput)
+					listTagsForCertOuput = r.Data.(*acm.ListTagsForCertificateOutput)
+					listTagsForCertOuput.Tags = tags[*listTagsForCertInput.CertificateArn]
+					listTagsForCertCallCount++
+				}
+
+			})
+
+			certDescriptions[IssuedCertificateArn1] = acm.CertificateDetail{CertificateArn: aws.String(IssuedCertificateArn1), Status: aws.String(acm.CertificateStatusIssued)}
+			certDescriptions[IssuedCertificateArn2] = acm.CertificateDetail{CertificateArn: aws.String(IssuedCertificateArn2), Status: aws.String(acm.CertificateStatusIssued)}
+
+			tags[IssuedCertificateArn1] = []*acm.Tag{&acm.Tag{Key: aws.String(utils.CertificateTagName), Value: aws.String("cloudfoundry-service-instance-id-1")}}
+			tags[IssuedCertificateArn2] = []*acm.Tag{&acm.Tag{Key: aws.String(utils.CertificateTagName), Value: aws.String("cloudfoundry-service-instance-id-2")}}
+
+			_, err := certsManager.ListIssuedCertificates()
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(listCertInput.CertificateStatuses).To(ContainElement(aws.String(acm.CertificateStatusIssued)))
+			Expect(describeCertInput).ToNot(BeNil())
+			Expect(listTagsForCertInput).ToNot(BeNil())
+			Expect(listCertCallCount).To(Equal(1))
+			Expect(describeCertCallCount).To(Equal(2))
+			Expect(listTagsForCertCallCount).To(Equal(2))
 		})
 
 	})

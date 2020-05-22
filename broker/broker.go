@@ -200,11 +200,32 @@ func (b *CdnServiceBroker) LastOperation(
 			})
 			return brokerapi.LastOperation{}, err
 		}
-		description := fmt.Sprintf(
-			"Provisioning in progress [%s => %s]; CNAME or ALIAS domain %s to %s and create TXT record(s): \n%s",
-			route.DomainExternal, route.Origin, route.DomainExternal, route.DomainInternal,
+		var description string
+
+		cloudFrontCNAMES := []string{}
+		for _, tenantDomain := range route.GetDomains() {
+			cloudFrontCNAMES = append(
+				cloudFrontCNAMES,
+				fmt.Sprintf("%s => %s", tenantDomain, route.DomainInternal),
+			)
+		}
+
+		description = fmt.Sprintf(
+			`
+Provisioning in progress.
+
+Create the following CNAME records to direct traffic from your domains to your CDN route
+
+%s
+
+To validate ownership of the domain, set the following DNS records
+
+%s
+`,
+			strings.Join(cloudFrontCNAMES, "\n"),
 			strings.Join(instructions, "\n"),
 		)
+
 		lsession.Info("provisioning-ok", lager.Data{
 			"domain":      route.DomainExternal,
 			"state":       route.State,

@@ -40,24 +40,40 @@ var _ = Describe("DataStore", func() {
 	Describe("RouteStore", func() {
 		Describe("FindOneMatching", func() {
 			BeforeEach(func() {
-				cert := models.Certificate{
-					Domain:  "foo.bar",
-					CertURL: "cert.url",
+				leCert := models.Certificate{
+					Domain:            "foo.bar",
+					CertURL:           "cert.url",
+					CertificateStatus: models.CertificateStatusLE,
+					CertificateArn:    "managed-by-letsencrypt",
+				}
+
+				validatingCert := models.Certificate{
+					Domain:            "foo.bar,blog.foo.bar",
+					CertURL:           "cert.url",
+					CertificateStatus: models.CertificateStatusValidating,
+					CertificateArn:    "ValidatingCertArn",
+				}
+
+				orphanedCert := models.Certificate{
+					Domain:            "example.com,blog.example.com",
+					CertURL:           "cert.url",
+					CertificateStatus: models.CertificateStatusValidating,
+					CertificateArn:    "ValidatingCertArn",
 				}
 
 				complexRoute := &models.Route{
-					InstanceId:     "complex-route",
-					State:          "provisioned",
-					ChallengeJSON:  []byte(`{}`),
-					DomainExternal: "foo.bar",
-					DomainInternal: "foo.london.cloudapps.digital",
-					DistId:         "cloudfront-dist",
-					Origin:         "foo.london.cloudapps.diigtal",
-					Path:           "",
-					InsecureOrigin: false,
-					UserDataID:     1,
-					DefaultTTL:     0,
-					Certificate:    cert,
+					InstanceId:                "complex-route",
+					State:                     "provisioned",
+					ChallengeJSON:             []byte(`{}`),
+					DomainExternal:            "foo.bar",
+					DomainInternal:            "foo.london.cloudapps.digital",
+					DistId:                    "cloudfront-dist",
+					Origin:                    "foo.london.cloudapps.diigtal",
+					Path:                      "",
+					InsecureOrigin:            false,
+					UserDataID:                1,
+					DefaultTTL:                0,
+					IsCertificateManagedByACM: false,
 				}
 
 				userData := &models.UserData{
@@ -74,13 +90,23 @@ var _ = Describe("DataStore", func() {
 				err := transaction.Save(userData).Error
 				Expect(err).ToNot(HaveOccurred())
 
-				err = transaction.Save(&cert).Error
-				Expect(err).ToNot(HaveOccurred())
-
 				complexRoute.UserDataID = int(userData.ID)
 
 				err = transaction.Save(complexRoute).Error
 				Expect(err).ToNot(HaveOccurred())
+
+				leCert.RouteId = complexRoute.ID
+				err = transaction.Save(&leCert).Error
+				Expect(err).ToNot(HaveOccurred())
+
+				validatingCert.RouteId = complexRoute.ID
+				err = transaction.Save(&validatingCert).Error
+				Expect(err).ToNot(HaveOccurred())
+
+				orphanedCert.RouteId = complexRoute.ID + 1
+				err = transaction.Save(&orphanedCert).Error
+				Expect(err).ToNot(HaveOccurred())
+
 			})
 
 			It("finds the first row matching the input", func() {
@@ -133,12 +159,35 @@ var _ = Describe("DataStore", func() {
 				})
 
 				Expect(err).ToNot(HaveOccurred())
-				Expect(route.Certificate.CertURL).To(Equal("cert.url"))
+				Expect(route.Certificates).To(HaveLen(2))
+				Expect(route.Certificates[0].CertificateArn).To(Equal("managed-by-letsencrypt"))
+				Expect(route.Certificates[1].CertificateArn).To(Equal("ValidatingCertArn"))
 			})
 		})
 
 		Describe("FindAllMatching", func() {
 			BeforeEach(func() {
+				cert1 := models.Certificate{
+					Domain:            "foo.bar",
+					CertURL:           "cert.url.1",
+					CertificateStatus: models.CertificateStatusLE,
+					CertificateArn:    "managed-by-letsencrypt",
+				}
+
+				cert2 := models.Certificate{
+					Domain:            "foo.bar,blog.foo.bar",
+					CertURL:           "cert.url.2",
+					CertificateStatus: models.CertificateStatusValidating,
+					CertificateArn:    "ValidatingCertArn.2",
+				}
+
+				cert3 := models.Certificate{
+					Domain:            "example.com,blog.example.com",
+					CertURL:           "cert.url.3",
+					CertificateStatus: models.CertificateStatusValidating,
+					CertificateArn:    "ValidatingCertArn.3",
+				}
+
 				routeOne := &models.Route{
 					InstanceId:     "route-one",
 					State:          "provisioned",
@@ -151,7 +200,6 @@ var _ = Describe("DataStore", func() {
 					InsecureOrigin: false,
 					UserDataID:     1,
 					DefaultTTL:     0,
-					Certificate:    models.Certificate{Domain: "foo.bar", CertURL: "this is a cert url"},
 				}
 
 				routeTwo := &models.Route{
@@ -166,7 +214,6 @@ var _ = Describe("DataStore", func() {
 					InsecureOrigin: false,
 					UserDataID:     1,
 					DefaultTTL:     0,
-					Certificate:    models.Certificate{Domain: "foo.bar", CertURL: "this is a different cert url"},
 				}
 
 				userData := &models.UserData{
@@ -190,6 +237,18 @@ var _ = Describe("DataStore", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				err = transaction.Save(routeTwo).Error
+				Expect(err).ToNot(HaveOccurred())
+
+				cert1.RouteId = routeOne.ID
+				err = transaction.Save(&cert1).Error
+				Expect(err).ToNot(HaveOccurred())
+
+				cert2.RouteId = routeOne.ID
+				err = transaction.Save(&cert2).Error
+				Expect(err).ToNot(HaveOccurred())
+
+				cert3.RouteId = routeTwo.ID
+				err = transaction.Save(&cert3).Error
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -243,7 +302,7 @@ var _ = Describe("DataStore", func() {
 
 			It("hydrates the certificate field", func() {
 				example := models.Route{
-					State: models.Provisioning,
+					State: models.Provisioned,
 				}
 
 				routeStore := models.RouteStore{
@@ -254,10 +313,10 @@ var _ = Describe("DataStore", func() {
 
 				Expect(err).ToNot(HaveOccurred())
 				Expect(routes).To(HaveLen(1))
-				Expect(routes[0].InstanceId).To(Equal("route-two"))
-				certificate := routes[0].Certificate
-
-				Expect(certificate.CertURL).To(Equal("this is a different cert url"))
+				Expect(routes[0].InstanceId).To(Equal("route-one"))
+				Expect(routes[0].Certificates).To(HaveLen(2))
+				Expect(routes[0].Certificates[0].CertURL).To(Equal("cert.url.1"))
+				Expect(routes[0].Certificates[1].CertURL).To(Equal("cert.url.2"))
 			})
 		})
 
@@ -276,10 +335,11 @@ var _ = Describe("DataStore", func() {
 					UserDataID:     1,
 					DefaultTTL:     0,
 					Certificate: models.Certificate{
-						Domain:      "foo.bar",
-						CertURL:     "cert.url.expires-later",
-						Certificate: []byte{},
-						Expires:     time.Now().AddDate(0, 0, 90),
+						Domain:            "foo.bar",
+						CertURL:           "cert.url.expires-later",
+						Certificate:       []byte{},
+						Expires:           time.Now().AddDate(0, 0, 90),
+						CertificateStatus: models.CertificateStatusLE,
 					},
 				}
 
@@ -296,10 +356,11 @@ var _ = Describe("DataStore", func() {
 					UserDataID:     1,
 					DefaultTTL:     0,
 					Certificate: models.Certificate{
-						Domain:      "bar.bar",
-						CertURL:     "cert.url.expires-sooner",
-						Certificate: []byte{},
-						Expires:     time.Now().AddDate(0, 0, 10),
+						Domain:            "bar.bar",
+						CertURL:           "cert.url.expires-sooner",
+						Certificate:       []byte{},
+						Expires:           time.Now().AddDate(0, 0, 10),
+						CertificateStatus: models.CertificateStatusLE,
 					},
 				}
 
@@ -316,11 +377,36 @@ var _ = Describe("DataStore", func() {
 					UserDataID:     1,
 					DefaultTTL:     0,
 					Certificate: models.Certificate{
-						Domain:      "bar.bar",
-						CertURL:     "cert.url.expires-sooner-but-not-provisoned",
-						Certificate: []byte{},
-						Expires:     time.Now().AddDate(0, 0, 10),
+						Domain:            "bar.bar",
+						CertURL:           "cert.url.expires-sooner-but-not-provisoned",
+						Certificate:       []byte{},
+						Expires:           time.Now().AddDate(0, 0, 10),
+						CertificateStatus: models.CertificateStatusLE,
 					},
+				}
+
+				routeFour := &models.Route{
+					InstanceId:     "expires-sooner-ACM-managed",
+					State:          "provisioned",
+					ChallengeJSON:  []byte(`{}`),
+					DomainExternal: "bar.bar",
+					DomainInternal: "bar.london.cloudapps.digital",
+					DistId:         "cloudfront-dist-two",
+					Origin:         "bar.london.cloudapps.diigtal",
+					Path:           "",
+					InsecureOrigin: false,
+					UserDataID:     1,
+					DefaultTTL:     0,
+					Certificates: []models.Certificate{
+						{
+							Domain:            "bar.bar",
+							CertURL:           "cert.url.expires-sooner-ACM-managed",
+							Expires:           time.Now().AddDate(0, 0, 10),
+							CertificateArn:    "CertificateArn",
+							CertificateStatus: models.CertificateStatusAttached,
+						},
+					},
+					IsCertificateManagedByACM: true,
 				}
 
 				userData := &models.UserData{
@@ -340,6 +426,7 @@ var _ = Describe("DataStore", func() {
 				routeOne.UserDataID = int(userData.ID)
 				routeTwo.UserDataID = int(userData.ID)
 				routeThree.UserDataID = int(userData.ID)
+				routeFour.UserDataID = int(userData.ID)
 
 				err = transaction.Save(&routeOne.Certificate).Error
 				Expect(err).ToNot(HaveOccurred())
@@ -350,6 +437,10 @@ var _ = Describe("DataStore", func() {
 				err = transaction.Save(&routeThree.Certificate).Error
 				Expect(err).ToNot(HaveOccurred())
 
+				Expect(len(routeFour.Certificates)).To(Equal(1))
+				err = transaction.Save(&routeFour.Certificates[0]).Error
+				Expect(err).ToNot(HaveOccurred())
+
 				err = transaction.Save(routeOne).Error
 				Expect(err).ToNot(HaveOccurred())
 
@@ -358,9 +449,12 @@ var _ = Describe("DataStore", func() {
 
 				err = transaction.Save(routeThree).Error
 				Expect(err).ToNot(HaveOccurred())
+
+				err = transaction.Save(routeFour).Error
+				Expect(err).ToNot(HaveOccurred())
 			})
 
-			It("finds certificates with less than 30 days until their expiry date and they are in the 'provisioned' state", func() {
+			It("finds certificates with less than 30 days until their expiry date and they are in the 'provisioned' state and managed by LetsEncrypt", func() {
 				routeStore := models.RouteStore{
 					Database: &transaction,
 				}
@@ -372,6 +466,7 @@ var _ = Describe("DataStore", func() {
 				Expect(routes[0].InstanceId).To(Equal("expires-sooner"))
 
 				Expect(string(routes[0].State)).To(Equal("provisioned"))
+				Expect(routes[0].IsCertificateManagedByACM).To(Equal(false), "The certificate is managed by ACM")
 			})
 
 			It("hydrates the user field", func() {
@@ -400,9 +495,9 @@ var _ = Describe("DataStore", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(routes).To(HaveLen(1))
 				Expect(routes[0].InstanceId).To(Equal("expires-sooner"))
-				certificate := routes[0].Certificate
-
-				Expect(certificate.CertURL).To(Equal("cert.url.expires-sooner"))
+				certificates := routes[0].Certificates
+				Expect(certificates).To(HaveLen(1))
+				Expect(certificates[0].CertURL).To(Equal("cert.url.expires-sooner"))
 			})
 		})
 
@@ -484,21 +579,13 @@ var _ = Describe("DataStore", func() {
 				newRoute := models.Route{
 					InstanceId: "new-route",
 					State:      models.Provisioning,
-					UserData: models.UserData{
-						Email: "foo@bar.org",
-						Reg: []byte(`
-							{
-								"Email": "the-mocky-cloud-paas-team@digital.cabinet-office.gov.uk",
-								"Registration": null
-							}
-						`),
-						Key: generateKey(),
-					},
-					Certificate: models.Certificate{
-						Domain:      "foo.bar",
-						CertURL:     "cert.url",
-						Certificate: nil,
-						Expires:     time.Now().AddDate(0, 0, 90),
+					Certificates: []models.Certificate{
+						models.Certificate {
+							Domain:      "foo.bar",
+							CertURL:     "cert.url",
+							Certificate: nil,
+							Expires:     time.Now().AddDate(0, 0, 90),
+						},
 					},
 				}
 
@@ -815,6 +902,7 @@ var _ = Describe("DataStore", func() {
 			})
 		})
 	})
+
 })
 
 func generateKey() []byte {

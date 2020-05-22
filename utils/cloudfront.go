@@ -9,11 +9,13 @@ import (
 	"github.com/18F/cf-cdn-service-broker/config"
 )
 
+//counterfeiter:generate -o mocks/FakeDistribution.go --fake-name FakeDistribution cloudfront.go DistributionIface
+
 type DistributionIface interface {
 	Create(callerReference string, domains []string, origin string, defaultTTL int64, forwardedHeaders Headers, forwardCookies bool, tags map[string]string) (*cloudfront.Distribution, error)
 	Update(distId string, domains *[]string, origin string, defaultTTL *int64, forwardedHeaders *Headers, forwardCookies *bool) (*cloudfront.Distribution, error)
 	Get(distId string) (*cloudfront.Distribution, error)
-	SetCertificateAndCname(distId, certId string, domains []string) error
+	SetCertificateAndCname(distId, certId string, domains []string, acmCert bool) error
 	Disable(distId string) error
 	Delete(distId string) (bool, error)
 	ListDistributions(callback func(cloudfront.DistributionSummary) bool) error
@@ -309,7 +311,7 @@ func (d *Distribution) Get(distId string) (*cloudfront.Distribution, error) {
 	return resp.Distribution, nil
 }
 
-func (d *Distribution) SetCertificateAndCname(distId, certId string, domains []string) error {
+func (d *Distribution) SetCertificateAndCname(distId, certId string, domains []string, acmCert bool) error {
 	resp, err := d.Service.GetDistributionConfig(&cloudfront.GetDistributionConfigInput{
 		Id: aws.String(distId),
 	})
@@ -321,9 +323,14 @@ func (d *Distribution) SetCertificateAndCname(distId, certId string, domains []s
 	DistributionConfig, ETag := resp.DistributionConfig, resp.ETag
 	DistributionConfig.Aliases = aliases
 
-	DistributionConfig.ViewerCertificate.Certificate = aws.String(certId)
-	DistributionConfig.ViewerCertificate.IAMCertificateId = aws.String(certId)
-	DistributionConfig.ViewerCertificate.CertificateSource = aws.String("iam")
+	if acmCert {
+		DistributionConfig.ViewerCertificate.ACMCertificateArn = aws.String(certId)
+		DistributionConfig.ViewerCertificate.IAMCertificateId = nil
+	} else {
+		DistributionConfig.ViewerCertificate.IAMCertificateId = aws.String(certId)
+		DistributionConfig.ViewerCertificate.ACMCertificateArn = nil
+	}
+
 	DistributionConfig.ViewerCertificate.SSLSupportMethod = aws.String("sni-only")
 	DistributionConfig.ViewerCertificate.MinimumProtocolVersion = aws.String("TLSv1.2_2018")
 	DistributionConfig.ViewerCertificate.CloudFrontDefaultCertificate = aws.Bool(false)

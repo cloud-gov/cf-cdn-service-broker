@@ -14,22 +14,22 @@ var _ = Describe("Route", func() {
 	Describe("IsProvisioningExpired", func() {
 		var (
 			route             models.Route
-			time32hoursBefore time.Time
+			time96hoursBefore time.Time
 		)
 		BeforeEach(func() {
 
-			time32hoursBefore = time.Now().Add(-32 * time.Hour)
+			time96hoursBefore = time.Now().Add(-96 * time.Hour)
 			route = models.Route{
 				Model: gorm.Model{
-					CreatedAt: time32hoursBefore,
-					UpdatedAt: time32hoursBefore,
+					CreatedAt: time96hoursBefore,
+					UpdatedAt: time96hoursBefore,
 				},
 			}
 
-			route.ProvisioningSince = &time32hoursBefore
+			route.ProvisioningSince = &time96hoursBefore
 		})
 
-		It("is expired when the last update time is >24h ago", func() {
+		It("is expired when the ProvisioningSince time is >84h ago", func() {
 
 			route.State = models.Provisioning
 
@@ -49,5 +49,33 @@ var _ = Describe("Route", func() {
 			Expect(route.IsProvisioningExpired()).To(BeFalse())
 
 		})
+
 	})
+
+	Context("IsCertificateManagedByACM", func() {
+		var (
+			route models.Route
+		)
+
+		BeforeEach(func() {
+
+			route = models.Route{}
+		})
+
+		It("Make sure that the default value is 'false'", func() {
+
+			Expect(route.IsCertificateManagedByACM).To(BeFalse())
+
+		})
+
+		It("Make sure that the value is 'true', after setting it to 'true'", func() {
+
+			route.IsCertificateManagedByACM = true
+
+			Expect(route.IsCertificateManagedByACM).To(BeTrue())
+
+		})
+
+	})
+
 })

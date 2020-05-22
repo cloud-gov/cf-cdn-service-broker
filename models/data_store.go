@@ -39,7 +39,7 @@ func (r RouteStore) Create(route *Route) error {
 
 func (r RouteStore) FindOneMatching(route Route) (Route, error) {
 	output := Route{}
-	err := r.Database.First(&output, route).Error
+	err := r.Database.Preload("Certificates").First(&output, route).Error
 
 	if err != nil {
 		return Route{}, err
@@ -55,7 +55,7 @@ func (r RouteStore) FindOneMatching(route Route) (Route, error) {
 
 func (r RouteStore) FindAllMatching(route Route) ([]Route, error) {
 	results := []Route{}
-	err := r.Database.Find(&results, route).Error
+	err := r.Database.Preload("Certificates").Find(&results, route).Error
 
 	if err != nil {
 		return []Route{}, err
@@ -74,12 +74,14 @@ func (r RouteStore) FindAllMatching(route Route) ([]Route, error) {
 func (r RouteStore) FindWithExpiringCerts() ([]Route, error) {
 	routes := []Route{}
 
-	err := r.Database.Having(
+	err := r.Database.Preload("Certificates").Having(
 		"max(expires) < now() + interval '30 days'",
 	).Group(
 		"routes.id",
 	).Where(
 		"state = ?", string(Provisioned),
+	).Where(
+		"is_certificate_managed_by_acm = ?", false,
 	).Joins(
 		"join certificates on routes.id = certificates.route_id",
 	).Find(&routes).Error
@@ -109,6 +111,10 @@ func (r *RouteStore) hydrateRoute(route *Route) error {
 }
 
 func (r *RouteStore) populateUser(route *Route) error {
+	if route.UserDataID == 0 {
+		return nil
+	}
+
 	var userData UserData
 	if err := r.Database.Model(route).Related(&userData).Error; err != nil {
 		return err

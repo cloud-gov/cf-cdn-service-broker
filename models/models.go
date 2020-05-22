@@ -12,6 +12,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"github.com/aws/aws-sdk-go/service/acm"
 	"io/ioutil"
 	"net/http"
 	"path"
@@ -174,21 +175,23 @@ func savePrivateKey(key crypto.PrivateKey) ([]byte, error) {
 
 type Route struct {
 	gorm.Model
-	InstanceId        string `gorm:"not null;unique_index"`
-	State             State  `gorm:"not null;index"`
-	ChallengeJSON     []byte
-	DomainExternal    string
-	DomainInternal    string
-	DistId            string
-	Origin            string
-	Path              string // Always empty, should not remove because it is in DB
-	InsecureOrigin    bool   // Always false, should not remove because it is in DB
-	Certificate       Certificate
-	UserData          UserData
-	UserDataID        int
-	User              utils.User `gorm:"-"`
-	DefaultTTL        int64      `gorm:"default:86400"`
-	ProvisioningSince *time.Time //using the same field to measure a time for Provisioning or Deprovisioning
+	InstanceId                string `gorm:"not null;unique_index"`
+	State                     State  `gorm:"not null;index"`
+	ChallengeJSON             []byte
+	DomainExternal            string
+	DomainInternal            string
+	DistId                    string
+	Origin                    string
+	Path                      string      // Always empty, should not remove because it is in DB
+	InsecureOrigin            bool        // Always false, should not remove because it is in DB
+	Certificate               Certificate //this is used by letsencrypt certs and will be removed once all our certs are migrated to ACM
+	UserData                  UserData
+	UserDataID                int
+	User                      utils.User `gorm:"-"`
+	DefaultTTL                int64      `gorm:"default:86400"`
+	ProvisioningSince         *time.Time //using the same field to measure a time for Provisioning or Deprovisioning
+	IsCertificateManagedByACM bool       `gorm:"default:false"` //using false as default value, so all the existing records will default to managed by LE
+	Certificates              []Certificate
 }
 
 // BeforeCreate hook will change the value of Provisioning_since field to time.Now()
@@ -231,6 +234,11 @@ func (r *Route) GetDomains() []string {
 	return strings.Split(r.DomainExternal, ",")
 }
 
+const ProvisioningExpirationPeriodHours time.Duration = 84 * time.Hour
+
+//the issue of a certificate in ACM has a time out limit of 72 hours
+//plus few (12) hours to account for any unexpected delays
+//we've got to the magic number of 84 hours represented by the const - ProvisioningExpirationPeriodHours
 func (r *Route) IsProvisioningExpired() bool {
 	var provisioningSince *time.Time
 
@@ -238,8 +246,16 @@ func (r *Route) IsProvisioningExpired() bool {
 		provisioningSince = r.ProvisioningSince
 	}
 	return r.State == Provisioning && provisioningSince != nil &&
-		(*provisioningSince).Before(time.Now().Add(-24*time.Hour))
+		(*provisioningSince).Before(time.Now().Add(-1*ProvisioningExpirationPeriodHours))
 }
+
+const (
+	CertificateStatusAttached   string = "attached"
+	CertificateStatusValidating string = "validating"
+	CertificateStatusDeleted    string = "deleted"
+	CertificateStatusFailed     string = "failed"
+	CertificateStatusLE         string = "letsencrypt"
+)
 
 type Certificate struct {
 	gorm.Model
@@ -248,6 +264,9 @@ type Certificate struct {
 	CertURL     string
 	Certificate []byte
 	Expires     time.Time `gorm:"index"`
+	//adding a certificateArn to this struct, so we can truck the requested/provisioned certificates by ACM
+	CertificateArn    string `gorm:"not null;default:'managedbyletsencrypt'"`
+	CertificateStatus string `gorm:"not null;default:'letsencrypt'"` //(Attached, Validating, Detached, failed, letsencrypt)
 }
 
 type RouteManagerIface interface {
@@ -291,6 +310,7 @@ type RouteManager struct {
 	settings           config.Settings
 	acmeClientProvider AcmeClientProviderInterface
 	routeStoreIface    RouteStoreInterface
+	certsManager       utils.CertificateManagerInterface
 }
 
 func NewManager(
@@ -300,6 +320,7 @@ func NewManager(
 	settings config.Settings,
 	acmeClientProvider AcmeClientProviderInterface,
 	routeStoreIface RouteStoreInterface,
+	certsManager utils.CertificateManagerInterface,
 ) RouteManager {
 	return RouteManager{
 		logger:             logger,
@@ -308,6 +329,7 @@ func NewManager(
 		settings:           settings,
 		acmeClientProvider: acmeClientProvider,
 		routeStoreIface:    routeStoreIface,
+		certsManager:       certsManager,
 	}
 }
 
@@ -322,47 +344,22 @@ func (m *RouteManager) Create(
 ) (*Route, error) {
 
 	route := &Route{
-		InstanceId:     instanceId,
-		State:          Provisioning,
-		DomainExternal: domain,
-		Origin:         origin,
-		Path:           "",
-		DefaultTTL:     defaultTTL,
-		InsecureOrigin: false,
+		InstanceId:                instanceId,
+		State:                     Provisioning,
+		DomainExternal:            domain,
+		Origin:                    origin,
+		Path:                      "",
+		DefaultTTL:                defaultTTL,
+		InsecureOrigin:            false,
+		IsCertificateManagedByACM: true,
+		Certificates:              []Certificate{},
 	}
 
 	lsession := m.logger.Session("route-manager-create-route", lager.Data{
 		"instance-id": instanceId,
 	})
 
-	lsession.Info("create-user")
-	user, err := CreateUser(m.settings.Email)
-	if err != nil {
-		lsession.Error("create-user", err)
-		return nil, err
-	}
-
-	lsession.Info("getting-dns01-client")
-	client, err := m.getDNS01Client(&user, m.settings)
-	if err != nil {
-		lsession.Error("get-dns-01-client", err)
-		return nil, err
-	}
-
-	//Setting the user
-	lsession.Info("set-user")
-	err = route.SetUser(user)
-	if err != nil {
-		lsession.Error("set-user", err)
-		return nil, err
-	}
-
-	lsession.Info("ensure-challenges-dns-01")
-	if err := m.ensureChallenges(route, client); err != nil {
-		lsession.Error("ensure-challenges-dns-01", err)
-		return nil, err
-	}
-
+	//Creating Cloud Front Distribution
 	lsession.Info("create-cloudfront-instance")
 	dist, err := m.cloudFront.Create(
 		instanceId,
@@ -380,6 +377,24 @@ func (m *RouteManager) Create(
 
 	route.DomainInternal = *dist.DomainName
 	route.DistId = *dist.Id
+
+	//request a certificate from ACM.
+	lsession.Info("certsmanager-request-certificate")
+	certArn, err := m.certsManager.RequestCertificate(route.GetDomains(), instanceId)
+	if err != nil {
+		lsession.Error("certsmanager-request-certificate", err)
+		return nil, err
+	}
+	lsession.Info("certsmanager-request-certificate-done", lager.Data{"certificate-arn": *certArn})
+
+	//WIP - it looks that the only data about ACM cert we need to persist is the ARN
+	// everything else we can retrieve
+	newCert := Certificate{
+		CertificateArn:    *certArn,
+		CertificateStatus: CertificateStatusValidating,
+	}
+
+	route.Certificates = append(route.Certificates, newCert)
 
 	//insert the route object into the database
 	lsession.Info("create-route")
@@ -417,6 +432,7 @@ func (m *RouteManager) Get(instanceId string) (*Route, error) {
 
 // Update function updates the CDN route service and returns whether the update has been
 // performed asynchronously or not
+// this function is ONLY called when a tenant will issue 'cf service-update'
 func (m *RouteManager) Update(
 	instanceId string,
 	domain *string,
@@ -437,17 +453,13 @@ func (m *RouteManager) Update(
 		return false, err
 	}
 
-	// Override any settings that are new or different.
-	if domain != nil {
-		lsession.Info("param-update-domain")
-		route.DomainExternal = *domain
-	}
+	// Override DefaultTTL settings that are new or different.
 	if defaultTTL != nil {
 		lsession.Info("param-update-default-ttl")
 		route.DefaultTTL = *defaultTTL
 	}
 
-	// Update the distribution
+	// Update the distribution with new TTL, forwardHeaders and forwardCookies settings
 	lsession.Info("cloudfront-update-excluding-domains")
 	dist, err := m.cloudFront.Update(
 		route.DistId,
@@ -476,25 +488,30 @@ func (m *RouteManager) Update(
 		lsession.Info("set-state-provisioning")
 		route.State = Provisioning
 
-		// We need to ensure there is a challenge in the database when provisioning
-		// It does not matter which client HTTP01 or DNS01 we use because it is the
-		// responsibility of the ACME server to give us what challenges are
-		// supported. I.e. LetsEncrypt will return ALPN01, HTTP01, DNS01 regardless
-		// of which client is used
+		if domain != nil {
+			lsession.Info("param-update-domain")
+			route.DomainExternal = *domain
+		}
+		//At this point we can assume that we will kick-off the Certificate Provisioning with ACM (even if it was provisioned with LE before)
+		route.IsCertificateManagedByACM = true
 
-		lsession.Info("get-dns01-client")
-		client, err := m.getDNS01Client(&route.User, m.settings)
+		//request a certificate from ACM.
+		lsession.Info("certsmanager-request-certificate")
+		certArn, err := m.certsManager.RequestCertificate(route.GetDomains(), instanceId)
 		if err != nil {
-			lsession.Error("get-dns01-client", err)
+			lsession.Error("certsmanager-request-certificate", err)
 			return false, err
+		}
+		lsession.Info("certsmanager-request-certificate-done", lager.Data{"certificate-arn": *certArn})
+
+		//WIP - it looks that the only data about ACM cert we need to persist is the ARN
+		// everything else we can retrieve
+		newCert := Certificate{
+			CertificateArn:    *certArn,
+			CertificateStatus: CertificateStatusValidating,
 		}
 
-		lsession.Info("ensure-challenges")
-		route.ChallengeJSON = []byte("")
-		if err := m.ensureChallenges(route, client); err != nil {
-			lsession.Error("ensure-challenges", err)
-			return false, err
-		}
+		route.Certificates = append(route.Certificates, newCert)
 	}
 
 	//save route object into the database
@@ -520,6 +537,7 @@ func (m *RouteManager) Poll(r *Route) error {
 		lsession.Info("update-deprovisioning")
 		return m.updateDeprovisioning(r)
 	default:
+		lsession.Info("unexpected-state", lager.Data{"state": r.State})
 		return nil
 	}
 }
@@ -692,6 +710,64 @@ func (m *RouteManager) Renew(r *Route) error {
 
 func (m *RouteManager) DeleteOrphanedCerts() {
 	lsession := m.logger.Session("delete-orphaned-certs")
+	//first let us call the function that will clean up orphaned certs that
+	//were issued by letsencrypt
+	m.deleteOrphanedLetsEncryptCerts()
+
+	m.deleteOrphanedACMCerts()
+
+	lsession.Info("finished")
+}
+
+func (m *RouteManager) deleteOrphanedACMCerts() {
+	lsession := m.logger.Session("delete-acm-managed-orphaned-certs")
+
+	lsession.Info("list-issued-certificates")
+	certs, err := m.certsManager.ListIssuedCertificates()
+	if err != nil {
+		lsession.Error("list-issued-certificates", err)
+		return
+	}
+
+	time24hAgo := time.Now().Add(-24 * time.Hour)
+
+	for _, cert := range certs {
+		managedByCdnBroker := false
+
+		for _, tag := range cert.Tags {
+			if *tag.Key == utils.ManagedByTagName && *tag.Value == utils.ManagedByTagValue {
+				managedByCdnBroker = true
+				break
+			}
+		}
+
+		isIssued := *cert.Status == acm.CertificateStatusIssued
+		isInUse := len(cert.InUseBy) > 0
+		olderThan24h := cert.IssuedAt.Before(time24hAgo)
+
+
+		if isIssued && !isInUse &&  managedByCdnBroker && olderThan24h {
+			lsession.Info("deleting-orphaned-cert", lager.Data{"certificate-arn": cert.CertificateArn})
+			err = m.certsManager.DeleteCertificate(*cert.CertificateArn)
+			if err != nil {
+				lsession.Error("deleting-orphaned-cert", err, lager.Data{"certificate-arn": cert.CertificateArn})
+			}
+		} else {
+			lsession.Info("not-deleting-certificate", lager.Data{
+				"certificate-arn": *cert.CertificateArn,
+				"is-issued": isIssued,
+				"is-in-use": isInUse,
+				"is-managed-by-cdn-broker": managedByCdnBroker,
+				"is-older-than-24h": olderThan24h,
+			})
+		}
+	}
+
+	lsession.Info("finished")
+}
+
+func (m *RouteManager) deleteOrphanedLetsEncryptCerts() {
+	lsession := m.logger.Session("delete-le-managed-orphaned-certs")
 	// iterate over all distributions and record all certificates in-use by these distributions
 	activeCerts := make(map[string]string)
 
@@ -809,27 +885,39 @@ func (m *RouteManager) CheckRoutesToUpdate() {
 				}
 
 			}
+
+			if err == utils.ErrValidationTimedOut {
+				lsession.Info("certificate-validation-timed-out", lager.Data{"instance_id": route.InstanceId, "domains": route.GetDomains()})
+				route.State = Failed
+				lsession.Info("set-state", lager.Data{"instance_id": route.InstanceId, "state": route.State})
+				err = m.routeStoreIface.Save(&route)
+				if err != nil {
+					lsession.Error("route-save-failed", err)
+					continue
+				}
+			}
 		}
 
+		lsession.Info("checking-provisioning-expiration", lager.Data{"instance_id": route.InstanceId, "provisioning_since": route.ProvisioningSince})
 		if route.IsProvisioningExpired() {
 			lsession.Info("expiring-unprovisioned-instance", lager.Data{
-				"domain":            route.DomainExternal,
-				"state":             route.State,
-				"createdAt":         route.CreatedAt,
-				"provisioningSince": route.ProvisioningSince,
+				"domain":             route.DomainExternal,
+				"state":              route.State,
+				"created_at":         route.CreatedAt,
+				"provisioning_since": route.ProvisioningSince,
 			})
 
 			err = m.Disable(&route)
 			if err != nil {
 				lsession.Error("unable-to-expire-unprovisioned-instance", err, lager.Data{
-					"domain":            route.DomainExternal,
-					"state":             route.State,
-					"createdAt":         route.CreatedAt,
-					"provisioningSince": route.ProvisioningSince,
+					"domain":             route.DomainExternal,
+					"state":              route.State,
+					"created_at":         route.CreatedAt,
+					"provisioning_since": route.ProvisioningSince,
 				})
 
-				lsession.Info("set-state", lager.Data{"instance_id": route.InstanceId, "state": route.State})
 				route.State = Failed
+				lsession.Info("set-state", lager.Data{"instance_id": route.InstanceId, "state": route.State})
 				err = m.routeStoreIface.Save(&route)
 				if err != nil {
 					lsession.Error("route-save-failed", err)
@@ -867,7 +955,12 @@ func (m *RouteManager) fetchRoutesToUpdate(lsession lager.Logger) ([]Route, erro
 	for _, route := range routes {
 		affectedDomains = append(affectedDomains, route.DomainExternal)
 	}
-	lsession.Info("found-instances", lager.Data{"domains": affectedDomains})
+
+	if len(routes) > 0 {
+		lsession.Info("found-instances", lager.Data{"domains": affectedDomains})
+	} else {
+		lsession.Info("found-no-instances")
+	}
 
 	return routes, nil
 }
@@ -917,17 +1010,10 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 	isDistributionDeployed := m.checkDistribution(r)
 
 	if !isDistributionDeployed {
+		//we are here when distribution provisioing
 		lsession.Info("distribution-provisioning")
 		return nil
 	}
-
-	// lsession.Info("load-user")
-	// user, err := r.loadUser(m.db)
-	// if err != nil {
-	// 	lsession.Error("load-user", err)
-	// 	return err
-	// }
-	user := r.User
 
 	desiredDomains := r.GetDomains()
 	lsession.Info("get-currently-deployed-domains")
@@ -945,78 +1031,64 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 		},
 	)
 
-	lsession.Info("get-dns01-client")
-	client, err := m.acmeClientProvider.GetDNS01Client(&user, m.settings)
+	lsession.Info("find-the-most-recent-validating-certificate")
+	var theMostRecentCert, theCurrentAttached *Certificate
+	for i, e := range r.Certificates {
+		if e.CertificateStatus == CertificateStatusValidating {
+			if theMostRecentCert == nil {
+				theMostRecentCert = &(r.Certificates[i])
+			}
+
+			if e.CreatedAt.After(theMostRecentCert.CreatedAt) {
+				theMostRecentCert = &(r.Certificates[i])
+			}
+		}
+
+		if e.CertificateStatus == CertificateStatusAttached {
+			theCurrentAttached = &(r.Certificates[i])
+		}
+	}
+
+	if theMostRecentCert == nil {
+		err = errors.New("couldn't find the most recent certificate")
+		lsession.Error("find-the-most-recent-validating-certificate-error", err)
+		return err
+	}
+
+	lsession.Info("find-the-most-recent-validating-certificate-found", lager.Data{"CertificateArn": theMostRecentCert.CertificateArn})
+
+	//we need to ensure that the certificate validation in ACM has finished and its status is 'ISSUED'
+	lsession.Info("is-certificate-issued")
+	issued, err := m.certsManager.IsCertificateIssued(theMostRecentCert.CertificateArn)
 	if err != nil {
-		lsession.Error("get-dns01-client-failed", err)
+		lsession.Error("is-certificate-issued", err)
+		if err == utils.ErrValidationTimedOut {
+			theMostRecentCert.CertificateStatus = CertificateStatusFailed
+		}
 		return err
 	}
 
-	lsession.Info("ensure-challenges")
-	if err := m.ensureChallenges(r, client); err != nil {
-		lsession.Error("ensure-challenges", err)
-		return err
-	}
-
-	// Ensure the challenges from LetsEncrypt are persisted in the database
-	lsession.Info("db-save-route-challenge")
-	err = m.routeStoreIface.Save(r) //WIP
-	// err = m.db.Save(r).Error
-	if err != nil {
-		lsession.Error("db-save-route-challenge-err", err)
-	}
-	lsession.Info("db-saved-route-challenge")
-
-	lsession.Info("challenge-unmarshall")
-	var challenges []acme.AuthorizationResource
-	if err := json.Unmarshal(r.ChallengeJSON, &challenges); err != nil {
-		lsession.Error("challenge-unmarshall", err)
-		return err
-	}
-
-	lsession.Info("solve-challenges")
-	if errs := m.solveChallenges(lsession, client, challenges); len(errs) > 0 {
-		errstr := fmt.Errorf("Error(s) solving challenges: %v", errs)
-		lsession.Error("solve-challenges", errstr)
-		return errstr
-	}
-
-	lsession.Info("request-certificate")
-	cert, err := client.RequestCertificate(challenges, true, nil, false)
-	if err != nil {
-		lsession.Error("request-certificate", err)
-		return err
-	}
-
-	lsession.Info("get-pem-cert-expiry")
-	expires, err := acme.GetPEMCertExpiration(cert.Certificate)
-	if err != nil {
-		lsession.Error("get-pem-cert-expiry", err)
-		return err
+	if !issued {
+		lsession.Info("certificate-is-not-issued-yet")
+		return nil
 	}
 
 	lsession.Info("deploy-certificate")
-	if err := m.deployCertificate(*r, cert); err != nil {
+	if err := m.deployACMCertificate(*r, *theMostRecentCert); err != nil {
 		lsession.Error("deploy-certificate", err)
 		return err
 	}
 
-	certRow := Certificate{
-		Domain:      cert.Domain,
-		CertURL:     cert.CertURL,
-		Certificate: cert.Certificate,
-		Expires:     expires,
+	//Swaping certificates from attached to detached
+	if theCurrentAttached != nil {
+		theCurrentAttached.CertificateStatus = CertificateStatusDeleted
 	}
 
-	// lsession.Info("db-create-cert")
-	// if err := m.db.Create(&certRow).Error; err != nil {
-	// 	lsession.Error("db-create-cert", err)
-	// 	return err
-	// }
+	//Set the new issued certificate as attached
+	theMostRecentCert.CertificateStatus = CertificateStatusAttached
 
 	lsession.Info("set-provisioned")
 	r.State = Provisioned
-	r.Certificate = certRow
 	lsession.Info("save-route-provisioned")
 	if err := m.routeStoreIface.Save(r); err != nil {
 		lsession.Error("save-route-provisioned", err)
@@ -1104,6 +1176,31 @@ func (m *RouteManager) solveChallenges(
 	return failures
 }
 
+func (m *RouteManager) deployACMCertificate(
+	route Route,
+	cert Certificate,
+) error {
+	lsession := m.logger.Session("deploy-acm-certificate", lager.Data{
+		"instance-id": route.InstanceId,
+		"domains":     route.GetDomains(),
+		"dist":        route.DistId,
+	})
+
+	lsession.Info("acm-set-certificate-and-cname", lager.Data{
+		"cert_id": cert.CertificateArn,
+	})
+	err := m.cloudFront.SetCertificateAndCname(route.DistId, cert.CertificateArn, route.GetDomains(), true)
+	if err != nil {
+		lsession.Error("acm-set-certificate-and-cname", err, lager.Data{
+			"cert_id": cert.CertificateArn,
+		})
+		return err
+	}
+
+	lsession.Info("finished")
+	return nil
+}
+
 func (m *RouteManager) deployCertificate(
 	route Route,
 	cert acme.CertificateResource,
@@ -1140,7 +1237,7 @@ func (m *RouteManager) deployCertificate(
 		"name":    name,
 		"cert_id": certId,
 	})
-	err = m.cloudFront.SetCertificateAndCname(route.DistId, certId, route.GetDomains())
+	err = m.cloudFront.SetCertificateAndCname(route.DistId, certId, route.GetDomains(), false)
 	if err != nil {
 		lsession.Error("iam-set-certificate-and-cname-err", err, lager.Data{
 			"name":    name,
@@ -1153,6 +1250,13 @@ func (m *RouteManager) deployCertificate(
 	return nil
 }
 
+//ToDo - will not need that with ACM (probably)
+//since we aren't going to save challenges in the database
+//we can always ask for them from ACM.
+//WIP - looks like if we don't have the challenges persisted in the database (1st time we call this function)
+//we will extract these and then save them in the DB.
+//worth checking when and where are we using this JSON again.
+//
 func (m *RouteManager) ensureChallenges(
 	route *Route,
 	client acme.ClientInterface,
@@ -1188,58 +1292,95 @@ func (m *RouteManager) ensureChallenges(
 	return nil
 }
 
+//This function will have a fork/dual behaviour for certs that were provisioned by LE or ACM
+//LE certs challenges are kept in the DB
+//ACM certs challenges are aquired dynamically via an API call
 func (m *RouteManager) GetDNSInstructions(route *Route) ([]string, error) {
 	var instructions []string
-	var challenges []acme.AuthorizationResource
 
 	lsession := m.logger.Session("get-dns-instructions", lager.Data{
 		"instance-id": route.InstanceId,
 		"domains":     route.GetDomains(),
 	})
 
-	// lsession.Info("load-user")
-	// user, err := route.loadUser(m.db)
-	// if err != nil {
-	// 	lsession.Error("load-user-err", err)
-	// 	return instructions, err
-	// }
-	// Maxim - WIP - the user data should be already in the Route obj
-	// since we are hydrating all the data from all related tables into the route object
+	if route.IsCertificateManagedByACM {
+		lsession.Info("certsmanager-get-validation-challenges")
+		validationChallenges, err := m.certsManager.GetDomainValidationChallenges(route.Certificate.CertificateArn)
+		if err != nil {
+			lsession.Error("certsmanager-get-validation-challenges", err)
+			return []string{}, err
+		}
 
-	// Maxim - WIP - instead of using additional variable 'user', we could just use route.User (line 1196)
-	//user := route.User
+		for _, e := range validationChallenges {
 
-	lsession.Info("json-unmarshal-challenge")
-	if err := json.Unmarshal(route.ChallengeJSON, &challenges); err != nil {
-		lsession.Error("json-unmarshal-challenge", err)
-		return instructions, err
-	}
 
-	lsession.Info("get-key-authorization")
-	for _, auth := range challenges {
-		for _, challenge := range auth.Body.Challenges {
-			if challenge.Type == acme.DNS01 {
-				lsession.Info(
-					"get-key-authorization-for-a-dns-challenge",
-					lager.Data{
-						"domain": auth.Domain,
-					},
-				)
-				keyAuth, err := acme.GetKeyAuthorization(
-					challenge.Token,
-					route.User.GetPrivateKey(),
-				)
-				if err != nil {
-					lsession.Error("get-key-authorization-err", err)
-					return instructions, err
-				}
-				fqdn, value, ttl := acme.DNS01Record(auth.Domain, keyAuth)
+
+			if e.RecordName == "" {
 				instructions = append(instructions, fmt.Sprintf(
-					"name: %s, value: %s, ttl: %d",
-					fqdn, value, ttl,
+					"Awaiting challenges for %s",
+					e.DomainName,
+				))
+			} else {
+				// Keep the new lines in this format
+				format := `
+
+For domain %s, set DNS record
+    Name:  %s
+    Type:  %s
+    Value: %s
+    TTL:   %d
+
+Current validation status of %s: %s
+
+`
+				instructions = append(instructions, fmt.Sprintf(
+					format,
+					e.DomainName,
+					e.RecordName,
+					e.RecordType,
+					strings.Trim(e.RecordValue, " "),
+					route.DefaultTTL,
+					e.DomainName,
+					e.ValidationStatus,
 				))
 			}
 		}
+	} else {
+		var challenges []acme.AuthorizationResource
+
+		lsession.Info("json-unmarshal-challenge")
+		if err := json.Unmarshal(route.ChallengeJSON, &challenges); err != nil {
+			lsession.Error("json-unmarshal-challenge", err)
+			return instructions, err
+		}
+
+		lsession.Info("get-key-authorization")
+		for _, auth := range challenges {
+			for _, challenge := range auth.Body.Challenges {
+				if challenge.Type == acme.DNS01 {
+					lsession.Info(
+						"get-key-authorization-for-a-dns-challenge",
+						lager.Data{
+							"domain": auth.Domain,
+						},
+					)
+					keyAuth, err := acme.GetKeyAuthorization(
+						challenge.Token,
+						route.User.GetPrivateKey(),
+					)
+					if err != nil {
+						lsession.Error("get-key-authorization-err", err)
+						return instructions, err
+					}
+					fqdn, value, ttl := acme.DNS01Record(auth.Domain, keyAuth)
+					instructions = append(instructions, fmt.Sprintf(
+						"name: %s, value: %s, ttl: %d, type: TXT",
+						fqdn, value, ttl,
+					))
+				}
+			}
+		}
+
 	}
 
 	lsession.Info("finished")
