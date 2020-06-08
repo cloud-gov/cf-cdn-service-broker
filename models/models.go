@@ -3,7 +3,6 @@ package models
 import (
 	"crypto"
 	"crypto/ecdsa"
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
@@ -76,19 +75,6 @@ type UserData struct {
 	Key   []byte
 }
 
-func CreateUser(email string) (utils.User, error) {
-	user := utils.User{Email: email}
-
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		helperLogger.Session("create-user").Error("rsa-generate-key", err)
-		return user, err
-	}
-	user.SetPrivateKey(key)
-
-	return user, nil
-}
-
 func (r *Route) SetUser(user utils.User) error {
 	var err error
 	userData := UserData{Email: user.GetEmail()}
@@ -111,44 +97,12 @@ func (r *Route) SetUser(user utils.User) error {
 	return nil
 }
 
-func LoadUser(userData UserData) (utils.User, error) {
-	var user utils.User
-
-	lsession := helperLogger.Session("load-user")
-
-	if err := json.Unmarshal(userData.Reg, &user); err != nil {
-		lsession.Error("json-unmarshal-user-data", err)
-		return user, err
-	}
-	key, err := loadPrivateKey(userData.Key)
-	if err != nil {
-		lsession.Error("load-private-key", err)
-		return user, err
-	}
-	user.SetPrivateKey(key)
-	return user, nil
-}
-
 func Migrate(db *gorm.DB) error {
 	if err := db.AutoMigrate(&Route{}, &Certificate{}, &UserData{}).Error; err != nil {
 		return err
 	}
 	db.Model(&UserData{}).RemoveIndex("uix_user_data_email")
 	return nil
-}
-
-// loadPrivateKey loads a PEM-encoded ECC/RSA private key from an array of bytes.
-func loadPrivateKey(keyBytes []byte) (crypto.PrivateKey, error) {
-	keyBlock, _ := pem.Decode(keyBytes)
-
-	switch keyBlock.Type {
-	case "RSA PRIVATE KEY":
-		return x509.ParsePKCS1PrivateKey(keyBlock.Bytes)
-	case "EC PRIVATE KEY":
-		return x509.ParseECPrivateKey(keyBlock.Bytes)
-	}
-
-	return nil, errors.New("unknown private key type")
 }
 
 // savePrivateKey saves a PEM-encoded ECC/RSA private key to an array of bytes.
@@ -266,7 +220,7 @@ type Certificate struct {
 	Expires     time.Time `gorm:"index"`
 	//adding a certificateArn to this struct, so we can truck the requested/provisioned certificates by ACM
 	CertificateArn    string `gorm:"not null;default:'managedbyletsencrypt'"`
-	CertificateStatus string `gorm:"not null;default:'letsencrypt'"` //(Attached, Validating, Detached, failed, letsencrypt)
+	CertificateStatus string `gorm:"not null;default:'letsencrypt'"` //(Attached, Validating, Deleted, failed, letsencrypt)
 }
 
 type RouteManagerIface interface {
@@ -387,8 +341,6 @@ func (m *RouteManager) Create(
 	}
 	lsession.Info("certsmanager-request-certificate-done", lager.Data{"certificate-arn": *certArn})
 
-	//WIP - it looks that the only data about ACM cert we need to persist is the ARN
-	// everything else we can retrieve
 	newCert := Certificate{
 		CertificateArn:    *certArn,
 		CertificateStatus: CertificateStatusValidating,
@@ -504,8 +456,6 @@ func (m *RouteManager) Update(
 		}
 		lsession.Info("certsmanager-request-certificate-done", lager.Data{"certificate-arn": *certArn})
 
-		//WIP - it looks that the only data about ACM cert we need to persist is the ARN
-		// everything else we can retrieve
 		newCert := Certificate{
 			CertificateArn:    *certArn,
 			CertificateStatus: CertificateStatusValidating,
@@ -1250,47 +1200,6 @@ func (m *RouteManager) deployCertificate(
 	return nil
 }
 
-//ToDo - will not need that with ACM (probably)
-//since we aren't going to save challenges in the database
-//we can always ask for them from ACM.
-//WIP - looks like if we don't have the challenges persisted in the database (1st time we call this function)
-//we will extract these and then save them in the DB.
-//worth checking when and where are we using this JSON again.
-//
-func (m *RouteManager) ensureChallenges(
-	route *Route,
-	client acme.ClientInterface,
-) error {
-
-	lsession := m.logger.Session("ensure-challenges", lager.Data{
-		"instance-id": route.InstanceId,
-		"domains":     route.GetDomains(),
-	})
-
-	if len(route.ChallengeJSON) > 0 {
-		lsession.Info("challenge-json-was-already-present")
-		return nil
-	}
-
-	lsession.Info("get-challenges")
-	challenges, errs := client.GetChallenges(route.GetDomains())
-	if len(errs) > 0 {
-		err := fmt.Errorf("Error(s) getting challenges: %v", errs)
-		lsession.Error("get-challenges-err", err)
-		return err
-	}
-
-	lsession.Info("unmarshal-challenges")
-	var err error
-	route.ChallengeJSON, err = json.Marshal(challenges)
-	if err != nil {
-		lsession.Error("json-marshal-challenge-err", err)
-		return err
-	}
-
-	lsession.Info("finished")
-	return nil
-}
 
 //This function will have a fork/dual behaviour for certs that were provisioned by LE or ACM
 //LE certs challenges are kept in the DB
