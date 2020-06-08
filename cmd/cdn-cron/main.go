@@ -42,20 +42,26 @@ func main() {
 		&utils.Iam{settings, iam.New(session)},
 		&utils.Distribution{settings, cloudfront.New(session)},
 		settings,
-		db,
 		models.NewAcmeClientProvider(logger),
+		models.RouteStore{Database: db},
+		utils.NewCertificateManager(logger, settings, session),
 	)
 
 	c := cron.New()
 
 	c.AddFunc(settings.Schedule, func() {
-		logger.Info("Running renew")
+		logger.Info("run-renew-certs")
 		manager.RenewAll()
 	})
 
 	c.AddFunc(settings.Schedule, func() {
-		logger.Info("Running cert cleanup")
+		logger.Info("run-cert-cleanup")
 		manager.DeleteOrphanedCerts()
+	})
+
+	c.AddFunc("@every 2m", func() {
+		logger.Info("run-updating-routes-check")
+		manager.CheckRoutesToUpdate()
 	})
 
 	logger.Info("Starting cron")

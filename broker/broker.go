@@ -176,23 +176,10 @@ func (b *CdnServiceBroker) LastOperation(
 		}, nil
 	}
 
-	err = b.manager.Poll(route)
-	if err != nil {
-		lsession.Error("manager-poll-err", err, lager.Data{
-			"domain": route.DomainExternal,
-			"state":  route.State,
-		})
-		if strings.Contains(err.Error(), "CNAMEAlreadyExists") {
-			return brokerapi.LastOperation{
-				State:       brokerapi.Failed,
-				Description: "One or more of the CNAMEs you provided are already associated with a different CDN",
-			}, nil
-		}
-	}
-
-	lsession.Info("provisioning-state", lager.Data{
-		"domain": route.DomainExternal,
-		"state":  route.State,
+	lsession.Info("route-state", lager.Data{
+		"instance_id": route.InstanceId,
+		"domain":      route.DomainExternal,
+		"state":       route.State,
 	})
 
 	switch route.State {
@@ -213,11 +200,32 @@ func (b *CdnServiceBroker) LastOperation(
 			})
 			return brokerapi.LastOperation{}, err
 		}
-		description := fmt.Sprintf(
-			"Provisioning in progress [%s => %s]; CNAME or ALIAS domain %s to %s and create TXT record(s): \n%s",
-			route.DomainExternal, route.Origin, route.DomainExternal, route.DomainInternal,
+		var description string
+
+		cloudFrontCNAMES := []string{}
+		for _, tenantDomain := range route.GetDomains() {
+			cloudFrontCNAMES = append(
+				cloudFrontCNAMES,
+				fmt.Sprintf("%s => %s", tenantDomain, route.DomainInternal),
+			)
+		}
+
+		description = fmt.Sprintf(
+			`
+Provisioning in progress.
+
+Create the following CNAME records to direct traffic from your domains to your CDN route
+
+%s
+
+To validate ownership of the domain, set the following DNS records
+
+%s
+`,
+			strings.Join(cloudFrontCNAMES, "\n"),
 			strings.Join(instructions, "\n"),
 		)
+
 		lsession.Info("provisioning-ok", lager.Data{
 			"domain":      route.DomainExternal,
 			"state":       route.State,
@@ -269,8 +277,25 @@ func (b *CdnServiceBroker) LastOperation(
 			State:       brokerapi.Succeeded,
 			Description: description,
 		}, nil
+	case models.Conflict:
+		description := "One or more of the CNAMEs you provided are already associated with a different CDN"
+		lsession.Info("conflict", lager.Data{
+			"domain":      route.DomainExternal,
+			"state":       route.State,
+			"description": description,
+		})
+		return brokerapi.LastOperation{
+			State:       brokerapi.Failed,
+			Description: description,
+		}, nil
+
+	case models.Failed:
+		fallthrough
 	default:
 		description := "Service instance stuck in unmanagable state."
+		if route.IsProvisioningExpired() {
+			description = fmt.Sprintf("Couldn't verify in 24h time slot. %s", description)
+		}
 		lsession.Info("unmanagable-state", lager.Data{
 			"domain":      route.DomainExternal,
 			"state":       route.State,

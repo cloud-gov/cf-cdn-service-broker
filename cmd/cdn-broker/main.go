@@ -55,8 +55,9 @@ func main() {
 		&utils.Iam{settings, iam.New(session)},
 		&utils.Distribution{settings, cloudfront.New(session)},
 		settings,
-		db,
 		models.NewAcmeClientProvider(logger),
+		models.RouteStore{Database: db},
+		utils.NewCertificateManager(logger, settings, session),
 	)
 	broker := broker.New(
 		&manager,

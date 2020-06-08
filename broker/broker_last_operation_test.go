@@ -3,6 +3,7 @@ package broker_test
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/suite"
@@ -71,7 +72,6 @@ var _ = Describe("Last operation", func() {
 			Origin:         "cdn.apps.cloud.gov",
 		}
 		manager.On("Get", "123").Return(route, nil)
-		manager.On("Poll", route).Return(nil)
 		b := broker.New(
 			&manager,
 			&s.cfclient,
@@ -92,11 +92,12 @@ var _ = Describe("Last operation", func() {
 			DomainExternal: "cdn.cloud.gov",
 			Origin:         "cdn.apps.cloud.gov",
 			ChallengeJSON:  []byte("[]"),
-			Model:          gorm.Model{},
+			Model: gorm.Model{
+				CreatedAt: time.Now().Add(-5 * time.Minute),
+			},
 		}
 		manager.On("Get", "123").Return(route, nil)
 		manager.On("GetDNSInstructions", route).Return([]string{"token"}, nil)
-		manager.On("Poll", route).Return(nil)
 		b := broker.New(
 			&manager,
 			&s.cfclient,
@@ -106,8 +107,32 @@ var _ = Describe("Last operation", func() {
 
 		operation, err := b.LastOperation(s.ctx, "123", brokerapi.PollDetails{OperationData: ""})
 		Expect(operation.State).To(Equal(brokerapi.InProgress))
-		Expect(operation.Description).To(ContainSubstring(operation.Description))
-		Expect(operation.Description).To(ContainSubstring("Provisioning in progress [cdn.cloud.gov => cdn.apps.cloud.gov]"))
+		Expect(operation.Description).To(ContainSubstring("Provisioning in progress"))
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("Should be failed when the route's state is failed", func() {
+		manager := mocks.RouteManagerIface{}
+		route := &models.Route{
+			State:          models.Failed,
+			DomainExternal: "cdn.cloud.gov",
+			Origin:         "cdn.apps.cloud.gov",
+			ChallengeJSON:  []byte("[]"),
+			Model: gorm.Model{
+				CreatedAt: time.Now().Add(-5 * time.Minute),
+			},
+		}
+		manager.On("Get", "123").Return(route, nil)
+		manager.On("GetDNSInstructions", route).Return([]string{"token"}, nil)
+		b := broker.New(
+			&manager,
+			&s.cfclient,
+			s.settings,
+			s.logger,
+		)
+
+		operation, err := b.LastOperation(s.ctx, "123", brokerapi.PollDetails{OperationData: ""})
+		Expect(operation.State).To(Equal(brokerapi.Failed))
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -120,7 +145,6 @@ var _ = Describe("Last operation", func() {
 			Origin:         "cdn.apps.cloud.gov",
 		}
 		manager.On("Get", "123").Return(route, nil)
-		manager.On("Poll", route).Return(nil)
 		b := broker.New(
 			&manager,
 			&s.cfclient,
