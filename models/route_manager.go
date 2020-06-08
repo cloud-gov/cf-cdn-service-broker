@@ -1,227 +1,28 @@
 package models
 
 import (
-	"crypto"
-	"crypto/ecdsa"
-	"crypto/rsa"
+	"code.cloudfoundry.org/lager"
 	"crypto/tls"
-	"crypto/x509"
-	"database/sql/driver"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
+	"github.com/18F/cf-cdn-service-broker/config"
+	"github.com/18F/cf-cdn-service-broker/lego/acme"
+	"github.com/18F/cf-cdn-service-broker/utils"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/acm"
+	"github.com/aws/aws-sdk-go/service/cloudfront"
+	"github.com/aws/aws-sdk-go/service/iam"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/jinzhu/gorm"
+	"github.com/pivotal-cf/brokerapi"
 	"io/ioutil"
 	"net/http"
 	"path"
 	"strings"
 	"time"
-
-	"code.cloudfoundry.org/lager"
-	"github.com/18F/cf-cdn-service-broker/lego/acme"
-	"github.com/jinzhu/gorm"
-	"github.com/pivotal-cf/brokerapi"
-
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/cloudfront"
-	"github.com/aws/aws-sdk-go/service/iam"
-	"github.com/aws/aws-sdk-go/service/s3"
-
-	"github.com/18F/cf-cdn-service-broker/config"
-	"github.com/18F/cf-cdn-service-broker/utils"
 )
-
-type State string
-
-const (
-	Provisioning   State = "provisioning"
-	Provisioned    State = "provisioned"
-	Deprovisioning State = "deprovisioning"
-	Deprovisioned  State = "deprovisioned"
-	Conflict       State = "conflict"
-	Failed         State = "failed"
-)
-
-var (
-	helperLogger = lager.NewLogger("helper-logger")
-)
-
-// Marshal a `State` to a `string` when saving to the database
-func (s State) Value() (driver.Value, error) {
-	return string(s), nil
-}
-
-// Unmarshal an `interface{}` to a `State` when reading from the database
-func (s *State) Scan(value interface{}) error {
-	switch value.(type) {
-	case string:
-		*s = State(value.(string))
-	case []byte:
-		*s = State(value.([]byte))
-	default:
-		err := fmt.Errorf("%s-is-incompatible", value)
-		helperLogger.Session("state-scan").Error("scan-switch", err)
-		return err
-	}
-	return nil
-}
-
-type UserData struct {
-	gorm.Model
-	Email string `gorm:"not null"`
-	Reg   []byte
-	Key   []byte
-}
-
-func (r *Route) SetUser(user utils.User) error {
-	var err error
-	userData := UserData{Email: user.GetEmail()}
-
-	lsession := helperLogger.Session("save-user")
-
-	userData.Key, err = savePrivateKey(user.GetPrivateKey())
-	if err != nil {
-		lsession.Error("save-private-key", err)
-		return err
-	}
-	userData.Reg, err = json.Marshal(user)
-	if err != nil {
-		lsession.Error("json-marshal-user", err)
-		return err
-	}
-
-	r.UserData = userData
-
-	return nil
-}
-
-func Migrate(db *gorm.DB) error {
-	if err := db.AutoMigrate(&Route{}, &Certificate{}, &UserData{}).Error; err != nil {
-		return err
-	}
-	db.Model(&UserData{}).RemoveIndex("uix_user_data_email")
-	return nil
-}
-
-// savePrivateKey saves a PEM-encoded ECC/RSA private key to an array of bytes.
-func savePrivateKey(key crypto.PrivateKey) ([]byte, error) {
-	var pemType string
-	var keyBytes []byte
-	switch key := key.(type) {
-	case *ecdsa.PrivateKey:
-		var err error
-		pemType = "EC"
-		keyBytes, err = x509.MarshalECPrivateKey(key)
-		if err != nil {
-			helperLogger.Session("save-private-key").Error("marshal-ec-private-key", err)
-			return nil, err
-		}
-	case *rsa.PrivateKey:
-		pemType = "RSA"
-		keyBytes = x509.MarshalPKCS1PrivateKey(key)
-	}
-
-	pemKey := pem.Block{Type: pemType + " PRIVATE KEY", Bytes: keyBytes}
-	return pem.EncodeToMemory(&pemKey), nil
-}
-
-type Route struct {
-	gorm.Model
-	InstanceId                string `gorm:"not null;unique_index"`
-	State                     State  `gorm:"not null;index"`
-	ChallengeJSON             []byte
-	DomainExternal            string
-	DomainInternal            string
-	DistId                    string
-	Origin                    string
-	Path                      string      // Always empty, should not remove because it is in DB
-	InsecureOrigin            bool        // Always false, should not remove because it is in DB
-	Certificate               Certificate //this is used by letsencrypt certs and will be removed once all our certs are migrated to ACM
-	UserData                  UserData
-	UserDataID                int
-	User                      utils.User `gorm:"-"`
-	DefaultTTL                int64      `gorm:"default:86400"`
-	ProvisioningSince         *time.Time //using the same field to measure a time for Provisioning or Deprovisioning
-	IsCertificateManagedByACM bool       `gorm:"default:false"` //using false as default value, so all the existing records will default to managed by LE
-	Certificates              []Certificate
-}
-
-// BeforeCreate hook will change the value of Provisioning_since field to time.Now()
-// if creating a route in 'Provisioning' state
-// if the state is 'Provisioned' then the value should be 'nil'
-func (r *Route) BeforeCreate(tx *gorm.DB) error {
-
-	if r.State == Provisioning {
-		t := time.Now()
-		r.ProvisioningSince = &t
-	}
-	return nil
-}
-
-func (r *Route) BeforeUpdate(tx *gorm.DB) error {
-	var originalStates []State
-	err := tx.Find(&Route{InstanceId: r.InstanceId}).Pluck("state", &originalStates).Error
-
-	if err != nil {
-		return err
-	}
-
-	originalState := originalStates[0]
-
-	if isActivelyChanging(originalState) && !isActivelyChanging(r.State) {
-		r.ProvisioningSince = nil
-	} else if !isActivelyChanging(originalState) && isActivelyChanging(r.State) {
-		t := time.Now()
-		r.ProvisioningSince = &t
-	}
-
-	return nil
-}
-
-func isActivelyChanging(st State) bool {
-	return st == Provisioning || st == Deprovisioning
-}
-
-func (r *Route) GetDomains() []string {
-	return strings.Split(r.DomainExternal, ",")
-}
-
-const ProvisioningExpirationPeriodHours time.Duration = 84 * time.Hour
-
-//the issue of a certificate in ACM has a time out limit of 72 hours
-//plus few (12) hours to account for any unexpected delays
-//we've got to the magic number of 84 hours represented by the const - ProvisioningExpirationPeriodHours
-func (r *Route) IsProvisioningExpired() bool {
-	var provisioningSince *time.Time
-
-	if r.ProvisioningSince != nil {
-		provisioningSince = r.ProvisioningSince
-	}
-	return r.State == Provisioning && provisioningSince != nil &&
-		(*provisioningSince).Before(time.Now().Add(-1*ProvisioningExpirationPeriodHours))
-}
-
-const (
-	CertificateStatusAttached   string = "attached"
-	CertificateStatusValidating string = "validating"
-	CertificateStatusDeleted    string = "deleted"
-	CertificateStatusFailed     string = "failed"
-	CertificateStatusLE         string = "letsencrypt"
-)
-
-type Certificate struct {
-	gorm.Model
-	RouteId     uint
-	Domain      string
-	CertURL     string
-	Certificate []byte
-	Expires     time.Time `gorm:"index"`
-	//adding a certificateArn to this struct, so we can truck the requested/provisioned certificates by ACM
-	CertificateArn    string `gorm:"not null;default:'managedbyletsencrypt'"`
-	CertificateStatus string `gorm:"not null;default:'letsencrypt'"` //(Attached, Validating, Deleted, failed, letsencrypt)
-}
 
 type RouteManagerIface interface {
 	Create(
@@ -513,88 +314,6 @@ func (m *RouteManager) Disable(r *Route) error {
 	return nil
 }
 
-func (m *RouteManager) stillActive(r *Route) error {
-	lsession := m.logger.Session("route-manager-still-active", lager.Data{
-		"instance-id": r.InstanceId,
-	})
-
-	lsession.Info("starting-canary-check", lager.Data{
-		"settings":    m.settings,
-		"instance-id": r.InstanceId,
-	})
-
-	session := session.New(aws.NewConfig().WithRegion(m.settings.AwsDefaultRegion))
-
-	s3client := s3.New(session)
-
-	target := path.Join(".well-known", "acme-challenge", "canary", r.InstanceId)
-
-	input := s3.PutObjectInput{
-		Bucket: aws.String(m.settings.Bucket),
-		Key:    aws.String(target),
-		Body:   strings.NewReader(r.InstanceId),
-	}
-
-	if m.settings.ServerSideEncryption != "" {
-		input.ServerSideEncryption = aws.String(m.settings.ServerSideEncryption)
-	}
-
-	lsession.Info("s3-put-object", lager.Data{
-		"bucket": m.settings.Bucket,
-		"key":    target,
-	})
-	if _, err := s3client.PutObject(&input); err != nil {
-		lsession.Error("s3-put-object", err)
-		return err
-	}
-
-	insecureClient := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
-
-	lsession.Info("get-domains")
-	for _, domain := range r.GetDomains() {
-		lsession.Info("insecure-client-get", lager.Data{
-			"domain": domain,
-			"target": target,
-		})
-		resp, err := insecureClient.Get("https://" + path.Join(domain, target))
-		if err != nil {
-			lsession.Error("insecure-client-get", err)
-			return err
-		}
-
-		defer resp.Body.Close()
-		lsession.Info("read-response-body", lager.Data{
-			"domain": domain,
-			"target": target,
-		})
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			lsession.Error("read-response-body", err)
-			return err
-		}
-
-		lsession.Info("canary-check", lager.Data{
-			"domain": domain,
-			"target": target,
-		})
-		if string(body) != r.InstanceId {
-			err := fmt.Errorf(
-				"Canary check failed for %s; expected %s, got %s",
-				domain, r.InstanceId, string(body),
-			)
-			lsession.Error("canary-check-failed", err)
-			return err
-		}
-	}
-
-	lsession.Info("finished")
-	return nil
-}
-
 func (m *RouteManager) Renew(r *Route) error {
 	lsession := m.logger.Session("route-manager-renew", lager.Data{
 		"instance-id": r.InstanceId,
@@ -665,104 +384,6 @@ func (m *RouteManager) DeleteOrphanedCerts() {
 	m.deleteOrphanedLetsEncryptCerts()
 
 	m.deleteOrphanedACMCerts()
-
-	lsession.Info("finished")
-}
-
-func (m *RouteManager) deleteOrphanedACMCerts() {
-	lsession := m.logger.Session("delete-acm-managed-orphaned-certs")
-
-	lsession.Info("list-issued-certificates")
-	certs, err := m.certsManager.ListIssuedCertificates()
-	if err != nil {
-		lsession.Error("list-issued-certificates", err)
-		return
-	}
-
-	time24hAgo := time.Now().Add(-24 * time.Hour)
-
-	for _, cert := range certs {
-		managedByCdnBroker := false
-
-		for _, tag := range cert.Tags {
-			if *tag.Key == utils.ManagedByTagName && *tag.Value == utils.ManagedByTagValue {
-				managedByCdnBroker = true
-				break
-			}
-		}
-
-		isIssued := *cert.Status == acm.CertificateStatusIssued
-		isInUse := len(cert.InUseBy) > 0
-		olderThan24h := cert.IssuedAt.Before(time24hAgo)
-
-
-		if isIssued && !isInUse &&  managedByCdnBroker && olderThan24h {
-			lsession.Info("deleting-orphaned-cert", lager.Data{"certificate-arn": cert.CertificateArn})
-			err = m.certsManager.DeleteCertificate(*cert.CertificateArn)
-			if err != nil {
-				lsession.Error("deleting-orphaned-cert", err, lager.Data{"certificate-arn": cert.CertificateArn})
-			}
-		} else {
-			lsession.Info("not-deleting-certificate", lager.Data{
-				"certificate-arn": *cert.CertificateArn,
-				"is-issued": isIssued,
-				"is-in-use": isInUse,
-				"is-managed-by-cdn-broker": managedByCdnBroker,
-				"is-older-than-24h": olderThan24h,
-			})
-		}
-	}
-
-	lsession.Info("finished")
-}
-
-func (m *RouteManager) deleteOrphanedLetsEncryptCerts() {
-	lsession := m.logger.Session("delete-le-managed-orphaned-certs")
-	// iterate over all distributions and record all certificates in-use by these distributions
-	activeCerts := make(map[string]string)
-
-	lsession.Info("list-distributions")
-	err := m.cloudFront.ListDistributions(func(distro cloudfront.DistributionSummary) bool {
-		if distro.ViewerCertificate.IAMCertificateId != nil {
-			activeCerts[*distro.ViewerCertificate.IAMCertificateId] = *distro.ARN
-		}
-		return true
-	})
-
-	if err != nil {
-		lsession.Error("cloudfront-list-distributions", err)
-		return
-	}
-
-	// iterate over all certificates
-	lsession.Info("list-certificates")
-	err = m.iam.ListCertificates(func(cert iam.ServerCertificateMetadata) bool {
-
-		// delete any certs not attached to a distribution that are older than 24 hours
-		_, active := activeCerts[*cert.ServerCertificateId]
-		if !active && time.Since(*cert.UploadDate).Hours() > 24 {
-			lsession.Info("cleaning-orphaned-certificate", lager.Data{
-				"cert": cert,
-			})
-
-			err := m.iam.DeleteCertificate(*cert.ServerCertificateName)
-			if err != nil {
-				lsession.Error("iam-delete-certificate", err, lager.Data{
-					"cert": cert,
-				})
-			}
-		} else {
-			lsession.Info("skipping", lager.Data{
-				"cert": cert,
-			})
-		}
-
-		return true
-	})
-
-	if err != nil {
-		lsession.Error("iam_list_certificates", err)
-	}
 
 	lsession.Info("finished")
 }
@@ -876,6 +497,302 @@ func (m *RouteManager) CheckRoutesToUpdate() {
 			}
 		}
 	}
+}
+
+//This function will have a fork/dual behaviour for certs that were provisioned by LE or ACM
+//LE certs challenges are kept in the DB
+//ACM certs challenges are aquired dynamically via an API call
+func (m *RouteManager) GetDNSInstructions(route *Route) ([]string, error) {
+	var instructions []string
+
+	lsession := m.logger.Session("get-dns-instructions", lager.Data{
+		"instance-id": route.InstanceId,
+		"domains":     route.GetDomains(),
+	})
+
+	if route.IsCertificateManagedByACM {
+		lsession.Info("certsmanager-get-validation-challenges")
+		validationChallenges, err := m.certsManager.GetDomainValidationChallenges(route.Certificate.CertificateArn)
+		if err != nil {
+			lsession.Error("certsmanager-get-validation-challenges", err)
+			return []string{}, err
+		}
+
+		for _, e := range validationChallenges {
+
+
+
+			if e.RecordName == "" {
+				instructions = append(instructions, fmt.Sprintf(
+					"Awaiting challenges for %s",
+					e.DomainName,
+				))
+			} else {
+				// Keep the new lines in this format
+				format := `
+
+For domain %s, set DNS record
+    Name:  %s
+    Type:  %s
+    Value: %s
+    TTL:   %d
+
+Current validation status of %s: %s
+
+`
+				instructions = append(instructions, fmt.Sprintf(
+					format,
+					e.DomainName,
+					e.RecordName,
+					e.RecordType,
+					strings.Trim(e.RecordValue, " "),
+					route.DefaultTTL,
+					e.DomainName,
+					e.ValidationStatus,
+				))
+			}
+		}
+	} else {
+		var challenges []acme.AuthorizationResource
+
+		lsession.Info("json-unmarshal-challenge")
+		if err := json.Unmarshal(route.ChallengeJSON, &challenges); err != nil {
+			lsession.Error("json-unmarshal-challenge", err)
+			return instructions, err
+		}
+
+		lsession.Info("get-key-authorization")
+		for _, auth := range challenges {
+			for _, challenge := range auth.Body.Challenges {
+				if challenge.Type == acme.DNS01 {
+					lsession.Info(
+						"get-key-authorization-for-a-dns-challenge",
+						lager.Data{
+							"domain": auth.Domain,
+						},
+					)
+					keyAuth, err := acme.GetKeyAuthorization(
+						challenge.Token,
+						route.User.GetPrivateKey(),
+					)
+					if err != nil {
+						lsession.Error("get-key-authorization-err", err)
+						return instructions, err
+					}
+					fqdn, value, ttl := acme.DNS01Record(auth.Domain, keyAuth)
+					instructions = append(instructions, fmt.Sprintf(
+						"name: %s, value: %s, ttl: %d, type: TXT",
+						fqdn, value, ttl,
+					))
+				}
+			}
+		}
+
+	}
+
+	lsession.Info("finished")
+	return instructions, nil
+}
+
+func (m *RouteManager) GetCurrentlyDeployedDomains(r *Route) ([]string, error) {
+	lsession := m.logger.Session("get-currently-deployed-domains")
+
+	lsession.Info("cloudfront-get-start")
+	dist, err := m.cloudFront.Get(r.DistId)
+	if err != nil {
+		lsession.Error("cloudfront-get-error", err)
+
+		return []string{}, err
+	}
+	lsession.Info("cloudfront-get-done")
+
+	deployedDomains := []string{}
+	for _, domain := range dist.DistributionConfig.Aliases.Items {
+		deployedDomains = append(deployedDomains, *domain)
+	}
+
+	lsession.Info("finished")
+	return deployedDomains, nil
+}
+
+func (m *RouteManager) deleteOrphanedACMCerts() {
+	lsession := m.logger.Session("delete-acm-managed-orphaned-certs")
+
+	lsession.Info("list-issued-certificates")
+	certs, err := m.certsManager.ListIssuedCertificates()
+	if err != nil {
+		lsession.Error("list-issued-certificates", err)
+		return
+	}
+
+	time24hAgo := time.Now().Add(-24 * time.Hour)
+
+	for _, cert := range certs {
+		managedByCdnBroker := false
+
+		for _, tag := range cert.Tags {
+			if *tag.Key == utils.ManagedByTagName && *tag.Value == utils.ManagedByTagValue {
+				managedByCdnBroker = true
+				break
+			}
+		}
+
+		isIssued := *cert.Status == acm.CertificateStatusIssued
+		isInUse := len(cert.InUseBy) > 0
+		olderThan24h := cert.IssuedAt.Before(time24hAgo)
+
+
+		if isIssued && !isInUse &&  managedByCdnBroker && olderThan24h {
+			lsession.Info("deleting-orphaned-cert", lager.Data{"certificate-arn": cert.CertificateArn})
+			err = m.certsManager.DeleteCertificate(*cert.CertificateArn)
+			if err != nil {
+				lsession.Error("deleting-orphaned-cert", err, lager.Data{"certificate-arn": cert.CertificateArn})
+			}
+		} else {
+			lsession.Info("not-deleting-certificate", lager.Data{
+				"certificate-arn": *cert.CertificateArn,
+				"is-issued": isIssued,
+				"is-in-use": isInUse,
+				"is-managed-by-cdn-broker": managedByCdnBroker,
+				"is-older-than-24h": olderThan24h,
+			})
+		}
+	}
+
+	lsession.Info("finished")
+}
+
+func (m *RouteManager) deleteOrphanedLetsEncryptCerts() {
+	lsession := m.logger.Session("delete-le-managed-orphaned-certs")
+	// iterate over all distributions and record all certificates in-use by these distributions
+	activeCerts := make(map[string]string)
+
+	lsession.Info("list-distributions")
+	err := m.cloudFront.ListDistributions(func(distro cloudfront.DistributionSummary) bool {
+		if distro.ViewerCertificate.IAMCertificateId != nil {
+			activeCerts[*distro.ViewerCertificate.IAMCertificateId] = *distro.ARN
+		}
+		return true
+	})
+
+	if err != nil {
+		lsession.Error("cloudfront-list-distributions", err)
+		return
+	}
+
+	// iterate over all certificates
+	lsession.Info("list-certificates")
+	err = m.iam.ListCertificates(func(cert iam.ServerCertificateMetadata) bool {
+
+		// delete any certs not attached to a distribution that are older than 24 hours
+		_, active := activeCerts[*cert.ServerCertificateId]
+		if !active && time.Since(*cert.UploadDate).Hours() > 24 {
+			lsession.Info("cleaning-orphaned-certificate", lager.Data{
+				"cert": cert,
+			})
+
+			err := m.iam.DeleteCertificate(*cert.ServerCertificateName)
+			if err != nil {
+				lsession.Error("iam-delete-certificate", err, lager.Data{
+					"cert": cert,
+				})
+			}
+		} else {
+			lsession.Info("skipping", lager.Data{
+				"cert": cert,
+			})
+		}
+
+		return true
+	})
+
+	if err != nil {
+		lsession.Error("iam_list_certificates", err)
+	}
+
+	lsession.Info("finished")
+}
+
+func (m *RouteManager) stillActive(r *Route) error {
+	lsession := m.logger.Session("route-manager-still-active", lager.Data{
+		"instance-id": r.InstanceId,
+	})
+
+	lsession.Info("starting-canary-check", lager.Data{
+		"settings":    m.settings,
+		"instance-id": r.InstanceId,
+	})
+
+	session := session.New(aws.NewConfig().WithRegion(m.settings.AwsDefaultRegion))
+
+	s3client := s3.New(session)
+
+	target := path.Join(".well-known", "acme-challenge", "canary", r.InstanceId)
+
+	input := s3.PutObjectInput{
+		Bucket: aws.String(m.settings.Bucket),
+		Key:    aws.String(target),
+		Body:   strings.NewReader(r.InstanceId),
+	}
+
+	if m.settings.ServerSideEncryption != "" {
+		input.ServerSideEncryption = aws.String(m.settings.ServerSideEncryption)
+	}
+
+	lsession.Info("s3-put-object", lager.Data{
+		"bucket": m.settings.Bucket,
+		"key":    target,
+	})
+	if _, err := s3client.PutObject(&input); err != nil {
+		lsession.Error("s3-put-object", err)
+		return err
+	}
+
+	insecureClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+
+	lsession.Info("get-domains")
+	for _, domain := range r.GetDomains() {
+		lsession.Info("insecure-client-get", lager.Data{
+			"domain": domain,
+			"target": target,
+		})
+		resp, err := insecureClient.Get("https://" + path.Join(domain, target))
+		if err != nil {
+			lsession.Error("insecure-client-get", err)
+			return err
+		}
+
+		defer resp.Body.Close()
+		lsession.Info("read-response-body", lager.Data{
+			"domain": domain,
+			"target": target,
+		})
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			lsession.Error("read-response-body", err)
+			return err
+		}
+
+		lsession.Info("canary-check", lager.Data{
+			"domain": domain,
+			"target": target,
+		})
+		if string(body) != r.InstanceId {
+			err := fmt.Errorf(
+				"Canary check failed for %s; expected %s, got %s",
+				domain, r.InstanceId, string(body),
+			)
+			lsession.Error("canary-check-failed", err)
+			return err
+		}
+	}
+
+	lsession.Info("finished")
+	return nil
 }
 
 func (m *RouteManager) fetchRoutesToUpdate(lsession lager.Logger) ([]Route, error) {
@@ -1126,6 +1043,7 @@ func (m *RouteManager) solveChallenges(
 	return failures
 }
 
+
 func (m *RouteManager) deployACMCertificate(
 	route Route,
 	cert Certificate,
@@ -1198,121 +1116,4 @@ func (m *RouteManager) deployCertificate(
 
 	lsession.Info("finished")
 	return nil
-}
-
-
-//This function will have a fork/dual behaviour for certs that were provisioned by LE or ACM
-//LE certs challenges are kept in the DB
-//ACM certs challenges are aquired dynamically via an API call
-func (m *RouteManager) GetDNSInstructions(route *Route) ([]string, error) {
-	var instructions []string
-
-	lsession := m.logger.Session("get-dns-instructions", lager.Data{
-		"instance-id": route.InstanceId,
-		"domains":     route.GetDomains(),
-	})
-
-	if route.IsCertificateManagedByACM {
-		lsession.Info("certsmanager-get-validation-challenges")
-		validationChallenges, err := m.certsManager.GetDomainValidationChallenges(route.Certificate.CertificateArn)
-		if err != nil {
-			lsession.Error("certsmanager-get-validation-challenges", err)
-			return []string{}, err
-		}
-
-		for _, e := range validationChallenges {
-
-
-
-			if e.RecordName == "" {
-				instructions = append(instructions, fmt.Sprintf(
-					"Awaiting challenges for %s",
-					e.DomainName,
-				))
-			} else {
-				// Keep the new lines in this format
-				format := `
-
-For domain %s, set DNS record
-    Name:  %s
-    Type:  %s
-    Value: %s
-    TTL:   %d
-
-Current validation status of %s: %s
-
-`
-				instructions = append(instructions, fmt.Sprintf(
-					format,
-					e.DomainName,
-					e.RecordName,
-					e.RecordType,
-					strings.Trim(e.RecordValue, " "),
-					route.DefaultTTL,
-					e.DomainName,
-					e.ValidationStatus,
-				))
-			}
-		}
-	} else {
-		var challenges []acme.AuthorizationResource
-
-		lsession.Info("json-unmarshal-challenge")
-		if err := json.Unmarshal(route.ChallengeJSON, &challenges); err != nil {
-			lsession.Error("json-unmarshal-challenge", err)
-			return instructions, err
-		}
-
-		lsession.Info("get-key-authorization")
-		for _, auth := range challenges {
-			for _, challenge := range auth.Body.Challenges {
-				if challenge.Type == acme.DNS01 {
-					lsession.Info(
-						"get-key-authorization-for-a-dns-challenge",
-						lager.Data{
-							"domain": auth.Domain,
-						},
-					)
-					keyAuth, err := acme.GetKeyAuthorization(
-						challenge.Token,
-						route.User.GetPrivateKey(),
-					)
-					if err != nil {
-						lsession.Error("get-key-authorization-err", err)
-						return instructions, err
-					}
-					fqdn, value, ttl := acme.DNS01Record(auth.Domain, keyAuth)
-					instructions = append(instructions, fmt.Sprintf(
-						"name: %s, value: %s, ttl: %d, type: TXT",
-						fqdn, value, ttl,
-					))
-				}
-			}
-		}
-
-	}
-
-	lsession.Info("finished")
-	return instructions, nil
-}
-
-func (m *RouteManager) GetCurrentlyDeployedDomains(r *Route) ([]string, error) {
-	lsession := m.logger.Session("get-currently-deployed-domains")
-
-	lsession.Info("cloudfront-get-start")
-	dist, err := m.cloudFront.Get(r.DistId)
-	if err != nil {
-		lsession.Error("cloudfront-get-error", err)
-
-		return []string{}, err
-	}
-	lsession.Info("cloudfront-get-done")
-
-	deployedDomains := []string{}
-	for _, domain := range dist.DistributionConfig.Aliases.Items {
-		deployedDomains = append(deployedDomains, *domain)
-	}
-
-	lsession.Info("finished")
-	return deployedDomains, nil
 }

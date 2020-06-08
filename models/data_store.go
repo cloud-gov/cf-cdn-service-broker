@@ -1,6 +1,7 @@
 package models
 
 import (
+	"code.cloudfoundry.org/lager"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
@@ -9,6 +10,11 @@ import (
 	"github.com/18F/cf-cdn-service-broker/utils"
 	"github.com/jinzhu/gorm"
 )
+
+var (
+	helperLogger = lager.NewLogger("helper-logger")
+)
+
 
 //counterfeiter:generate -o mocks/FakeRouteStore.go --fake-name FakeRouteStore data_store.go RouteStoreInterface
 type RouteStoreInterface interface {

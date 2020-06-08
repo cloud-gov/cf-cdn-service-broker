@@ -32,7 +32,7 @@ func StubAcmeClientProvider() *mocks.FakeAcmeClientProvider {
 	return &acmeProviderMock
 }
 
-var _ = Describe("Models", func() {
+var _ = Describe("RouteManager", func() {
 
 	Context("DeleteOrphanedCerts", func() {
 		var (
