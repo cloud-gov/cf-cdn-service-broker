@@ -192,14 +192,7 @@ func (b *CdnServiceBroker) LastOperation(
 			})
 			return brokerapi.LastOperation{}, err
 		}
-		if len(instructions) != len(route.GetDomains()) {
-			err = fmt.Errorf("Expected to find %d tokens; found %d", len(route.GetDomains()), len(instructions))
-			lsession.Error("too-few-dns-instructions", err, lager.Data{
-				"domain": route.DomainExternal,
-				"state":  route.State,
-			})
-			return brokerapi.LastOperation{}, err
-		}
+
 		var description string
 
 		cloudFrontCNAMES := []string{}
