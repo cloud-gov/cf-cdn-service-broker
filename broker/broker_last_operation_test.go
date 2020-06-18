@@ -81,7 +81,7 @@ var _ = Describe("Last operation", func() {
 
 		operation, err := b.LastOperation(s.ctx, "123", brokerapi.PollDetails{OperationData: ""})
 		Expect(operation.State).To(Equal(brokerapi.Succeeded))
-		Expect(operation.Description).To(Equal("Service instance provisioned [cdn.cloud.gov => cdn.apps.cloud.gov]; CDN domain abc.cloudfront.net"))
+		Expect(operation.Description).To(ContainSubstring("Service instance provisioned [cdn.cloud.gov => cdn.apps.cloud.gov]; CDN domain abc.cloudfront.net"))
 		Expect(err).NotTo(HaveOccurred())
 	})
 
