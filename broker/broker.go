@@ -192,14 +192,7 @@ func (b *CdnServiceBroker) LastOperation(
 			})
 			return brokerapi.LastOperation{}, err
 		}
-		if len(instructions) != len(route.GetDomains()) {
-			err = fmt.Errorf("Expected to find %d tokens; found %d", len(route.GetDomains()), len(instructions))
-			lsession.Error("too-few-dns-instructions", err, lager.Data{
-				"domain": route.DomainExternal,
-				"state":  route.State,
-			})
-			return brokerapi.LastOperation{}, err
-		}
+
 		var description string
 
 		cloudFrontCNAMES := []string{}
@@ -254,6 +247,15 @@ To validate ownership of the domain, set the following DNS records
 			"Service instance provisioned [%s => %s]; CDN domain %s",
 			route.DomainExternal, route.Origin, route.DomainInternal,
 		)
+
+		if !route.IsCertificateManagedByACM {
+			description += `
+
+Your CDN route service requires an update to migrate it a new certificate authority
+
+Please see our documentation at https://docs.cloud.service.gov.uk/deploying_services/use_a_custom_domain/#you-may-need-to-make-a-dns-change`
+		}
+
 		lsession.Info("ok", lager.Data{
 			"domain":      route.DomainExternal,
 			"state":       route.State,
