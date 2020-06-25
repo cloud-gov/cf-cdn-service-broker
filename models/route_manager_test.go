@@ -1080,6 +1080,81 @@ var _ = Describe("RouteManager", func() {
 	})
 
 	Context("GetDNSInstructions", func() {
+		It("requests DNS challenges for the right certificate when there are multiple", func(){
+			firstOfMarch := time.Date(2020, 03, 01, 12, 00, 00, 00, time.UTC)
+			thirdOfMarch := time.Date(2020, 03, 03, 12, 00, 00, 00, time.UTC)
+			firstOfJune := time.Date(2020, 06, 01, 12, 00, 00, 00, time.UTC)
+			now := time.Now()
+
+			leCertOne := models.Certificate{
+				Model: gorm.Model{
+					ID:        1,
+					CreatedAt: firstOfMarch,
+					UpdatedAt: now,
+				},
+				CertificateStatus: models.CertificateStatusLE,
+				CertificateArn: "managedbyletsencrypt",
+			}
+			leCertTwo := models.Certificate{
+				Model: gorm.Model{
+					ID:        2,
+					CreatedAt: thirdOfMarch,
+					UpdatedAt: now,
+				},
+				CertificateStatus: models.CertificateStatusLE,
+				CertificateArn: "managedbyletsencrypt",
+			}
+			acmCertOne := models.Certificate{
+				Model: gorm.Model{
+					ID:        3,
+					CreatedAt: firstOfJune,
+					UpdatedAt: now,
+				},
+				CertificateStatus: models.CertificateStatusValidating,
+				CertificateArn: "arn:aws:acm::my-cert",
+			}
+
+			route := models.Route{
+				Certificates: []models.Certificate{
+					leCertOne,
+					leCertTwo,
+					acmCertOne,
+				},
+				// This represents an old code path used by Let's Encrypt,
+				// which often (always?) picks the oldest certificate
+				Certificate: leCertOne,
+				IsCertificateManagedByACM: true,
+			}
+
+			certsManager := &utilsmocks.FakeCertificateManager{}
+			manager := models.NewManager(
+				lager.NewLogger(""),
+				&utils.Iam{},
+				&utils.Distribution{},
+				config.Settings{},
+				&models.AcmeClientProvider{},
+				&models.RouteStore{},
+				certsManager,
+			)
+
+			domainValidationChallenge := utils.DomainValidationChallenge{
+				DomainName:       "domain.com",
+				RecordName:       "domain.com",
+				RecordType:       "CNAME",
+				RecordValue:      "BlahBlahBlah",
+				ValidationStatus: "PENDING_VALIDATION",
+			}
+
+			certsManager.GetDomainValidationChallengesReturns([]utils.DomainValidationChallenge{domainValidationChallenge}, nil)
+
+			_, err := manager.GetDNSInstructions(&route)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(certsManager.GetDomainValidationChallengesCallCount()).To(Equal(1))
+			requestedArn := certsManager.GetDomainValidationChallengesArgsForCall(0)
+			Expect(requestedArn).To(Equal("arn:aws:acm::my-cert"))
+		})
+
 		It("Getting the DNS challenges from ACM when the Routes Certificates are managed by ACM", func() {
 
 			certsManager := &utilsmocks.FakeCertificateManager{}
@@ -1112,6 +1187,12 @@ var _ = Describe("RouteManager", func() {
 				DefaultTTL:                600,
 				InsecureOrigin:            false,
 				IsCertificateManagedByACM: true,
+				Certificates: []models.Certificate{
+					{
+						CertificateArn: "arn:aws:acm:::foo",
+						CertificateStatus: models.CertificateStatusValidating,
+					},
+				},
 			}
 
 			instructions, err := manager.GetDNSInstructions(route)

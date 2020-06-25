@@ -511,16 +511,23 @@ func (m *RouteManager) GetDNSInstructions(route *Route) ([]string, error) {
 	})
 
 	if route.IsCertificateManagedByACM {
+
+		validatingCert, _ := findValidatingAndAttachedCerts(route)
+
+		if validatingCert == nil {
+			err := errors.New("couldn't find the most recent validating certificate")
+			lsession.Error("missing-validating-certificate", err)
+			return nil, err
+		}
+
 		lsession.Info("certsmanager-get-validation-challenges")
-		validationChallenges, err := m.certsManager.GetDomainValidationChallenges(route.Certificate.CertificateArn)
+		validationChallenges, err := m.certsManager.GetDomainValidationChallenges(validatingCert.CertificateArn)
 		if err != nil {
 			lsession.Error("certsmanager-get-validation-challenges", err)
 			return []string{}, err
 		}
 
 		for _, e := range validationChallenges {
-
-
 
 			if e.RecordName == "" {
 				instructions = append(instructions, fmt.Sprintf(
@@ -899,22 +906,7 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 	)
 
 	lsession.Info("find-the-most-recent-validating-certificate")
-	var theMostRecentCert, theCurrentAttached *Certificate
-	for i, e := range r.Certificates {
-		if e.CertificateStatus == CertificateStatusValidating {
-			if theMostRecentCert == nil {
-				theMostRecentCert = &(r.Certificates[i])
-			}
-
-			if e.CreatedAt.After(theMostRecentCert.CreatedAt) {
-				theMostRecentCert = &(r.Certificates[i])
-			}
-		}
-
-		if e.CertificateStatus == CertificateStatusAttached {
-			theCurrentAttached = &(r.Certificates[i])
-		}
-	}
+	theMostRecentCert, theCurrentAttached := findValidatingAndAttachedCerts(r)
 
 	if theMostRecentCert == nil {
 		err = errors.New("couldn't find the most recent certificate")
@@ -964,6 +956,26 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 
 	lsession.Info("finished")
 	return nil
+}
+
+func findValidatingAndAttachedCerts(r *Route) (*Certificate, *Certificate) {
+	var theMostRecentCert, theCurrentAttached *Certificate
+	for i, e := range r.Certificates {
+		if e.CertificateStatus == CertificateStatusValidating {
+			if theMostRecentCert == nil {
+				theMostRecentCert = &(r.Certificates[i])
+			}
+
+			if e.CreatedAt.After(theMostRecentCert.CreatedAt) {
+				theMostRecentCert = &(r.Certificates[i])
+			}
+		}
+
+		if e.CertificateStatus == CertificateStatusAttached {
+			theCurrentAttached = &(r.Certificates[i])
+		}
+	}
+	return theMostRecentCert, theCurrentAttached
 }
 
 func (m *RouteManager) updateDeprovisioning(r *Route) error {
