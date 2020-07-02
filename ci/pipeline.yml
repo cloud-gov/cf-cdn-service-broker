@@ -85,7 +85,7 @@ jobs:
   plan:
   - in_parallel:
     - get: broker-src
-      passed: [acceptance-tests-staging]
+      passed: [push-cf-cdn-service-broker-staging]
       trigger: true
     - get: pipeline-tasks
   - task: create-db
