@@ -62,14 +62,6 @@ jobs:
         path: broker-src
         manifest: broker-src/manifest-cron.yml
         environment_variables: *cfenv-staging
-  - task: update-broker
-    file: pipeline-tasks/register-service-broker.yml
-    params:
-      <<: *cf-creds-staging
-      BROKER_NAME: cdn-broker
-      AUTH_USER: ((cdn-broker-user-staging))
-      AUTH_PASS: ((cdn-broker-pass-staging))
-      SERVICES: cdn-route
   on_failure:
     put: slack
     params:
@@ -152,14 +144,6 @@ jobs:
         path: broker-src
         manifest: broker-src/manifest-cron.yml
         environment_variables: *cfenv-production
-  - task: update-broker
-    file: pipeline-tasks/register-service-broker.yml
-    params:
-      <<: *cf-creds-production
-      BROKER_NAME: cdn-broker
-      AUTH_USER: ((cdn-broker-user-production))
-      AUTH_PASS: ((cdn-broker-pass-production))
-      SERVICES: cdn-route
   on_failure:
     put: slack
     params:
