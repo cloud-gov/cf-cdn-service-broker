@@ -332,7 +332,7 @@ func (d *Distribution) SetCertificateAndCname(distId, certId string, domains []s
 	}
 
 	DistributionConfig.ViewerCertificate.SSLSupportMethod = aws.String("sni-only")
-	DistributionConfig.ViewerCertificate.MinimumProtocolVersion = aws.String("TLSv1.2_2018")
+	DistributionConfig.ViewerCertificate.MinimumProtocolVersion = aws.String("TLSv1.2_2019")
 	DistributionConfig.ViewerCertificate.CloudFrontDefaultCertificate = aws.Bool(false)
 
 	_, err = d.Service.UpdateDistribution(&cloudfront.UpdateDistributionInput{
