@@ -6,6 +6,7 @@ import (
 	"github.com/alphagov/paas-cdn-broker/config"
 	"github.com/alphagov/paas-cdn-broker/utils"
 	"github.com/aws/aws-sdk-go/service/acm"
+	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"github.com/jinzhu/gorm"
 	"github.com/pivotal-cf/brokerapi"
 	"strings"
@@ -41,6 +42,8 @@ type RouteManagerIface interface {
 	DeleteOrphanedCerts()
 
 	GetDNSChallenges(route *Route) ([]utils.DomainValidationChallenge, error)
+
+	GetCDNConfiguration(route *Route) (*cloudfront.Distribution, error)
 }
 
 type RouteManager struct {
@@ -415,6 +418,10 @@ func (m *RouteManager) GetCurrentlyDeployedDomains(r *Route) ([]string, error) {
 
 	lsession.Info("finished")
 	return deployedDomains, nil
+}
+
+func (m *RouteManager) GetCDNConfiguration(route *Route) (*cloudfront.Distribution, error) {
+	return m.cloudFront.Get(route.DistId)
 }
 
 func (m *RouteManager) deleteOrphanedACMCerts() {

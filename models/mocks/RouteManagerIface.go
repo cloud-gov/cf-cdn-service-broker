@@ -6,6 +6,7 @@ import (
 
 	"github.com/alphagov/paas-cdn-broker/models"
 	"github.com/alphagov/paas-cdn-broker/utils"
+	"github.com/aws/aws-sdk-go/service/cloudfront"
 )
 
 type RouteManagerIface struct {
@@ -54,6 +55,19 @@ type RouteManagerIface struct {
 	}
 	getReturnsOnCall map[int]struct {
 		result1 *models.Route
+		result2 error
+	}
+	GetCDNConfigurationStub        func(*models.Route) (*cloudfront.Distribution, error)
+	getCDNConfigurationMutex       sync.RWMutex
+	getCDNConfigurationArgsForCall []struct {
+		arg1 *models.Route
+	}
+	getCDNConfigurationReturns struct {
+		result1 *cloudfront.Distribution
+		result2 error
+	}
+	getCDNConfigurationReturnsOnCall map[int]struct {
+		result1 *cloudfront.Distribution
 		result2 error
 	}
 	GetDNSChallengesStub        func(*models.Route) ([]utils.DomainValidationChallenge, error)
@@ -320,6 +334,70 @@ func (fake *RouteManagerIface) GetReturnsOnCall(i int, result1 *models.Route, re
 	}{result1, result2}
 }
 
+func (fake *RouteManagerIface) GetCDNConfiguration(arg1 *models.Route) (*cloudfront.Distribution, error) {
+	fake.getCDNConfigurationMutex.Lock()
+	ret, specificReturn := fake.getCDNConfigurationReturnsOnCall[len(fake.getCDNConfigurationArgsForCall)]
+	fake.getCDNConfigurationArgsForCall = append(fake.getCDNConfigurationArgsForCall, struct {
+		arg1 *models.Route
+	}{arg1})
+	stub := fake.GetCDNConfigurationStub
+	fakeReturns := fake.getCDNConfigurationReturns
+	fake.recordInvocation("GetCDNConfiguration", []interface{}{arg1})
+	fake.getCDNConfigurationMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *RouteManagerIface) GetCDNConfigurationCallCount() int {
+	fake.getCDNConfigurationMutex.RLock()
+	defer fake.getCDNConfigurationMutex.RUnlock()
+	return len(fake.getCDNConfigurationArgsForCall)
+}
+
+func (fake *RouteManagerIface) GetCDNConfigurationCalls(stub func(*models.Route) (*cloudfront.Distribution, error)) {
+	fake.getCDNConfigurationMutex.Lock()
+	defer fake.getCDNConfigurationMutex.Unlock()
+	fake.GetCDNConfigurationStub = stub
+}
+
+func (fake *RouteManagerIface) GetCDNConfigurationArgsForCall(i int) *models.Route {
+	fake.getCDNConfigurationMutex.RLock()
+	defer fake.getCDNConfigurationMutex.RUnlock()
+	argsForCall := fake.getCDNConfigurationArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *RouteManagerIface) GetCDNConfigurationReturns(result1 *cloudfront.Distribution, result2 error) {
+	fake.getCDNConfigurationMutex.Lock()
+	defer fake.getCDNConfigurationMutex.Unlock()
+	fake.GetCDNConfigurationStub = nil
+	fake.getCDNConfigurationReturns = struct {
+		result1 *cloudfront.Distribution
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *RouteManagerIface) GetCDNConfigurationReturnsOnCall(i int, result1 *cloudfront.Distribution, result2 error) {
+	fake.getCDNConfigurationMutex.Lock()
+	defer fake.getCDNConfigurationMutex.Unlock()
+	fake.GetCDNConfigurationStub = nil
+	if fake.getCDNConfigurationReturnsOnCall == nil {
+		fake.getCDNConfigurationReturnsOnCall = make(map[int]struct {
+			result1 *cloudfront.Distribution
+			result2 error
+		})
+	}
+	fake.getCDNConfigurationReturnsOnCall[i] = struct {
+		result1 *cloudfront.Distribution
+		result2 error
+	}{result1, result2}
+}
+
 func (fake *RouteManagerIface) GetDNSChallenges(arg1 *models.Route) ([]utils.DomainValidationChallenge, error) {
 	fake.getDNSChallengesMutex.Lock()
 	ret, specificReturn := fake.getDNSChallengesReturnsOnCall[len(fake.getDNSChallengesArgsForCall)]
@@ -524,6 +602,8 @@ func (fake *RouteManagerIface) Invocations() map[string][][]interface{} {
 	defer fake.disableMutex.RUnlock()
 	fake.getMutex.RLock()
 	defer fake.getMutex.RUnlock()
+	fake.getCDNConfigurationMutex.RLock()
+	defer fake.getCDNConfigurationMutex.RUnlock()
 	fake.getDNSChallengesMutex.RLock()
 	defer fake.getDNSChallengesMutex.RUnlock()
 	fake.pollMutex.RLock()

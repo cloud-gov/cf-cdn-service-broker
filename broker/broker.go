@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
 	"io/ioutil"
 	"strings"
 
@@ -61,8 +62,57 @@ func (b *CdnServiceBroker) GetBinding(ctx context.Context, first, second string)
 	return brokerapi.GetBindingSpec{}, fmt.Errorf("GetBinding method not implemented")
 }
 
-func (b *CdnServiceBroker) GetInstance(ctx context.Context, first string) (brokerapi.GetInstanceDetailsSpec, error) {
-	return brokerapi.GetInstanceDetailsSpec{}, fmt.Errorf("GetInstance method not implemented")
+func (b *CdnServiceBroker) GetInstance(ctx context.Context, instanceID string) (brokerapi.GetInstanceDetailsSpec, error) {
+	lsession := b.logger.Session("get-instance", lager.Data{
+		"instance_id": instanceID,
+	})
+
+	lsession.Info("lookup-instance")
+	route, err := b.manager.Get(instanceID)
+
+	if err != nil {
+		if err == brokerapi.ErrInstanceDoesNotExist {
+			lsession.Error("instance-does-not-exist", err)
+			return brokerapi.GetInstanceDetailsSpec{}, brokerapi.ErrInstanceDoesNotExist
+		} else {
+			lsession.Error("lookup-instance", err)
+			return brokerapi.GetInstanceDetailsSpec{}, err
+		}
+	}
+
+	lsession.Info("get-dns-challenges")
+	challenges, err := b.manager.GetDNSChallenges(route)
+	if err != nil {
+		lsession.Error("get-dns-challenges", err)
+		return brokerapi.GetInstanceDetailsSpec{}, fmt.Errorf("could not get dns challenges for domain")
+	}
+
+	lsession.Info("get-cdn-configuration")
+	distribution, err := b.manager.GetCDNConfiguration(route)
+	if err != nil {
+		lsession.Error("get-cdn-configuration", err)
+		return brokerapi.GetInstanceDetailsSpec{}, fmt.Errorf("could not get cdn configuration")
+	}
+
+	headers := []string{}
+	for _, h := range distribution.DistributionConfig.DefaultCacheBehavior.ForwardedValues.Headers.Items {
+		headers = append(headers, aws.StringValue(h))
+	}
+
+	forwardCookies := aws.StringValue(distribution.DistributionConfig.DefaultCacheBehavior.ForwardedValues.Cookies.Forward) == "all"
+	cacheTTL := aws.Int64Value(distribution.DistributionConfig.DefaultCacheBehavior.DefaultTTL)
+
+	instanceParams := map[string]interface{}{
+		"cloudfront_domain": route.DomainInternal,
+		"dns_records":       challenges,
+		"forwarded_headers": headers,
+		"forward_cookies":   forwardCookies,
+		"cache_ttl":         cacheTTL,
+	}
+
+	return brokerapi.GetInstanceDetailsSpec{
+		Parameters: instanceParams,
+	}, nil
 }
 
 func (b *CdnServiceBroker) LastBindingOperation(ctx context.Context, first, second string, pollDetails brokerapi.PollDetails) (brokerapi.LastOperation, error) {
