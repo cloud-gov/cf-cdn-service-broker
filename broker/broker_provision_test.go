@@ -3,6 +3,7 @@ package broker_test
 import (
 	"context"
 	"errors"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/stretchr/testify/suite"
 
@@ -33,14 +34,7 @@ type ProvisionSuite struct {
 
 func (s *ProvisionSuite) allowCreateWithExpectedHeaders(expectedHeaders utils.Headers) {
 	route := &models.Route{State: models.Provisioning}
-	s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", s.settings.DefaultDefaultTTL, expectedHeaders, true,
-		map[string]string{
-			"Organization":    "",
-			"Space":           "",
-			"Service":         "",
-			"ServiceInstance": "123",
-			"Plan":            "",
-		}).Return(route, nil)
+	s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", s.settings.DefaultDefaultTTL, expectedHeaders, true, mock.AnythingOfType("map[string]string")).Return(route, nil)
 }
 
 var _ = Describe("Last operation", func() {
@@ -109,14 +103,7 @@ var _ = Describe("Last operation", func() {
 		s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
 		route := &models.Route{State: models.Provisioning}
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
-		s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", s.settings.DefaultDefaultTTL, utils.Headers{"Host": true}, true,
-			map[string]string{
-				"Organization":    "",
-				"Space":           "",
-				"Service":         "",
-				"ServiceInstance": "123",
-				"Plan":            "",
-			}).Return(route, nil)
+		s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", s.settings.DefaultDefaultTTL, utils.Headers{"Host": true}, true, mock.AnythingOfType("map[string]string")).Return(route, nil)
 
 		details := brokerapi.ProvisionDetails{
 			RawParameters: []byte(`{"domain": "domain.gov"}`),
@@ -130,14 +117,7 @@ var _ = Describe("Last operation", func() {
 		s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
 		route := &models.Route{State: models.Provisioning}
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
-		s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", int64(52), utils.Headers{"Host": true}, true,
-			map[string]string{
-				"Organization":    "",
-				"Space":           "",
-				"ServiceInstance": "123",
-				"Service":         "",
-				"Plan":            "",
-			}).Return(route, nil)
+		s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", int64(52), utils.Headers{"Host": true}, true, mock.AnythingOfType("map[string]string")).Return(route, nil)
 
 		details := brokerapi.ProvisionDetails{
 			RawParameters: []byte(`{
@@ -148,6 +128,44 @@ var _ = Describe("Last operation", func() {
 		_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
 		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("Should set the correct tags", func(){
+		instanceId := "123"
+		s.Manager.On("Get", instanceId).Return(&models.Route{}, errors.New("not found"))
+		route := &models.Route{State: models.Provisioning}
+		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
+		s.Manager.On("Create", instanceId, "domain.gov", "origin.cloud.gov", s.settings.DefaultDefaultTTL, utils.Headers{"Host": true}, true, mock.AnythingOfType("map[string]string")).Return(route, nil)
+
+		details := brokerapi.ProvisionDetails{
+			RawParameters: []byte(`{"domain": "domain.gov"}`),
+			OrganizationGUID: "org-1",
+			SpaceGUID: "space-1",
+			ServiceID: "service-1",
+			PlanID: "plan-1",
+		}
+
+		_, err := s.Broker.Provision(s.ctx, instanceId, details, true)
+
+		Expect(err).NotTo(HaveOccurred())
+
+		var createCall *mock.Call
+		for i, call := range s.Manager.Calls {
+			if call.Method == "Create" {
+				createCall = &s.Manager.Calls[i]
+				break
+			}
+		}
+
+		Expect(createCall).ToNot(BeNil())
+
+		inputTags := createCall.Arguments[6].(map[string]string)
+		Expect(inputTags).To(HaveKeyWithValue("Organization", "org-1"))
+		Expect(inputTags).To(HaveKeyWithValue("Space", "space-1"))
+		Expect(inputTags).To(HaveKeyWithValue("Service", "service-1"))
+		Expect(inputTags).To(HaveKeyWithValue("ServiceInstance", instanceId))
+		Expect(inputTags).To(HaveKeyWithValue("Plan", "plan-1"))
+		Expect(inputTags).To(HaveKeyWithValue("chargeable_entity", instanceId))
 	})
 
 	It("Should error when Cloud Foundry does not have the domain registered", func() {

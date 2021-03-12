@@ -127,11 +127,12 @@ func (b *CdnServiceBroker) Provision(
 	}
 
 	tags := map[string]string{
-		"Organization":    details.OrganizationGUID,
-		"Space":           details.SpaceGUID,
-		"Service":         details.ServiceID,
-		"ServiceInstance": instanceID,
-		"Plan":            details.PlanID,
+		"Organization":      details.OrganizationGUID,
+		"Space":             details.SpaceGUID,
+		"Service":           details.ServiceID,
+		"ServiceInstance":   instanceID,
+		"Plan":              details.PlanID,
+		"chargeable_entity": instanceID,
 	}
 
 	_, err = b.manager.Create(
