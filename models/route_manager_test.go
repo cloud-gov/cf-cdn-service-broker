@@ -14,12 +14,12 @@ import (
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"github.com/aws/aws-sdk-go/service/iam"
 
-	"github.com/18F/cf-cdn-service-broker/config"
-	"github.com/18F/cf-cdn-service-broker/models"
-	"github.com/18F/cf-cdn-service-broker/models/mocks"
-	modelsmocks "github.com/18F/cf-cdn-service-broker/models/mocks"
-	"github.com/18F/cf-cdn-service-broker/utils"
-	utilsmocks "github.com/18F/cf-cdn-service-broker/utils/mocks"
+	"github.com/alphagov/paas-cdn-broker/config"
+	"github.com/alphagov/paas-cdn-broker/models"
+	"github.com/alphagov/paas-cdn-broker/models/mocks"
+	modelsmocks "github.com/alphagov/paas-cdn-broker/models/mocks"
+	"github.com/alphagov/paas-cdn-broker/utils"
+	utilsmocks "github.com/alphagov/paas-cdn-broker/utils/mocks"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

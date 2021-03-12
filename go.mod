@@ -1,4 +1,4 @@
-module github.com/18F/cf-cdn-service-broker
+module github.com/alphagov/paas-cdn-broker
 
 go 1.12
 

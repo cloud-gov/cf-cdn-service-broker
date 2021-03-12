@@ -7,10 +7,10 @@ import (
 	"gopkg.in/square/go-jose.v1"
 	"time"
 
-	"github.com/18F/cf-cdn-service-broker/config"
-	"github.com/18F/cf-cdn-service-broker/utils"
+	"github.com/alphagov/paas-cdn-broker/config"
+	"github.com/alphagov/paas-cdn-broker/utils"
 
-	legoacme "github.com/18F/cf-cdn-service-broker/lego/acme"
+	legoacme "github.com/alphagov/paas-cdn-broker/lego/acme"
 	goacme "golang.org/x/crypto/acme"
 )
 

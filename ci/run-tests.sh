@@ -4,5 +4,5 @@ set -e -x
 
 export GOPATH=$(pwd)/gopath
 
-cd gopath/src/github.com/18F/cf-cdn-service-broker
+cd gopath/src/github.com/alphagov/paas-cdn-broker
 ginkgo -r

@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"github.com/18F/cf-cdn-service-broker/models"
+	"github.com/alphagov/paas-cdn-broker/models"
 )
 
 var _ = Describe("Route", func() {

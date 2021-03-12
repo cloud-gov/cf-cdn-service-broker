@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/18F/cf-cdn-service-broker/lego/acme"
+	"github.com/alphagov/paas-cdn-broker/lego/acme"
 )
 
 func preCheckDNS(fqdn, value string) (bool, error) {

@@ -7,7 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 
-	"github.com/18F/cf-cdn-service-broker/config"
+	"github.com/alphagov/paas-cdn-broker/config"
 )
 
 func S3(settings config.Settings) error {

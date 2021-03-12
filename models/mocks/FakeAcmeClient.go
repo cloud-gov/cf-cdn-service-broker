@@ -6,7 +6,7 @@ import (
 	"crypto/x509"
 	"sync"
 
-	"github.com/18F/cf-cdn-service-broker/lego/acme"
+	"github.com/alphagov/paas-cdn-broker/lego/acme"
 )
 
 type FakeAcmeClient struct {

@@ -6,9 +6,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/iam"
 
-	"github.com/18F/cf-cdn-service-broker/lego/acme"
+	"github.com/alphagov/paas-cdn-broker/lego/acme"
 
-	"github.com/18F/cf-cdn-service-broker/config"
+	"github.com/alphagov/paas-cdn-broker/config"
 )
 
 //counterfeiter:generate -o mocks/FakeIAM.go --fake-name FakeIAM iam.go IamIface

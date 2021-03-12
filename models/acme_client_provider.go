@@ -2,9 +2,9 @@ package models
 
 import (
 	"code.cloudfoundry.org/lager"
-	"github.com/18F/cf-cdn-service-broker/config"
-	"github.com/18F/cf-cdn-service-broker/lego/acme"
-	"github.com/18F/cf-cdn-service-broker/utils"
+	"github.com/alphagov/paas-cdn-broker/config"
+	"github.com/alphagov/paas-cdn-broker/lego/acme"
+	"github.com/alphagov/paas-cdn-broker/utils"
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate

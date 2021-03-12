@@ -6,7 +6,7 @@ import (
 
 	"github.com/jarcoal/httpmock"
 
-	"github.com/18F/cf-cdn-service-broker/config"
+	"github.com/alphagov/paas-cdn-broker/config"
 )
 
 var _ = Describe("LetsEncrypt", func() {

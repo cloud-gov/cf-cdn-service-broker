@@ -7,7 +7,7 @@ import (
 	"encoding/pem"
 	"errors"
 
-	"github.com/18F/cf-cdn-service-broker/utils"
+	"github.com/alphagov/paas-cdn-broker/utils"
 	"github.com/jinzhu/gorm"
 )
 

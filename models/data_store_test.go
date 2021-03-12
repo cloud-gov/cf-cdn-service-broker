@@ -8,8 +8,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/18F/cf-cdn-service-broker/models"
-	"github.com/18F/cf-cdn-service-broker/utils"
+	"github.com/alphagov/paas-cdn-broker/models"
+	"github.com/alphagov/paas-cdn-broker/utils"
 	"github.com/jinzhu/gorm"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
