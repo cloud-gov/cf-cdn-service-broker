@@ -3,12 +3,6 @@ language: go
 go:
 - "1.12"
 
-install: |
-  cd ../.. && \
-  mv alphagov 18F && \
-  cd 18F && \
-  mv paas-cdn-broker cf-cdn-service-broker && \
-  cd cf-cdn-service-broker
 env:
   - GO111MODULE=on
 

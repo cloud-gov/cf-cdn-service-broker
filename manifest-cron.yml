@@ -6,4 +6,4 @@ applications:
   health-check-type: none
   no-route: true
   env:
-    GO_INSTALL_PACKAGE_SPEC: "github.com/18F/cf-cdn-service-broker/cmd/cdn-cron"
+    GO_INSTALL_PACKAGE_SPEC: "github.com/alphagov/paas-cdn-broker/cmd/cdn-cron"

@@ -4,10 +4,10 @@ package mocks
 import (
 	"sync"
 
-	"github.com/18F/cf-cdn-service-broker/config"
-	"github.com/18F/cf-cdn-service-broker/lego/acme"
-	"github.com/18F/cf-cdn-service-broker/models"
-	"github.com/18F/cf-cdn-service-broker/utils"
+	"github.com/alphagov/paas-cdn-broker/config"
+	"github.com/alphagov/paas-cdn-broker/lego/acme"
+	"github.com/alphagov/paas-cdn-broker/models"
+	"github.com/alphagov/paas-cdn-broker/utils"
 )
 
 type FakeAcmeClientProvider struct {

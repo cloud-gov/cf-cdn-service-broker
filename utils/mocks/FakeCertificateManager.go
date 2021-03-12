@@ -4,7 +4,7 @@ package mocks
 import (
 	"sync"
 
-	"github.com/18F/cf-cdn-service-broker/utils"
+	"github.com/alphagov/paas-cdn-broker/utils"
 )
 
 type FakeCertificateManager struct {

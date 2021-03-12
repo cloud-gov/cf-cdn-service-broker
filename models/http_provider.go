@@ -12,15 +12,15 @@ import (
 	"strings"
 	"time"
 
-	legoacme "github.com/18F/cf-cdn-service-broker/lego/acme"
+	legoacme "github.com/alphagov/paas-cdn-broker/lego/acme"
 	goacme "golang.org/x/crypto/acme"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 
-	"github.com/18F/cf-cdn-service-broker/config"
-	"github.com/18F/cf-cdn-service-broker/utils"
+	"github.com/alphagov/paas-cdn-broker/config"
+	"github.com/alphagov/paas-cdn-broker/utils"
 )
 
 func (acp *AcmeClientProvider) GetHTTP01Client(user *utils.User, settings config.Settings) (legoacme.ClientInterface, error) {

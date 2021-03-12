@@ -2,9 +2,9 @@ package healthchecks
 
 import (
 	"crypto"
-	"github.com/18F/cf-cdn-service-broker/lego/acme"
+	"github.com/alphagov/paas-cdn-broker/lego/acme"
 
-	"github.com/18F/cf-cdn-service-broker/config"
+	"github.com/alphagov/paas-cdn-broker/config"
 )
 
 type User struct {

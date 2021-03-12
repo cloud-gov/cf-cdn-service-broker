@@ -4,8 +4,8 @@ package mocks
 import (
 	"sync"
 
-	"github.com/18F/cf-cdn-service-broker/lego/acme"
-	"github.com/18F/cf-cdn-service-broker/utils"
+	"github.com/alphagov/paas-cdn-broker/lego/acme"
+	"github.com/alphagov/paas-cdn-broker/utils"
 	"github.com/aws/aws-sdk-go/service/iam"
 )
 

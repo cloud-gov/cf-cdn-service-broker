@@ -9,7 +9,7 @@ image_resource:
 
 inputs:
 - name: broker-src
-  path: gopath/src/github.com/18F/cf-cdn-service-broker
+  path: gopath/src/github.com/alphagov/paas-cdn-broker
 
 run:
-  path: gopath/src/github.com/18F/cf-cdn-service-broker/ci/run-tests.sh
+  path: gopath/src/github.com/alphagov/paas-cdn-broker/ci/run-tests.sh

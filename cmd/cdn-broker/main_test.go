@@ -5,8 +5,8 @@ import (
 	"net/http/httptest"
 
 	"code.cloudfoundry.org/lager"
-	"github.com/18F/cf-cdn-service-broker/broker"
-	"github.com/18F/cf-cdn-service-broker/config"
+	"github.com/alphagov/paas-cdn-broker/broker"
+	"github.com/alphagov/paas-cdn-broker/config"
 	"github.com/pivotal-cf/brokerapi"
 
 	. "github.com/onsi/ginkgo"
