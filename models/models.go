@@ -606,7 +606,7 @@ func (m *RouteManager) RenewAll() {
 	m.logger.Info("Looking for routes that are expiring soon")
 
 	m.db.Having(
-		"max(expires) < now() + interval '30 days'",
+		"max(expires) < now() + interval '70 days'",
 	).Group(
 		"routes.id",
 	).Where(
