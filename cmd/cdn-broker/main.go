@@ -12,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
-	"github.com/aws/aws-sdk-go/service/iam"
 
 	"github.com/alphagov/paas-cdn-broker/broker"
 	"github.com/alphagov/paas-cdn-broker/config"
@@ -52,10 +51,8 @@ func main() {
 
 	manager := models.NewManager(
 		logger,
-		&utils.Iam{settings, iam.New(session)},
 		&utils.Distribution{settings, cloudfront.New(session)},
 		settings,
-		models.NewAcmeClientProvider(logger),
 		models.RouteStore{Database: db},
 		utils.NewCertificateManager(logger, settings, session),
 	)

@@ -12,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/acm"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
-	"github.com/aws/aws-sdk-go/service/iam"
 
 	"github.com/alphagov/paas-cdn-broker/config"
 	"github.com/alphagov/paas-cdn-broker/models"
@@ -25,26 +24,15 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func StubAcmeClientProvider() *mocks.FakeAcmeClientProvider {
-	acmeProviderMock := mocks.FakeAcmeClientProvider{}
-	acmeProviderMock.GetDNS01ClientReturns(&mocks.FakeAcmeClient{}, nil)
-	acmeProviderMock.GetHTTP01ClientReturns(&mocks.FakeAcmeClient{}, nil)
-	return &acmeProviderMock
-}
-
 var _ = Describe("RouteManager", func() {
 
 	Context("DeleteOrphanedCerts", func() {
 		var (
 			manager models.RouteManager
 
-			fakeIam          *utilsmocks.FakeIAM
 			fakeDistribution *utilsmocks.FakeDistribution
 			fakeCertsManager *utilsmocks.FakeCertificateManager
 			fakeDatastore	 *mocks.FakeRouteStore
-
-			serverCertificates []*iam.ServerCertificateMetadata
-			distributions      []*cloudfront.DistributionSummary
 
 			errorLogOutput *bytes.Buffer
 		)
@@ -52,187 +40,25 @@ var _ = Describe("RouteManager", func() {
 		BeforeEach(func(){
 			errorLogOutput = bytes.NewBuffer([]byte{})
 
-			logger := lager.NewLogger("delete-orphaned-iam-certs")
+			logger := lager.NewLogger("delete-orphaned-acm-certs")
 			logger.RegisterSink(lager.NewWriterSink(GinkgoWriter, lager.INFO))
 			logger.RegisterSink(lager.NewWriterSink(errorLogOutput, lager.ERROR))
 
 			fakeCertsManager = &utilsmocks.FakeCertificateManager{}
 			fakeDatastore = &mocks.FakeRouteStore{}
 			fakeDistribution = &utilsmocks.FakeDistribution{}
-			fakeIam = &utilsmocks.FakeIAM{}
 
 			manager = models.NewManager(
 				logger,
-				fakeIam,
 				fakeDistribution,
 				config.Settings{},
-				StubAcmeClientProvider(),
 				fakeDatastore,
 				fakeCertsManager,
 			)
 		})
 
-		Context("deleting IAM certs", func() {
-			BeforeEach(func() {
-				fakeIam.ListCertificatesCalls(func(f func(iam.ServerCertificateMetadata) bool) error {
-					for _, certificate := range serverCertificates {
-						if cont := f(*certificate); !cont {
-							return nil
-						}
-					}
-					return nil
-				})
-
-
-				fakeDistribution.ListDistributionsCalls(func(f func(cloudfront.DistributionSummary) bool) error {
-					for _, distribution := range distributions {
-						if cont := f(*distribution); !cont {
-							return nil
-						}
-					}
-					return nil
-				})
-			})
-
-			It("should delete orphaned certs", func() {
-				old := time.Now().AddDate(0, 0, -2)
-				current := time.Now().AddDate(0, 0, 0)
-				serverCertificates = []*iam.ServerCertificateMetadata{
-					&iam.ServerCertificateMetadata{
-						Arn:                   aws.String("an-active-certificate"),
-						ServerCertificateName: aws.String("an-active-certificate"),
-						ServerCertificateId:   aws.String("an-active-certificate"),
-						UploadDate:            &old,
-					},
-					&iam.ServerCertificateMetadata{
-						Arn:                   aws.String("some-other-active-certificate"),
-						ServerCertificateName: aws.String("some-other-active-certificate"),
-						ServerCertificateId:   aws.String("some-other-active-certificate"),
-						UploadDate:            &old,
-					},
-					&iam.ServerCertificateMetadata{
-						Arn:                   aws.String("orphaned-but-not-old-enough"),
-						ServerCertificateName: aws.String("orphaned-but-not-old-enough"),
-						ServerCertificateId:   aws.String("this-cert-should-not-be-deleted"),
-						UploadDate:            &current,
-					},
-					&iam.ServerCertificateMetadata{
-						Arn:                   aws.String("some-orphaned-cert"),
-						ServerCertificateName: aws.String("some-orphaned-cert"),
-						ServerCertificateId:   aws.String("this-cert-should-be-deleted"),
-						UploadDate:            &old,
-					},
-					&iam.ServerCertificateMetadata{
-						Arn:                   aws.String("some-other-orphaned-cert"),
-						ServerCertificateName: aws.String("some-other-orphaned-cert"),
-						ServerCertificateId:   aws.String("this-cert-should-also-be-deleted"),
-						UploadDate:            &old,
-					},
-				}
-
-				distributions = []*cloudfront.DistributionSummary{
-					&cloudfront.DistributionSummary{
-						ARN: aws.String("some-distribution"),
-						ViewerCertificate: &cloudfront.ViewerCertificate{
-							IAMCertificateId: aws.String("an-active-certificate"),
-						},
-					},
-					&cloudfront.DistributionSummary{
-						ARN: aws.String("some-other-distribution"),
-						ViewerCertificate: &cloudfront.ViewerCertificate{
-							IAMCertificateId: aws.String("some-other-active-certificate"),
-						},
-					},
-				}
-
-				fakeIam.DeleteCertificateReturns(nil)
-
-				manager.DeleteOrphanedCerts()
-
-				Expect(fakeIam.DeleteCertificateCallCount()).To(Equal(2))
-				deletedCert1 := fakeIam.DeleteCertificateArgsForCall(0)
-				deletedCert2 := fakeIam.DeleteCertificateArgsForCall(1)
-
-				Expect(deletedCert1).To(Equal("some-orphaned-cert"))
-				Expect(deletedCert2).To(Equal("some-other-orphaned-cert"))
-			})
-
-			It("should handle AWS certificate deletion failure gracefully", func() {
-				old := time.Now().AddDate(0, 0, -2)
-				serverCertificates = []*iam.ServerCertificateMetadata{
-					&iam.ServerCertificateMetadata{
-						Arn:                   aws.String("some-orphaned-cert"),
-						ServerCertificateName: aws.String("some-orphaned-cert"),
-						ServerCertificateId:   aws.String("this-cert-should-be-deleted"),
-						UploadDate:            &old,
-					},
-				}
-
-				distributions = []*cloudfront.DistributionSummary{}
-
-				fakeIam.DeleteCertificateReturns(errors.New("DeleteCertificate error"))
-
-				//run the test
-				manager.DeleteOrphanedCerts()
-
-				Expect(errorLogOutput.String()).To(
-					ContainSubstring("DeleteCertificate error"),
-					"was expecting DeleteCertificate error to be logged",
-				)
-			})
-
-			It("should handle AWS certificate deletion failure gracefully when listing certificates fails", func() {
-				distributions = []*cloudfront.DistributionSummary{
-					&cloudfront.DistributionSummary{
-						ARN: aws.String("some-distribution"),
-						ViewerCertificate: &cloudfront.ViewerCertificate{
-							IAMCertificateId: aws.String("an-active-certificate"),
-						},
-					},
-					&cloudfront.DistributionSummary{
-						ARN: aws.String("some-other-distribution"),
-						ViewerCertificate: &cloudfront.ViewerCertificate{
-							IAMCertificateId: aws.String("some-other-active-certificate"),
-						},
-					},
-				}
-				fakeIam.ListCertificatesReturns(errors.New("ListServerCertificates error"))
-
-				//run the test
-				manager.DeleteOrphanedCerts()
-
-				Expect(errorLogOutput.String()).To(
-					ContainSubstring("ListServerCertificates error"),
-					"was expecting ListServerCertificates error to be logged",
-				)
-			})
-
-			It("should handle AWS certificate deletion failure gracefully when listing cloudfront distributions fails", func() {
-				fakeDistribution.ListDistributionsReturns(errors.New("ListDistributions error"))
-
-				old := time.Now().AddDate(0, 0, -2)
-				serverCertificates = []*iam.ServerCertificateMetadata{
-					&iam.ServerCertificateMetadata{
-						Arn:                   aws.String("some-orphaned-cert"),
-						ServerCertificateName: aws.String("some-orphaned-cert"),
-						ServerCertificateId:   aws.String("this-cert-should-be-deleted"),
-						UploadDate:            &old,
-					},
-				}
-
-				//run the test
-				manager.DeleteOrphanedCerts()
-
-				Expect(errorLogOutput.String()).To(
-					ContainSubstring("ListDistributions error"),
-					"was expecting ListDistributions error to be logged",
-				)
-			})
-		})
-
 		Context("deleting ACM certs", func() {
 			BeforeEach(func() {
-				fakeIam.ListCertificatesReturns(nil)
 				fakeDistribution.ListDistributionsReturns(nil)
 			})
 
@@ -320,10 +146,8 @@ var _ = Describe("RouteManager", func() {
 
 			manager = models.NewManager(
 				logger,
-				&utils.Iam{},
 				fakeDistribution,
 				config.Settings{},
-				&models.AcmeClientProvider{},
 				fakeDatastore,
 				fakeCertsManager,
 			)
@@ -384,7 +208,6 @@ var _ = Describe("RouteManager", func() {
 			Expect(fakeDistribution.CreateCallCount()).To(Equal(1), "distribution.Creat() function should have been called once")
 			Expect(fakeDatastore.CreateCallCount()).To(Equal(1), "datastore.Create() function should have been called once")
 			Expect(routeArg.State).To(Equal(models.Provisioning))
-			Expect(routeArg.IsCertificateManagedByACM).To(Equal(true))
 		})
 
 	})
@@ -411,10 +234,8 @@ var _ = Describe("RouteManager", func() {
 
 			manager = models.NewManager(
 				logger,
-				&utils.Iam{},
 				fakeDistribution,
 				config.Settings{},
-				&models.AcmeClientProvider{},
 				fakeDatastore,
 				fakeCertsManager,
 			)
@@ -529,12 +350,11 @@ var _ = Describe("RouteManager", func() {
 				It("making sure that the correct certificate is set to the CloudFront distribution", func() {
 					err := manager.Poll(route)
 
-					_, certArn, domains, acmCert := fakeDistribution.SetCertificateAndCnameArgsForCall(0)
+					_, certArn, domains := fakeDistribution.SetCertificateAndCnameArgsForCall(0)
 
 					Expect(err).ToNot(HaveOccurred())
 					Expect(certArn).To(Equal(route.Certificates[2].CertificateArn))
 					Expect(domains).To(Equal(route.GetDomains()))
-					Expect(acmCert).To(BeTrue())
 
 				})
 
@@ -632,10 +452,8 @@ var _ = Describe("RouteManager", func() {
 
 			manager = models.NewManager(
 				logger,
-				&utils.Iam{},
 				fakeDistribution,
 				config.Settings{},
-				&models.AcmeClientProvider{},
 				fakeDatastore,
 				fakeCertsManager,
 			)
@@ -716,10 +534,8 @@ var _ = Describe("RouteManager", func() {
 
 			manager = models.NewManager(
 				logger,
-				&utils.Iam{},
 				fakeDistribution,
 				config.Settings{},
-				&models.AcmeClientProvider{},
 				fakeDatastore,
 				fakeCertsManager,
 			)
@@ -834,10 +650,8 @@ var _ = Describe("RouteManager", func() {
 
 			manager = models.NewManager(
 				logger,
-				&utils.Iam{},
 				fakeDistribution,
 				config.Settings{},
-				&models.AcmeClientProvider{},
 				fakeDatastore,
 				fakeCertsManager,
 			)
@@ -884,15 +698,14 @@ var _ = Describe("RouteManager", func() {
 		It("when a CNAMEAlreadyExists error occurs, set the route.State to Conflict", func() {
 			//1. RouteStore needs to return at least a single route in a Provisioning state
 			route := models.Route{
-				InstanceId:                "instanceID",
-				DistId:                    "DistID",
-				State:                     models.Provisioning,
-				DomainExternal:            "domain.com",
-				Origin:                    "origin.com",
-				Path:                      "",
-				DefaultTTL:                600,
-				InsecureOrigin:            false,
-				IsCertificateManagedByACM: true,
+				InstanceId:     "instanceID",
+				DistId:         "DistID",
+				State:          models.Provisioning,
+				DomainExternal: "domain.com",
+				Origin:         "origin.com",
+				Path:           "",
+				DefaultTTL:     600,
+				InsecureOrigin: false,
 				Certificates: []models.Certificate{
 					{
 						CertificateArn:    "CertificateArn",
@@ -933,15 +746,14 @@ var _ = Describe("RouteManager", func() {
 		It("When utils.ErrValidationTimedOut error occurs, set the route.State to Failed", func() {
 			//1. RouteStore needs to return at least a single route in a Provisioning state
 			route := models.Route{
-				InstanceId:                "instanceID",
-				DistId:                    "DistID",
-				State:                     models.Provisioning,
-				DomainExternal:            "domain.com",
-				Origin:                    "origin.com",
-				Path:                      "",
-				DefaultTTL:                600,
-				InsecureOrigin:            false,
-				IsCertificateManagedByACM: true,
+				InstanceId:     "instanceID",
+				DistId:         "DistID",
+				State:          models.Provisioning,
+				DomainExternal: "domain.com",
+				Origin:         "origin.com",
+				Path:           "",
+				DefaultTTL:     600,
+				InsecureOrigin: false,
 				Certificates: []models.Certificate{
 					{
 						CertificateArn:    "CertificateArn",
@@ -979,16 +791,15 @@ var _ = Describe("RouteManager", func() {
 			// and set the provisioingSince to 85 hours ago
 			provisioingSincePeriod := time.Now().Add(-1 * models.ProvisioningExpirationPeriodHours).Add(-1 * time.Hour)
 			route := models.Route{
-				InstanceId:                "instanceID",
-				DistId:                    "DistID",
-				State:                     models.Provisioning,
-				DomainExternal:            "domain.com",
-				Origin:                    "origin.com",
-				Path:                      "",
-				DefaultTTL:                600,
-				InsecureOrigin:            false,
-				IsCertificateManagedByACM: true,
-				ProvisioningSince:         &provisioingSincePeriod,
+				InstanceId:        "instanceID",
+				DistId:            "DistID",
+				State:             models.Provisioning,
+				DomainExternal:    "domain.com",
+				Origin:            "origin.com",
+				Path:              "",
+				DefaultTTL:        600,
+				InsecureOrigin:    false,
+				ProvisioningSince: &provisioingSincePeriod,
 				Certificates: []models.Certificate{
 					{
 						CertificateArn:    "CertificateArn",
@@ -1031,16 +842,15 @@ var _ = Describe("RouteManager", func() {
 			// and set the provisioingSince to 85 hours ago
 			provisioingSincePeriod := time.Now().Add(-1 * models.ProvisioningExpirationPeriodHours).Add(-1 * time.Hour)
 			route := models.Route{
-				InstanceId:                "instanceID",
-				DistId:                    "DistID",
-				State:                     models.Provisioning,
-				DomainExternal:            "domain.com",
-				Origin:                    "origin.com",
-				Path:                      "",
-				DefaultTTL:                600,
-				InsecureOrigin:            false,
-				IsCertificateManagedByACM: true,
-				ProvisioningSince:         &provisioingSincePeriod,
+				InstanceId:        "instanceID",
+				DistId:            "DistID",
+				State:             models.Provisioning,
+				DomainExternal:    "domain.com",
+				Origin:            "origin.com",
+				Path:              "",
+				DefaultTTL:        600,
+				InsecureOrigin:    false,
+				ProvisioningSince: &provisioingSincePeriod,
 				Certificates: []models.Certificate{
 					{
 						CertificateArn:    "CertificateArn",
@@ -1081,29 +891,9 @@ var _ = Describe("RouteManager", func() {
 
 	Context("GetDNSInstructions", func() {
 		It("requests DNS challenges for the right certificate when there are multiple", func(){
-			firstOfMarch := time.Date(2020, 03, 01, 12, 00, 00, 00, time.UTC)
-			thirdOfMarch := time.Date(2020, 03, 03, 12, 00, 00, 00, time.UTC)
 			firstOfJune := time.Date(2020, 06, 01, 12, 00, 00, 00, time.UTC)
 			now := time.Now()
 
-			leCertOne := models.Certificate{
-				Model: gorm.Model{
-					ID:        1,
-					CreatedAt: firstOfMarch,
-					UpdatedAt: now,
-				},
-				CertificateStatus: models.CertificateStatusLE,
-				CertificateArn: "managedbyletsencrypt",
-			}
-			leCertTwo := models.Certificate{
-				Model: gorm.Model{
-					ID:        2,
-					CreatedAt: thirdOfMarch,
-					UpdatedAt: now,
-				},
-				CertificateStatus: models.CertificateStatusLE,
-				CertificateArn: "managedbyletsencrypt",
-			}
 			acmCertOne := models.Certificate{
 				Model: gorm.Model{
 					ID:        3,
@@ -1116,23 +906,15 @@ var _ = Describe("RouteManager", func() {
 
 			route := models.Route{
 				Certificates: []models.Certificate{
-					leCertOne,
-					leCertTwo,
 					acmCertOne,
 				},
-				// This represents an old code path used by Let's Encrypt,
-				// which often (always?) picks the oldest certificate
-				Certificate: leCertOne,
-				IsCertificateManagedByACM: true,
 			}
 
 			certsManager := &utilsmocks.FakeCertificateManager{}
 			manager := models.NewManager(
 				lager.NewLogger(""),
-				&utils.Iam{},
 				&utils.Distribution{},
 				config.Settings{},
-				&models.AcmeClientProvider{},
 				&models.RouteStore{},
 				certsManager,
 			)
@@ -1160,10 +942,8 @@ var _ = Describe("RouteManager", func() {
 			certsManager := &utilsmocks.FakeCertificateManager{}
 			manager := models.NewManager(
 				lager.NewLogger(""),
-				&utils.Iam{},
 				&utils.Distribution{},
 				config.Settings{},
-				&models.AcmeClientProvider{},
 				&models.RouteStore{},
 				certsManager,
 			)
@@ -1179,17 +959,16 @@ var _ = Describe("RouteManager", func() {
 			certsManager.GetDomainValidationChallengesReturns([]utils.DomainValidationChallenge{domainValidationChallenge}, nil)
 
 			route := &models.Route{
-				InstanceId:                "instanceID",
-				State:                     models.Provisioning,
-				DomainExternal:            "domain.com",
-				Origin:                    "origin.com",
-				Path:                      "",
-				DefaultTTL:                600,
-				InsecureOrigin:            false,
-				IsCertificateManagedByACM: true,
+				InstanceId:     "instanceID",
+				State:          models.Provisioning,
+				DomainExternal: "domain.com",
+				Origin:         "origin.com",
+				Path:           "",
+				DefaultTTL:     600,
+				InsecureOrigin: false,
 				Certificates: []models.Certificate{
 					{
-						CertificateArn: "arn:aws:acm:::foo",
+						CertificateArn:    "arn:aws:acm:::foo",
 						CertificateStatus: models.CertificateStatusValidating,
 					},
 				},
@@ -1200,11 +979,6 @@ var _ = Describe("RouteManager", func() {
 			Expect(certsManager.GetDomainValidationChallengesCallCount()).To(Equal(1))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(instructions).NotTo(BeNil())
-
-		})
-
-		It("Getting the DNS challenges from the database (e.g.:JSON) when the Routes Certificates are managed by Letsencrypt", func() {
-			By("To test the letsencrypt path of GetDNSInstructions function is too complex and given we are getting rid of this functionality soon - not worth it")
 
 		})
 	})

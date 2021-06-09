@@ -127,11 +127,6 @@ func (_m *RouteManagerIface) Renew(route *models.Route) error {
 	return r0
 }
 
-// RenewAll provides a mock function with given fields:
-func (_m *RouteManagerIface) RenewAll() {
-	_m.Called()
-}
-
 // Update provides a mock function with given fields: instanceId, domain, forwardedHeaders, forwardCookies
 func (_m *RouteManagerIface) Update(instanceId string, domain *string, defaultTTL *int64, forwardedHeaders *utils.Headers, forwardCookies *bool) (bool, error) {
 	ret := _m.Called(instanceId, domain, defaultTTL, forwardedHeaders, forwardCookies)

@@ -15,7 +15,7 @@ type DistributionIface interface {
 	Create(callerReference string, domains []string, origin string, defaultTTL int64, forwardedHeaders Headers, forwardCookies bool, tags map[string]string) (*cloudfront.Distribution, error)
 	Update(distId string, domains *[]string, origin string, defaultTTL *int64, forwardedHeaders *Headers, forwardCookies *bool) (*cloudfront.Distribution, error)
 	Get(distId string) (*cloudfront.Distribution, error)
-	SetCertificateAndCname(distId, certId string, domains []string, acmCert bool) error
+	SetCertificateAndCname(distId, certId string, domains []string) error
 	Disable(distId string) error
 	Delete(distId string) (bool, error)
 	ListDistributions(callback func(cloudfront.DistributionSummary) bool) error
@@ -65,58 +65,6 @@ func (d *Distribution) setDistributionConfigDefaults(config *cloudfront.Distribu
 	config.Enabled = aws.Bool(true)
 	config.IsIPV6Enabled = aws.Bool(true)
 	config.PriceClass = aws.String("PriceClass_100")
-}
-
-func (d *Distribution) setDistributionConfigCacheBehaviors(config *cloudfront.DistributionConfig, callerReference string) {
-	config.CacheBehaviors = &cloudfront.CacheBehaviors{
-		Quantity: aws.Int64(1),
-		Items: []*cloudfront.CacheBehavior{
-			{
-				TargetOriginId:         aws.String(fmt.Sprintf("s3-%s-%s", d.Settings.Bucket, callerReference)),
-				FieldLevelEncryptionId: aws.String(""),
-				AllowedMethods: &cloudfront.AllowedMethods{
-					CachedMethods: &cloudfront.CachedMethods{
-						Quantity: aws.Int64(2),
-						Items: []*string{
-							aws.String("HEAD"),
-							aws.String("GET"),
-						},
-					},
-					Items: []*string{
-						aws.String("HEAD"),
-						aws.String("GET"),
-					},
-					Quantity: aws.Int64(2),
-				},
-				Compress:    aws.Bool(false),
-				PathPattern: aws.String("/.well-known/acme-challenge/*"),
-				ForwardedValues: &cloudfront.ForwardedValues{
-					Headers: &cloudfront.Headers{
-						Quantity: aws.Int64(0),
-					},
-					QueryString: aws.Bool(false),
-					Cookies: &cloudfront.CookiePreference{
-						Forward: aws.String("none"),
-					},
-					QueryStringCacheKeys: &cloudfront.QueryStringCacheKeys{
-						Quantity: aws.Int64(0),
-					},
-				},
-				SmoothStreaming: aws.Bool(false),
-				DefaultTTL:      aws.Int64(86400),
-				MinTTL:          aws.Int64(0),
-				MaxTTL:          aws.Int64(31536000),
-				LambdaFunctionAssociations: &cloudfront.LambdaFunctionAssociations{
-					Quantity: aws.Int64(0),
-				},
-				TrustedSigners: &cloudfront.TrustedSigners{
-					Enabled:  aws.Bool(false),
-					Quantity: aws.Int64(0),
-				},
-				ViewerProtocolPolicy: aws.String("allow-all"),
-			},
-		},
-	}
 }
 
 func (d *Distribution) setDistributionConfigOrigins(config *cloudfront.DistributionConfig, callerReference string) {
@@ -211,7 +159,6 @@ func (d *Distribution) Create(callerReference string, domains []string, origin s
 	}
 
 	d.setDistributionConfigDefaults(distConfig, callerReference)
-	d.setDistributionConfigCacheBehaviors(distConfig, callerReference)
 	d.setDistributionConfigDefaultCacheBehavior(distConfig, callerReference)
 	d.setDistributionConfigOrigins(distConfig, callerReference)
 
@@ -260,7 +207,6 @@ func (d *Distribution) Update(
 	callerReference := *dist.DistributionConfig.CallerReference
 
 	d.setDistributionConfigDefaults(dist.DistributionConfig, callerReference)
-	d.setDistributionConfigCacheBehaviors(dist.DistributionConfig, callerReference)
 	d.setDistributionConfigDefaultCacheBehavior(dist.DistributionConfig, callerReference)
 	d.setDistributionConfigOrigins(dist.DistributionConfig, callerReference)
 
@@ -311,7 +257,7 @@ func (d *Distribution) Get(distId string) (*cloudfront.Distribution, error) {
 	return resp.Distribution, nil
 }
 
-func (d *Distribution) SetCertificateAndCname(distId, certId string, domains []string, acmCert bool) error {
+func (d *Distribution) SetCertificateAndCname(distId, certId string, domains []string) error {
 	resp, err := d.Service.GetDistributionConfig(&cloudfront.GetDistributionConfigInput{
 		Id: aws.String(distId),
 	})
@@ -323,13 +269,8 @@ func (d *Distribution) SetCertificateAndCname(distId, certId string, domains []s
 	DistributionConfig, ETag := resp.DistributionConfig, resp.ETag
 	DistributionConfig.Aliases = aliases
 
-	if acmCert {
-		DistributionConfig.ViewerCertificate.ACMCertificateArn = aws.String(certId)
-		DistributionConfig.ViewerCertificate.IAMCertificateId = nil
-	} else {
-		DistributionConfig.ViewerCertificate.IAMCertificateId = aws.String(certId)
-		DistributionConfig.ViewerCertificate.ACMCertificateArn = nil
-	}
+	DistributionConfig.ViewerCertificate.ACMCertificateArn = aws.String(certId)
+	DistributionConfig.ViewerCertificate.IAMCertificateId = nil
 
 	DistributionConfig.ViewerCertificate.SSLSupportMethod = aws.String("sni-only")
 	DistributionConfig.ViewerCertificate.MinimumProtocolVersion = aws.String("TLSv1.2_2019")

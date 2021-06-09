@@ -10,7 +10,6 @@ const (
 	CertificateStatusValidating string = "validating"
 	CertificateStatusDeleted    string = "deleted"
 	CertificateStatusFailed     string = "failed"
-	CertificateStatusLE         string = "letsencrypt"
 )
 
 type Certificate struct {
@@ -20,7 +19,7 @@ type Certificate struct {
 	CertURL     string
 	Certificate []byte
 	Expires     time.Time `gorm:"index"`
-	//adding a certificateArn to this struct, so we can truck the requested/provisioned certificates by ACM
-	CertificateArn    string `gorm:"not null;default:'managedbyletsencrypt'"`
-	CertificateStatus string `gorm:"not null;default:'letsencrypt'"` //(Attached, Validating, Deleted, failed, letsencrypt)
+	// adding a certificateArn to this struct, so we can truck the requested/provisioned certificates by ACM
+	CertificateArn    string `gorm:"not null"`
+	CertificateStatus string `gorm:"not null"` //(Attached, Validating, Deleted, failed)
 }

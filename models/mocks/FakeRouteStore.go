@@ -45,18 +45,6 @@ type FakeRouteStore struct {
 		result1 models.Route
 		result2 error
 	}
-	FindWithExpiringCertsStub        func() ([]models.Route, error)
-	findWithExpiringCertsMutex       sync.RWMutex
-	findWithExpiringCertsArgsForCall []struct {
-	}
-	findWithExpiringCertsReturns struct {
-		result1 []models.Route
-		result2 error
-	}
-	findWithExpiringCertsReturnsOnCall map[int]struct {
-		result1 []models.Route
-		result2 error
-	}
 	SaveStub        func(*models.Route) error
 	saveMutex       sync.RWMutex
 	saveArgsForCall []struct {
@@ -258,61 +246,6 @@ func (fake *FakeRouteStore) FindOneMatchingReturnsOnCall(i int, result1 models.R
 	}{result1, result2}
 }
 
-func (fake *FakeRouteStore) FindWithExpiringCerts() ([]models.Route, error) {
-	fake.findWithExpiringCertsMutex.Lock()
-	ret, specificReturn := fake.findWithExpiringCertsReturnsOnCall[len(fake.findWithExpiringCertsArgsForCall)]
-	fake.findWithExpiringCertsArgsForCall = append(fake.findWithExpiringCertsArgsForCall, struct {
-	}{})
-	fake.recordInvocation("FindWithExpiringCerts", []interface{}{})
-	fake.findWithExpiringCertsMutex.Unlock()
-	if fake.FindWithExpiringCertsStub != nil {
-		return fake.FindWithExpiringCertsStub()
-	}
-	if specificReturn {
-		return ret.result1, ret.result2
-	}
-	fakeReturns := fake.findWithExpiringCertsReturns
-	return fakeReturns.result1, fakeReturns.result2
-}
-
-func (fake *FakeRouteStore) FindWithExpiringCertsCallCount() int {
-	fake.findWithExpiringCertsMutex.RLock()
-	defer fake.findWithExpiringCertsMutex.RUnlock()
-	return len(fake.findWithExpiringCertsArgsForCall)
-}
-
-func (fake *FakeRouteStore) FindWithExpiringCertsCalls(stub func() ([]models.Route, error)) {
-	fake.findWithExpiringCertsMutex.Lock()
-	defer fake.findWithExpiringCertsMutex.Unlock()
-	fake.FindWithExpiringCertsStub = stub
-}
-
-func (fake *FakeRouteStore) FindWithExpiringCertsReturns(result1 []models.Route, result2 error) {
-	fake.findWithExpiringCertsMutex.Lock()
-	defer fake.findWithExpiringCertsMutex.Unlock()
-	fake.FindWithExpiringCertsStub = nil
-	fake.findWithExpiringCertsReturns = struct {
-		result1 []models.Route
-		result2 error
-	}{result1, result2}
-}
-
-func (fake *FakeRouteStore) FindWithExpiringCertsReturnsOnCall(i int, result1 []models.Route, result2 error) {
-	fake.findWithExpiringCertsMutex.Lock()
-	defer fake.findWithExpiringCertsMutex.Unlock()
-	fake.FindWithExpiringCertsStub = nil
-	if fake.findWithExpiringCertsReturnsOnCall == nil {
-		fake.findWithExpiringCertsReturnsOnCall = make(map[int]struct {
-			result1 []models.Route
-			result2 error
-		})
-	}
-	fake.findWithExpiringCertsReturnsOnCall[i] = struct {
-		result1 []models.Route
-		result2 error
-	}{result1, result2}
-}
-
 func (fake *FakeRouteStore) Save(arg1 *models.Route) error {
 	fake.saveMutex.Lock()
 	ret, specificReturn := fake.saveReturnsOnCall[len(fake.saveArgsForCall)]
@@ -382,8 +315,6 @@ func (fake *FakeRouteStore) Invocations() map[string][][]interface{} {
 	defer fake.findAllMatchingMutex.RUnlock()
 	fake.findOneMatchingMutex.RLock()
 	defer fake.findOneMatchingMutex.RUnlock()
-	fake.findWithExpiringCertsMutex.RLock()
-	defer fake.findWithExpiringCertsMutex.RUnlock()
 	fake.saveMutex.RLock()
 	defer fake.saveMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
