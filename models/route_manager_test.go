@@ -32,12 +32,12 @@ var _ = Describe("RouteManager", func() {
 
 			fakeDistribution *utilsmocks.FakeDistribution
 			fakeCertsManager *utilsmocks.FakeCertificateManager
-			fakeDatastore	 *mocks.FakeRouteStore
+			fakeDatastore    *mocks.FakeRouteStore
 
 			errorLogOutput *bytes.Buffer
 		)
 
-		BeforeEach(func(){
+		BeforeEach(func() {
 			errorLogOutput = bytes.NewBuffer([]byte{})
 
 			logger := lager.NewLogger("delete-orphaned-acm-certs")
@@ -890,7 +890,7 @@ var _ = Describe("RouteManager", func() {
 	})
 
 	Context("GetDNSInstructions", func() {
-		It("requests DNS challenges for the right certificate when there are multiple", func(){
+		It("requests DNS challenges for the right certificate when there are multiple", func() {
 			firstOfJune := time.Date(2020, 06, 01, 12, 00, 00, 00, time.UTC)
 			now := time.Now()
 
@@ -901,7 +901,7 @@ var _ = Describe("RouteManager", func() {
 					UpdatedAt: now,
 				},
 				CertificateStatus: models.CertificateStatusValidating,
-				CertificateArn: "arn:aws:acm::my-cert",
+				CertificateArn:    "arn:aws:acm::my-cert",
 			}
 
 			route := models.Route{

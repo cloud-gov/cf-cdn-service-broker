@@ -483,8 +483,7 @@ func (m *RouteManager) deleteOrphanedACMCerts() {
 		isInUse := len(cert.InUseBy) > 0
 		olderThan24h := cert.IssuedAt.Before(time24hAgo)
 
-
-		if isIssued && !isInUse &&  managedByCdnBroker && olderThan24h {
+		if isIssued && !isInUse && managedByCdnBroker && olderThan24h {
 			lsession.Info("deleting-orphaned-cert", lager.Data{"certificate-arn": cert.CertificateArn})
 			err = m.certsManager.DeleteCertificate(*cert.CertificateArn)
 			if err != nil {
@@ -492,11 +491,11 @@ func (m *RouteManager) deleteOrphanedACMCerts() {
 			}
 		} else {
 			lsession.Info("not-deleting-certificate", lager.Data{
-				"certificate-arn": *cert.CertificateArn,
-				"is-issued": isIssued,
-				"is-in-use": isInUse,
+				"certificate-arn":          *cert.CertificateArn,
+				"is-issued":                isIssued,
+				"is-in-use":                isInUse,
 				"is-managed-by-cdn-broker": managedByCdnBroker,
-				"is-older-than-24h": olderThan24h,
+				"is-older-than-24h":        olderThan24h,
 			})
 		}
 	}
