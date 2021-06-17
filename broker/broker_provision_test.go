@@ -130,7 +130,7 @@ var _ = Describe("Last operation", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("Should set the correct tags", func(){
+	It("Should set the correct tags", func() {
 		instanceId := "123"
 		s.Manager.On("Get", instanceId).Return(&models.Route{}, errors.New("not found"))
 		route := &models.Route{State: models.Provisioning}
@@ -138,11 +138,11 @@ var _ = Describe("Last operation", func() {
 		s.Manager.On("Create", instanceId, "domain.gov", "origin.cloud.gov", s.settings.DefaultDefaultTTL, utils.Headers{"Host": true}, true, mock.AnythingOfType("map[string]string")).Return(route, nil)
 
 		details := brokerapi.ProvisionDetails{
-			RawParameters: []byte(`{"domain": "domain.gov"}`),
+			RawParameters:    []byte(`{"domain": "domain.gov"}`),
 			OrganizationGUID: "org-1",
-			SpaceGUID: "space-1",
-			ServiceID: "service-1",
-			PlanID: "plan-1",
+			SpaceGUID:        "space-1",
+			ServiceID:        "service-1",
+			PlanID:           "plan-1",
 		}
 
 		_, err := s.Broker.Provision(s.ctx, instanceId, details, true)

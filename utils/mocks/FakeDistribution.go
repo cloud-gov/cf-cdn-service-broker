@@ -76,13 +76,12 @@ type FakeDistribution struct {
 	listDistributionsReturnsOnCall map[int]struct {
 		result1 error
 	}
-	SetCertificateAndCnameStub        func(string, string, []string, bool) error
+	SetCertificateAndCnameStub        func(string, string, []string) error
 	setCertificateAndCnameMutex       sync.RWMutex
 	setCertificateAndCnameArgsForCall []struct {
 		arg1 string
 		arg2 string
 		arg3 []string
-		arg4 bool
 	}
 	setCertificateAndCnameReturns struct {
 		result1 error
@@ -432,7 +431,7 @@ func (fake *FakeDistribution) ListDistributionsReturnsOnCall(i int, result1 erro
 	}{result1}
 }
 
-func (fake *FakeDistribution) SetCertificateAndCname(arg1 string, arg2 string, arg3 []string, arg4 bool) error {
+func (fake *FakeDistribution) SetCertificateAndCname(arg1 string, arg2 string, arg3 []string) error {
 	var arg3Copy []string
 	if arg3 != nil {
 		arg3Copy = make([]string, len(arg3))
@@ -444,12 +443,11 @@ func (fake *FakeDistribution) SetCertificateAndCname(arg1 string, arg2 string, a
 		arg1 string
 		arg2 string
 		arg3 []string
-		arg4 bool
-	}{arg1, arg2, arg3Copy, arg4})
-	fake.recordInvocation("SetCertificateAndCname", []interface{}{arg1, arg2, arg3Copy, arg4})
+	}{arg1, arg2, arg3Copy})
+	fake.recordInvocation("SetCertificateAndCname", []interface{}{arg1, arg2, arg3Copy})
 	fake.setCertificateAndCnameMutex.Unlock()
 	if fake.SetCertificateAndCnameStub != nil {
-		return fake.SetCertificateAndCnameStub(arg1, arg2, arg3, arg4)
+		return fake.SetCertificateAndCnameStub(arg1, arg2, arg3)
 	}
 	if specificReturn {
 		return ret.result1
@@ -464,17 +462,17 @@ func (fake *FakeDistribution) SetCertificateAndCnameCallCount() int {
 	return len(fake.setCertificateAndCnameArgsForCall)
 }
 
-func (fake *FakeDistribution) SetCertificateAndCnameCalls(stub func(string, string, []string, bool) error) {
+func (fake *FakeDistribution) SetCertificateAndCnameCalls(stub func(string, string, []string) error) {
 	fake.setCertificateAndCnameMutex.Lock()
 	defer fake.setCertificateAndCnameMutex.Unlock()
 	fake.SetCertificateAndCnameStub = stub
 }
 
-func (fake *FakeDistribution) SetCertificateAndCnameArgsForCall(i int) (string, string, []string, bool) {
+func (fake *FakeDistribution) SetCertificateAndCnameArgsForCall(i int) (string, string, []string) {
 	fake.setCertificateAndCnameMutex.RLock()
 	defer fake.setCertificateAndCnameMutex.RUnlock()
 	argsForCall := fake.setCertificateAndCnameArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
 func (fake *FakeDistribution) SetCertificateAndCnameReturns(result1 error) {

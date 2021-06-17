@@ -10,7 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
-	"github.com/aws/aws-sdk-go/service/iam"
 
 	"github.com/alphagov/paas-cdn-broker/config"
 	"github.com/alphagov/paas-cdn-broker/models"
@@ -33,26 +32,19 @@ func main() {
 		logger.Fatal("connect", err)
 	}
 
-	if err := db.AutoMigrate(&models.Route{}, &models.Certificate{}, &models.UserData{}).Error; err != nil {
+	if err := db.AutoMigrate(&models.Route{}, &models.Certificate{}).Error; err != nil {
 		logger.Fatal("migrate", err)
 	}
 
 	manager := models.NewManager(
 		logger,
-		&utils.Iam{settings, iam.New(session)},
 		&utils.Distribution{settings, cloudfront.New(session)},
 		settings,
-		models.NewAcmeClientProvider(logger),
 		models.RouteStore{Database: db},
 		utils.NewCertificateManager(logger, settings, session),
 	)
 
 	c := cron.New()
-
-	c.AddFunc(settings.Schedule, func() {
-		logger.Info("run-renew-certs")
-		manager.RenewAll()
-	})
 
 	c.AddFunc(settings.Schedule, func() {
 		logger.Info("run-cert-cleanup")

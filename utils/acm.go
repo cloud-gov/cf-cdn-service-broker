@@ -221,8 +221,8 @@ func (cm *CertificateManager) GetDomainValidationChallenges(arn string) ([]Domai
 			continue
 		}
 
-		var recordName  = ""
-		var recordType  = ""
+		var recordName = ""
+		var recordType = ""
 		var recordValue = ""
 
 		if e.ResourceRecord != nil {

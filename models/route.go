@@ -5,9 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
-	"encoding/json"
 	"encoding/pem"
-	"github.com/alphagov/paas-cdn-broker/utils"
 	"github.com/jinzhu/gorm"
 	"strings"
 	"time"
@@ -17,23 +15,18 @@ const ProvisioningExpirationPeriodHours time.Duration = 84 * time.Hour
 
 type Route struct {
 	gorm.Model
-	InstanceId                string `gorm:"not null;unique_index"`
-	State                     State  `gorm:"not null;index"`
-	ChallengeJSON             []byte
-	DomainExternal            string
-	DomainInternal            string
-	DistId                    string
-	Origin                    string
-	Path                      string      // Always empty, should not remove because it is in DB
-	InsecureOrigin            bool        // Always false, should not remove because it is in DB
-	Certificate               Certificate //this is used by letsencrypt certs and will be removed once all our certs are migrated to ACM
-	UserData                  UserData
-	UserDataID                int
-	User                      utils.User `gorm:"-"`
-	DefaultTTL                int64      `gorm:"default:86400"`
-	ProvisioningSince         *time.Time //using the same field to measure a time for Provisioning or Deprovisioning
-	IsCertificateManagedByACM bool       `gorm:"default:false"` //using false as default value, so all the existing records will default to managed by LE
-	Certificates              []Certificate
+	InstanceId        string `gorm:"not null;unique_index"`
+	State             State  `gorm:"not null;index"`
+	ChallengeJSON     []byte
+	DomainExternal    string
+	DomainInternal    string
+	DistId            string
+	Origin            string
+	Path              string     // Always empty, should not remove because it is in DB
+	InsecureOrigin    bool       // Always false, should not remove because it is in DB
+	DefaultTTL        int64      `gorm:"default:86400"`
+	ProvisioningSince *time.Time //using the same field to measure a time for Provisioning or Deprovisioning
+	Certificates      []Certificate
 }
 
 // BeforeCreate hook will change the value of Provisioning_since field to time.Now()
@@ -83,28 +76,6 @@ func (r *Route) IsProvisioningExpired() bool {
 	}
 	return r.State == Provisioning && provisioningSince != nil &&
 		(*provisioningSince).Before(time.Now().Add(-1*ProvisioningExpirationPeriodHours))
-}
-
-func (r *Route) SetUser(user utils.User) error {
-	var err error
-	userData := UserData{Email: user.GetEmail()}
-
-	lsession := helperLogger.Session("save-user")
-
-	userData.Key, err = savePrivateKey(user.GetPrivateKey())
-	if err != nil {
-		lsession.Error("save-private-key", err)
-		return err
-	}
-	userData.Reg, err = json.Marshal(user)
-	if err != nil {
-		lsession.Error("json-marshal-user", err)
-		return err
-	}
-
-	r.UserData = userData
-
-	return nil
 }
 
 func isActivelyChanging(st State) bool {

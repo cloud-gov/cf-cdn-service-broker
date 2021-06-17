@@ -52,30 +52,4 @@ var _ = Describe("Route", func() {
 
 	})
 
-	Context("IsCertificateManagedByACM", func() {
-		var (
-			route models.Route
-		)
-
-		BeforeEach(func() {
-
-			route = models.Route{}
-		})
-
-		It("Make sure that the default value is 'false'", func() {
-
-			Expect(route.IsCertificateManagedByACM).To(BeFalse())
-
-		})
-
-		It("Make sure that the value is 'true', after setting it to 'true'", func() {
-
-			route.IsCertificateManagedByACM = true
-
-			Expect(route.IsCertificateManagedByACM).To(BeTrue())
-
-		})
-
-	})
-
 })
