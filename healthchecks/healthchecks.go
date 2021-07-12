@@ -7,7 +7,6 @@ import (
 )
 
 var checks = map[string]func(config.Settings) error{
-	"s3":           S3,
 	"cloudfront":   Cloudfront,
 	"cloudfoundry": Cloudfoundry,
 	"postgresql":   Postgresql,

@@ -30,8 +30,6 @@ jobs:
         environment_variables: &cfenv-staging
           BROKER_USERNAME: {{cdn-broker-user-staging}}
           BROKER_PASSWORD: {{cdn-broker-pass-staging}}
-          EMAIL: {{cdn-broker-email-staging}}
-          BUCKET: {{cdn-broker-bucket-staging}}
           AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id-staging}}
           AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key-staging}}
           AWS_DEFAULT_REGION: {{cdn-broker-region-staging}}
@@ -121,8 +119,6 @@ jobs:
         environment_variables: &cfenv-production
           BROKER_USERNAME: {{cdn-broker-user-production}}
           BROKER_PASSWORD: {{cdn-broker-pass-production}}
-          EMAIL: {{cdn-broker-email-production}}
-          BUCKET: {{cdn-broker-bucket-production}}
           AWS_ACCESS_KEY_ID: {{cdn-broker-access-key-id-production}}
           AWS_SECRET_ACCESS_KEY: {{cdn-broker-secret-access-key-production}}
           AWS_DEFAULT_REGION: {{cdn-broker-region-production}}
