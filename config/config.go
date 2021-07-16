@@ -13,7 +13,6 @@ type Settings struct {
 	BrokerUsername       string `envconfig:"broker_username" required:"true"`
 	BrokerPassword       string `envconfig:"broker_password" required:"true"`
 	DatabaseUrl          string `envconfig:"database_url" required:"true"`
-	Bucket               string `envconfig:"bucket" required:"true"`
 	CloudFrontPrefix     string `envconfig:"cloudfront_prefix" default:""`
 	AwsAccessKeyId       string `envconfig:"aws_access_key_id" required:"true"`
 	AwsSecretAccessKey   string `envconfig:"aws_secret_access_key" required:"true"`

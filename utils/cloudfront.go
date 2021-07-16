@@ -1,8 +1,6 @@
 package utils
 
 import (
-	"fmt"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 
@@ -88,17 +86,6 @@ func (d *Distribution) setDistributionConfigOrigins(config *cloudfront.Distribut
 							aws.String("TLSv1.2"),
 						},
 					},
-				},
-			},
-			{
-				Id:         aws.String(fmt.Sprintf("s3-%s-%s", d.Settings.Bucket, callerReference)),
-				DomainName: aws.String(fmt.Sprintf("%s.s3.amazonaws.com", d.Settings.Bucket)),
-				OriginPath: aws.String(""),
-				CustomHeaders: &cloudfront.CustomHeaders{
-					Quantity: aws.Int64(0),
-				},
-				S3OriginConfig: &cloudfront.S3OriginConfig{
-					OriginAccessIdentity: aws.String(""),
 				},
 			},
 		},
