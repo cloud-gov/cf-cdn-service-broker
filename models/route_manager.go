@@ -354,22 +354,12 @@ func (m *RouteManager) CheckRoutesToUpdate() {
 				"provisioning_since": route.ProvisioningSince,
 			})
 
-			err = m.Disable(&route)
+			lsession.Info("set-state", lager.Data{"instance_id": route.InstanceId, "state": route.State})
+			route.State = Failed
+			err = m.routeStoreIface.Save(&route)
 			if err != nil {
-				lsession.Error("unable-to-expire-unprovisioned-instance", err, lager.Data{
-					"domain":             route.DomainExternal,
-					"state":              route.State,
-					"created_at":         route.CreatedAt,
-					"provisioning_since": route.ProvisioningSince,
-				})
-
-				route.State = Failed
-				lsession.Info("set-state", lager.Data{"instance_id": route.InstanceId, "state": route.State})
-				err = m.routeStoreIface.Save(&route)
-				if err != nil {
-					lsession.Error("route-save-failed", err)
-					continue
-				}
+				lsession.Error("route-save-failed", err)
+				continue
 			}
 		}
 	}

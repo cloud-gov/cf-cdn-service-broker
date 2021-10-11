@@ -786,10 +786,11 @@ var _ = Describe("RouteManager", func() {
 			Expect(fakeDatastore.SaveArgsForCall(0).State).To(Equal(models.Failed))
 
 		})
-		It("When provisioing has expired, the cloud front distribution should be disabled and route state should be set to Deprovisioing", func() {
+
+		It("When provisioning has expired, set route.State to Failed", func() {
 			//1. RouteStore needs to return at least a single route in a Provisioning state
-			// and set the provisioingSince to 85 hours ago
-			provisioingSincePeriod := time.Now().Add(-1 * models.ProvisioningExpirationPeriodHours).Add(-1 * time.Hour)
+			// and set the provisioningSince to 85 hours ago
+			provisioningSincePeriod := time.Now().Add(-1 * models.ProvisioningExpirationPeriodHours).Add(-1 * time.Hour)
 			route := models.Route{
 				InstanceId:        "instanceID",
 				DistId:            "DistID",
@@ -799,7 +800,7 @@ var _ = Describe("RouteManager", func() {
 				Path:              "",
 				DefaultTTL:        600,
 				InsecureOrigin:    false,
-				ProvisioningSince: &provisioingSincePeriod,
+				ProvisioningSince: &provisioningSincePeriod,
 				Certificates: []models.Certificate{
 					{
 						CertificateArn:    "CertificateArn",
@@ -832,58 +833,7 @@ var _ = Describe("RouteManager", func() {
 			manager.CheckRoutesToUpdate()
 
 			//5. Assert that the route was saved with a route.State = Deprovisioning
-			Expect(fakeDistribution.DisableCallCount()).To(Equal(1), "The call to Disable distribution didn't happen")
-			Expect(fakeDatastore.SaveCallCount()).To(Equal(1))
-			Expect(fakeDatastore.SaveArgsForCall(0).State).To(Equal(models.Deprovisioning))
-		})
-
-		It("When provisioing has expired and disabling of cloudfront distribution has failed, route state should be set to Failed", func() {
-			//1. RouteStore needs to return at least a single route in a Provisioning state
-			// and set the provisioingSince to 85 hours ago
-			provisioingSincePeriod := time.Now().Add(-1 * models.ProvisioningExpirationPeriodHours).Add(-1 * time.Hour)
-			route := models.Route{
-				InstanceId:        "instanceID",
-				DistId:            "DistID",
-				State:             models.Provisioning,
-				DomainExternal:    "domain.com",
-				Origin:            "origin.com",
-				Path:              "",
-				DefaultTTL:        600,
-				InsecureOrigin:    false,
-				ProvisioningSince: &provisioingSincePeriod,
-				Certificates: []models.Certificate{
-					{
-						CertificateArn:    "CertificateArn",
-						CertificateStatus: models.CertificateStatusValidating,
-					},
-				},
-			}
-
-			provisioningRoutes = []models.Route{route}
-
-			//2. CloudFront needs to return a distribution
-			dist := cloudfront.Distribution{
-				Id:     aws.String("DistID"),
-				Status: aws.String("Deployed"),
-				DistributionConfig: &cloudfront.DistributionConfig{
-					Aliases: &cloudfront.Aliases{Items: []*string{aws.String("domain.com")}},
-					Enabled: aws.Bool(true),
-				},
-			}
-
-			fakeDistribution.GetReturns(&dist, nil)
-
-			//3. ACM has to say that Certificate is Not Issued, so we can progress to the
-			// Provisioing expired
-			fakeCertsManager.IsCertificateIssuedReturns(false, nil)
-
-			fakeDistribution.DisableReturns(errors.New("disable distribution has failed"))
-
-			//4 Call the method
-			manager.CheckRoutesToUpdate()
-
-			//5. Assert that the route was saved with a route.State = Failed
-			Expect(fakeDistribution.DisableCallCount()).To(Equal(1), "The call to Disable distribution didn't happen")
+			Expect(fakeDistribution.DisableCallCount()).To(Equal(0), "Disable was called, and it should not have been.")
 			Expect(fakeDatastore.SaveCallCount()).To(Equal(1))
 			Expect(fakeDatastore.SaveArgsForCall(0).State).To(Equal(models.Failed))
 		})
