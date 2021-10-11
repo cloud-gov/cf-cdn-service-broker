@@ -136,6 +136,31 @@ var _ = Describe("Last operation", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
+	It("Should be failed when the route's state is TimedOut", func() {
+		manager := mocks.RouteManagerIface{}
+		route := &models.Route{
+			State:          models.TimedOut,
+			DomainExternal: "cdn.cloud.gov",
+			Origin:         "cdn.apps.cloud.gov",
+			ChallengeJSON:  []byte("[]"),
+			Model: gorm.Model{
+				CreatedAt: time.Now().Add(-5 * time.Minute),
+			},
+		}
+		manager.On("Get", "123").Return(route, nil)
+		manager.On("GetDNSInstructions", route).Return([]string{"token"}, nil)
+		b := broker.New(
+			&manager,
+			&s.cfclient,
+			s.settings,
+			s.logger,
+		)
+
+		operation, err := b.LastOperation(s.ctx, "123", brokerapi.PollDetails{OperationData: ""})
+		Expect(operation.State).To(Equal(brokerapi.Failed))
+		Expect(err).NotTo(HaveOccurred())
+	})
+
 	It("Should be in progress when deprovisioning", func() {
 		manager := mocks.RouteManagerIface{}
 		route := &models.Route{

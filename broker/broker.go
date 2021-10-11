@@ -284,13 +284,25 @@ To validate ownership of the domain, set the following DNS records
 			Description: description,
 		}, nil
 
+	case models.TimedOut:
+		lsession.Info("timed-out")
+		description := fmt.Sprintf(
+			`Create/update operation has timed out. Operations have %d hours to complete before expiring
+
+Create/update operations usually expire because the domain validation DNS records have not been set.  
+`,
+			int(models.ProvisioningExpirationPeriodHours.Hours()),
+		)
+
+		return brokerapi.LastOperation{
+			State: brokerapi.Failed,
+			Description: description,
+		}, nil
+
 	case models.Failed:
 		fallthrough
 	default:
 		description := "Service instance stuck in unmanagable state."
-		if route.IsProvisioningExpired() {
-			description = fmt.Sprintf("Couldn't verify in 24h time slot. %s", description)
-		}
 		lsession.Info("unmanagable-state", lager.Data{
 			"domain":      route.DomainExternal,
 			"state":       route.State,

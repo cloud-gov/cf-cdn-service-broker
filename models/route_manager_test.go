@@ -787,7 +787,7 @@ var _ = Describe("RouteManager", func() {
 
 		})
 
-		It("When provisioning has expired, set route.State to Failed", func() {
+		It("When provisioning has expired, set route.State to TimedOut", func() {
 			//1. RouteStore needs to return at least a single route in a Provisioning state
 			// and set the provisioningSince to 85 hours ago
 			provisioningSincePeriod := time.Now().Add(-1 * models.ProvisioningExpirationPeriodHours).Add(-1 * time.Hour)
@@ -835,7 +835,7 @@ var _ = Describe("RouteManager", func() {
 			//5. Assert that the route was saved with a route.State = Deprovisioning
 			Expect(fakeDistribution.DisableCallCount()).To(Equal(0), "Disable was called, and it should not have been.")
 			Expect(fakeDatastore.SaveCallCount()).To(Equal(1))
-			Expect(fakeDatastore.SaveArgsForCall(0).State).To(Equal(models.Failed))
+			Expect(fakeDatastore.SaveArgsForCall(0).State).To(Equal(models.TimedOut))
 		})
 	})
 

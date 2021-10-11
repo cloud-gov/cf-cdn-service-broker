@@ -359,8 +359,8 @@ func (m *RouteManager) CheckRoutesToUpdate() {
 				"provisioning_since": route.ProvisioningSince,
 			})
 
+			route.State = TimedOut
 			loopLog.Info("set-state", lager.Data{"state": route.State})
-			route.State = Failed
 			err = m.routeStoreIface.Save(&route)
 			if err != nil {
 				loopLog.Error("route-save-failed", err)
