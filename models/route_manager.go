@@ -315,61 +315,56 @@ func (m *RouteManager) CheckRoutesToUpdate() {
 	}
 
 	for _, route := range routes {
-		lsession.Info("check", lager.Data{"instance_id": route.InstanceId})
+		loopLog := lsession.WithData(lager.Data{
+			"instance-id": route.InstanceId,
+			"domains": route.GetDomains(),
+		})
+
+		loopLog.Info("check")
 		err := m.Poll(&route)
 		if err != nil {
-			lsession.Info("check-failed", lager.Data{"instance_id": route.InstanceId})
+			loopLog.Info("check-failed")
 
 			if strings.Contains(err.Error(), "CNAMEAlreadyExists") {
-				lsession.Info("cname-conflict", lager.Data{"instance_id": route.InstanceId, "domains": route.GetDomains()})
+				loopLog.Info("cname-conflict")
 
 				route.State = Conflict
-				lsession.Info("set-state", lager.Data{"instance_id": route.InstanceId, "state": route.State})
+				loopLog.Info("set-state", lager.Data{"state": route.State})
 				err = m.routeStoreIface.Save(&route)
 				if err != nil {
-					lsession.Error("route-save-failed", err)
+					loopLog.Error("route-save-failed", err)
 					continue
 				}
 
 			}
 
 			if err == utils.ErrValidationTimedOut {
-				lsession.Info("certificate-validation-timed-out", lager.Data{"instance_id": route.InstanceId, "domains": route.GetDomains()})
+				loopLog.Info("certificate-validation-timed-out")
 				route.State = Failed
-				lsession.Info("set-state", lager.Data{"instance_id": route.InstanceId, "state": route.State})
+				loopLog.Info("set-state", lager.Data{"state": route.State})
 				err = m.routeStoreIface.Save(&route)
 				if err != nil {
-					lsession.Error("route-save-failed", err)
+					loopLog.Error("route-save-failed", err)
 					continue
 				}
 			}
 		}
 
-		lsession.Info("checking-provisioning-expiration", lager.Data{"instance_id": route.InstanceId, "provisioning_since": route.ProvisioningSince})
+		loopLog.Info("checking-provisioning-expiration", lager.Data{"provisioning_since": route.ProvisioningSince})
 		if route.IsProvisioningExpired() {
-			lsession.Info("expiring-unprovisioned-instance", lager.Data{
+			loopLog.Info("expiring-unprovisioned-instance", lager.Data{
 				"domain":             route.DomainExternal,
 				"state":              route.State,
 				"created_at":         route.CreatedAt,
 				"provisioning_since": route.ProvisioningSince,
 			})
 
-			err = m.Disable(&route)
+			route.State = TimedOut
+			loopLog.Info("set-state", lager.Data{"state": route.State})
+			err = m.routeStoreIface.Save(&route)
 			if err != nil {
-				lsession.Error("unable-to-expire-unprovisioned-instance", err, lager.Data{
-					"domain":             route.DomainExternal,
-					"state":              route.State,
-					"created_at":         route.CreatedAt,
-					"provisioning_since": route.ProvisioningSince,
-				})
-
-				route.State = Failed
-				lsession.Info("set-state", lager.Data{"instance_id": route.InstanceId, "state": route.State})
-				err = m.routeStoreIface.Save(&route)
-				if err != nil {
-					lsession.Error("route-save-failed", err)
-					continue
-				}
+				loopLog.Error("route-save-failed", err)
+				continue
 			}
 		}
 	}
@@ -543,6 +538,8 @@ func (m *RouteManager) fetchRoutesToUpdate(lsession lager.Logger) ([]Route, erro
 func (m *RouteManager) updateProvisioning(r *Route) error {
 	lsession := m.logger.Session("route-manager-update-provisioning", lager.Data{
 		"instance-id": r.InstanceId,
+		"domains": r.GetDomains(),
+		"state": r.State,
 	})
 
 	lsession.Info("check-distribution")
@@ -644,7 +641,11 @@ func findValidatingAndAttachedCerts(r *Route) (*Certificate, *Certificate) {
 }
 
 func (m *RouteManager) updateDeprovisioning(r *Route) error {
-	lsession := m.logger.Session("route-manager-update-deprovisioning")
+	lsession := m.logger.Session("route-manager-update-deprovisioning", lager.Data{
+		"instance-id": r.InstanceId,
+		"domains": r.GetDomains(),
+		"state": r.State,
+	})
 
 	lsession.Info("cloudfront-delete")
 	deleted, err := m.cloudFront.Delete(r.DistId)

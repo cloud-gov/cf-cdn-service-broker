@@ -1,6 +1,7 @@
 package models_test
 
 import (
+	"code.cloudfoundry.org/lager"
 	"os"
 	"time"
 
@@ -14,6 +15,7 @@ var _ = Describe("DataStore", func() {
 	var (
 		db          gorm.DB
 		transaction gorm.DB
+		logger		lager.Logger
 	)
 
 	BeforeEach(func() {
@@ -26,6 +28,8 @@ var _ = Describe("DataStore", func() {
 		transaction = *db.Begin()
 		err = models.Migrate(&db)
 		Expect(err).ToNot(HaveOccurred())
+
+		logger = lager.NewLogger("data-store-test")
 	})
 
 	AfterEach(func() {
@@ -78,6 +82,7 @@ var _ = Describe("DataStore", func() {
 			It("finds the first row matching the input", func() {
 				routeStore := models.RouteStore{
 					Database: &transaction,
+					Logger: logger,
 				}
 
 				route, err := routeStore.FindOneMatching(models.Route{
@@ -92,6 +97,7 @@ var _ = Describe("DataStore", func() {
 			It("returns an error if it can't find a matching row", func() {
 				routeStore := models.RouteStore{
 					Database: &transaction,
+					Logger: logger,
 				}
 
 				_, err := routeStore.FindOneMatching(models.Route{
@@ -104,6 +110,7 @@ var _ = Describe("DataStore", func() {
 			It("hydrates the certificate field", func() {
 				routeStore := models.RouteStore{
 					Database: &transaction,
+					Logger: logger,
 				}
 
 				route, err := routeStore.FindOneMatching(models.Route{
@@ -178,6 +185,7 @@ var _ = Describe("DataStore", func() {
 
 				routeStore := models.RouteStore{
 					Database: &transaction,
+					Logger: logger,
 				}
 
 				routes, err := routeStore.FindAllMatching(example)
@@ -193,6 +201,7 @@ var _ = Describe("DataStore", func() {
 
 				routeStore := models.RouteStore{
 					Database: &transaction,
+					Logger: logger,
 				}
 
 				routes, err := routeStore.FindAllMatching(example)
@@ -209,6 +218,7 @@ var _ = Describe("DataStore", func() {
 
 				routeStore := models.RouteStore{
 					Database: &transaction,
+					Logger: logger,
 				}
 
 				routes, err := routeStore.FindAllMatching(example)
@@ -235,6 +245,7 @@ var _ = Describe("DataStore", func() {
 
 				routeStore := models.RouteStore{
 					Database: &transaction,
+					Logger: logger,
 				}
 
 				err = routeStore.Create(&newRoute)
@@ -266,6 +277,7 @@ var _ = Describe("DataStore", func() {
 
 				routeStore := models.RouteStore{
 					Database: &transaction,
+					Logger: logger,
 				}
 
 				err = routeStore.Create(&newRoute)
@@ -287,6 +299,7 @@ var _ = Describe("DataStore", func() {
 
 				routeStore := models.RouteStore{
 					Database: &transaction,
+					Logger: logger,
 				}
 
 				err := routeStore.Create(&newRoute)
@@ -305,6 +318,7 @@ var _ = Describe("DataStore", func() {
 
 				routeStore := models.RouteStore{
 					Database: &transaction,
+					Logger: logger,
 				}
 
 				err := routeStore.Create(&newRoute)
@@ -324,6 +338,7 @@ var _ = Describe("DataStore", func() {
 
 				routeStore := models.RouteStore{
 					Database: &transaction,
+					Logger: logger,
 				}
 
 				err := routeStore.Create(&newRoute)
@@ -348,6 +363,7 @@ var _ = Describe("DataStore", func() {
 
 				routeStore := models.RouteStore{
 					Database: &transaction,
+					Logger: logger,
 				}
 
 				route.State = "provisioned"
@@ -373,6 +389,7 @@ var _ = Describe("DataStore", func() {
 
 				routeStore := models.RouteStore{
 					Database: &transaction,
+					Logger: logger,
 				}
 
 				route.State = models.Provisioning
@@ -402,6 +419,7 @@ var _ = Describe("DataStore", func() {
 
 				routeStore := models.RouteStore{
 					Database: &transaction,
+					Logger: logger,
 				}
 
 				route.State = models.Provisioned

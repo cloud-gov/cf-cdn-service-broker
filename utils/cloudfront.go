@@ -67,7 +67,7 @@ func (d *Distribution) setDistributionConfigDefaults(config *cloudfront.Distribu
 
 func (d *Distribution) setDistributionConfigOrigins(config *cloudfront.DistributionConfig, callerReference string) {
 	config.Origins = &cloudfront.Origins{
-		Quantity: aws.Int64(2),
+		Quantity: aws.Int64(1),
 		Items: []*cloudfront.Origin{
 			{
 				Id:         aws.String(callerReference),

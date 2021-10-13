@@ -40,7 +40,7 @@ func main() {
 		logger,
 		&utils.Distribution{settings, cloudfront.New(session)},
 		settings,
-		models.RouteStore{Database: db},
+		models.RouteStore{Database: db, Logger: logger.Session("route-store", lager.Data{"entry-point": "cron"})},
 		utils.NewCertificateManager(logger, settings, session),
 	)
 

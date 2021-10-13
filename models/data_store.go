@@ -21,15 +21,20 @@ type RouteStoreInterface interface {
 
 type RouteStore struct {
 	Database *gorm.DB
+	Logger lager.Logger
 }
 
 func (r RouteStore) Save(route *Route) error {
-	return r.Database.Save(route).Error
+	r.Logger.Info("pre-save", lager.Data{"route": route})
+	err := r.Database.Save(route).Error
+	r.Logger.Info("post-save", lager.Data{"route": route})
+	return err
 }
 
 func (r RouteStore) Create(route *Route) error {
+	r.Logger.Info("pre-create", lager.Data{"route": route})
 	err := r.Database.Create(route).Error
-
+	r.Logger.Info("post-create", lager.Data{"route": route})
 	if err != nil {
 		return err
 	}

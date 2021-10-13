@@ -14,6 +14,7 @@ const (
 	Deprovisioned  State = "deprovisioned"
 	Conflict       State = "conflict"
 	Failed         State = "failed"
+	TimedOut       State = "timedout"
 )
 
 // Marshal a `State` to a `string` when saving to the database
