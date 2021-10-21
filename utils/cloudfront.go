@@ -196,6 +196,7 @@ func (d *Distribution) Update(
 	d.setDistributionConfigDefaults(dist.DistributionConfig, callerReference)
 	d.setDistributionConfigDefaultCacheBehavior(dist.DistributionConfig, callerReference)
 	d.setDistributionConfigOrigins(dist.DistributionConfig, callerReference)
+	d.removeLetsEncryptCacheBehavior(dist.DistributionConfig)
 
 	dist.DistributionConfig.Origins.Items[0].DomainName = aws.String(origin)
 	dist.DistributionConfig.Origins.Items[0].CustomOriginConfig.OriginProtocolPolicy = aws.String("https-only")
@@ -326,4 +327,16 @@ func (d *Distribution) ListDistributions(callback func(cloudfront.DistributionSu
 
 			return true
 		})
+}
+
+func (d *Distribution) removeLetsEncryptCacheBehavior(config *cloudfront.DistributionConfig) {
+	newItems := []*cloudfront.CacheBehavior{}
+
+	for _, v := range config.CacheBehaviors.Items {
+		if v.PathPattern != nil && *v.PathPattern != "/.well-known/acme-challenge/*" {
+			newItems = append(newItems, v)
+		}
+	}
+	config.CacheBehaviors.Items = newItems
+	config.CacheBehaviors.Quantity = aws.Int64(int64(len(newItems)))
 }
