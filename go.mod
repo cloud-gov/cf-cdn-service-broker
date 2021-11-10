@@ -5,7 +5,7 @@ go 1.17
 require (
 	cloud.google.com/go v0.43.0 // indirect
 	code.cloudfoundry.org/lager v0.0.0-20170223024724-de8e9c6c6e47
-	github.com/aws/aws-sdk-go v1.29.2
+	github.com/aws/aws-sdk-go v1.38.66
 	github.com/cloudfoundry-community/go-cfclient v0.0.0-20170502130034-23156ed0e73b
 	github.com/codegangsta/inject v0.0.0-20150114235600-33e0aa1cb7c0 // indirect
 	github.com/denisenkom/go-mssqldb v0.0.0-20190515213511-eb9f6a1743f3 // indirect
@@ -39,7 +39,7 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/uuid v1.0.0 // indirect
-	github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
