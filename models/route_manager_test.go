@@ -839,7 +839,7 @@ var _ = Describe("RouteManager", func() {
 		})
 	})
 
-	Context("GetDNSInstructions", func() {
+	Context("GetDNSChallenges", func() {
 		It("requests DNS challenges for the right certificate when there are multiple", func() {
 			firstOfJune := time.Date(2020, 06, 01, 12, 00, 00, 00, time.UTC)
 			now := time.Now()
@@ -879,7 +879,7 @@ var _ = Describe("RouteManager", func() {
 
 			certsManager.GetDomainValidationChallengesReturns([]utils.DomainValidationChallenge{domainValidationChallenge}, nil)
 
-			_, err := manager.GetDNSInstructions(&route)
+			_, err := manager.GetDNSChallenges(&route)
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(certsManager.GetDomainValidationChallengesCallCount()).To(Equal(1))
@@ -924,11 +924,11 @@ var _ = Describe("RouteManager", func() {
 				},
 			}
 
-			instructions, err := manager.GetDNSInstructions(route)
+			challenges, err := manager.GetDNSChallenges(route)
 
 			Expect(certsManager.GetDomainValidationChallengesCallCount()).To(Equal(1))
 			Expect(err).NotTo(HaveOccurred())
-			Expect(instructions).NotTo(BeNil())
+			Expect(challenges).NotTo(BeNil())
 
 		})
 	})

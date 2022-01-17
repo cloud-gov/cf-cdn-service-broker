@@ -56,17 +56,17 @@ type RouteManagerIface struct {
 		result1 *models.Route
 		result2 error
 	}
-	GetDNSInstructionsStub        func(*models.Route) ([]string, error)
-	getDNSInstructionsMutex       sync.RWMutex
-	getDNSInstructionsArgsForCall []struct {
+	GetDNSChallengesStub        func(*models.Route) ([]utils.DomainValidationChallenge, error)
+	getDNSChallengesMutex       sync.RWMutex
+	getDNSChallengesArgsForCall []struct {
 		arg1 *models.Route
 	}
-	getDNSInstructionsReturns struct {
-		result1 []string
+	getDNSChallengesReturns struct {
+		result1 []utils.DomainValidationChallenge
 		result2 error
 	}
-	getDNSInstructionsReturnsOnCall map[int]struct {
-		result1 []string
+	getDNSChallengesReturnsOnCall map[int]struct {
+		result1 []utils.DomainValidationChallenge
 		result2 error
 	}
 	PollStub        func(*models.Route) error
@@ -320,16 +320,16 @@ func (fake *RouteManagerIface) GetReturnsOnCall(i int, result1 *models.Route, re
 	}{result1, result2}
 }
 
-func (fake *RouteManagerIface) GetDNSInstructions(arg1 *models.Route) ([]string, error) {
-	fake.getDNSInstructionsMutex.Lock()
-	ret, specificReturn := fake.getDNSInstructionsReturnsOnCall[len(fake.getDNSInstructionsArgsForCall)]
-	fake.getDNSInstructionsArgsForCall = append(fake.getDNSInstructionsArgsForCall, struct {
+func (fake *RouteManagerIface) GetDNSChallenges(arg1 *models.Route) ([]utils.DomainValidationChallenge, error) {
+	fake.getDNSChallengesMutex.Lock()
+	ret, specificReturn := fake.getDNSChallengesReturnsOnCall[len(fake.getDNSChallengesArgsForCall)]
+	fake.getDNSChallengesArgsForCall = append(fake.getDNSChallengesArgsForCall, struct {
 		arg1 *models.Route
 	}{arg1})
-	stub := fake.GetDNSInstructionsStub
-	fakeReturns := fake.getDNSInstructionsReturns
-	fake.recordInvocation("GetDNSInstructions", []interface{}{arg1})
-	fake.getDNSInstructionsMutex.Unlock()
+	stub := fake.GetDNSChallengesStub
+	fakeReturns := fake.getDNSChallengesReturns
+	fake.recordInvocation("GetDNSChallenges", []interface{}{arg1})
+	fake.getDNSChallengesMutex.Unlock()
 	if stub != nil {
 		return stub(arg1)
 	}
@@ -339,47 +339,47 @@ func (fake *RouteManagerIface) GetDNSInstructions(arg1 *models.Route) ([]string,
 	return fakeReturns.result1, fakeReturns.result2
 }
 
-func (fake *RouteManagerIface) GetDNSInstructionsCallCount() int {
-	fake.getDNSInstructionsMutex.RLock()
-	defer fake.getDNSInstructionsMutex.RUnlock()
-	return len(fake.getDNSInstructionsArgsForCall)
+func (fake *RouteManagerIface) GetDNSChallengesCallCount() int {
+	fake.getDNSChallengesMutex.RLock()
+	defer fake.getDNSChallengesMutex.RUnlock()
+	return len(fake.getDNSChallengesArgsForCall)
 }
 
-func (fake *RouteManagerIface) GetDNSInstructionsCalls(stub func(*models.Route) ([]string, error)) {
-	fake.getDNSInstructionsMutex.Lock()
-	defer fake.getDNSInstructionsMutex.Unlock()
-	fake.GetDNSInstructionsStub = stub
+func (fake *RouteManagerIface) GetDNSChallengesCalls(stub func(*models.Route) ([]utils.DomainValidationChallenge, error)) {
+	fake.getDNSChallengesMutex.Lock()
+	defer fake.getDNSChallengesMutex.Unlock()
+	fake.GetDNSChallengesStub = stub
 }
 
-func (fake *RouteManagerIface) GetDNSInstructionsArgsForCall(i int) *models.Route {
-	fake.getDNSInstructionsMutex.RLock()
-	defer fake.getDNSInstructionsMutex.RUnlock()
-	argsForCall := fake.getDNSInstructionsArgsForCall[i]
+func (fake *RouteManagerIface) GetDNSChallengesArgsForCall(i int) *models.Route {
+	fake.getDNSChallengesMutex.RLock()
+	defer fake.getDNSChallengesMutex.RUnlock()
+	argsForCall := fake.getDNSChallengesArgsForCall[i]
 	return argsForCall.arg1
 }
 
-func (fake *RouteManagerIface) GetDNSInstructionsReturns(result1 []string, result2 error) {
-	fake.getDNSInstructionsMutex.Lock()
-	defer fake.getDNSInstructionsMutex.Unlock()
-	fake.GetDNSInstructionsStub = nil
-	fake.getDNSInstructionsReturns = struct {
-		result1 []string
+func (fake *RouteManagerIface) GetDNSChallengesReturns(result1 []utils.DomainValidationChallenge, result2 error) {
+	fake.getDNSChallengesMutex.Lock()
+	defer fake.getDNSChallengesMutex.Unlock()
+	fake.GetDNSChallengesStub = nil
+	fake.getDNSChallengesReturns = struct {
+		result1 []utils.DomainValidationChallenge
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *RouteManagerIface) GetDNSInstructionsReturnsOnCall(i int, result1 []string, result2 error) {
-	fake.getDNSInstructionsMutex.Lock()
-	defer fake.getDNSInstructionsMutex.Unlock()
-	fake.GetDNSInstructionsStub = nil
-	if fake.getDNSInstructionsReturnsOnCall == nil {
-		fake.getDNSInstructionsReturnsOnCall = make(map[int]struct {
-			result1 []string
+func (fake *RouteManagerIface) GetDNSChallengesReturnsOnCall(i int, result1 []utils.DomainValidationChallenge, result2 error) {
+	fake.getDNSChallengesMutex.Lock()
+	defer fake.getDNSChallengesMutex.Unlock()
+	fake.GetDNSChallengesStub = nil
+	if fake.getDNSChallengesReturnsOnCall == nil {
+		fake.getDNSChallengesReturnsOnCall = make(map[int]struct {
+			result1 []utils.DomainValidationChallenge
 			result2 error
 		})
 	}
-	fake.getDNSInstructionsReturnsOnCall[i] = struct {
-		result1 []string
+	fake.getDNSChallengesReturnsOnCall[i] = struct {
+		result1 []utils.DomainValidationChallenge
 		result2 error
 	}{result1, result2}
 }
@@ -524,8 +524,8 @@ func (fake *RouteManagerIface) Invocations() map[string][][]interface{} {
 	defer fake.disableMutex.RUnlock()
 	fake.getMutex.RLock()
 	defer fake.getMutex.RUnlock()
-	fake.getDNSInstructionsMutex.RLock()
-	defer fake.getDNSInstructionsMutex.RUnlock()
+	fake.getDNSChallengesMutex.RLock()
+	defer fake.getDNSChallengesMutex.RUnlock()
 	fake.pollMutex.RLock()
 	defer fake.pollMutex.RUnlock()
 	fake.updateMutex.RLock()

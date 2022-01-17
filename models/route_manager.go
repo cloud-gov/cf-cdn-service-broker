@@ -3,7 +3,6 @@ package models
 import (
 	"code.cloudfoundry.org/lager"
 	"errors"
-	"fmt"
 	"github.com/alphagov/paas-cdn-broker/config"
 	"github.com/alphagov/paas-cdn-broker/utils"
 	"github.com/aws/aws-sdk-go/service/acm"
@@ -41,7 +40,7 @@ type RouteManagerIface interface {
 
 	DeleteOrphanedCerts()
 
-	GetDNSInstructions(route *Route) ([]string, error)
+	GetDNSChallenges(route *Route) ([]utils.DomainValidationChallenge, error)
 }
 
 type RouteManager struct {
@@ -372,9 +371,7 @@ func (m *RouteManager) CheckRoutesToUpdate() {
 }
 
 // ACM certs challenges are aquired dynamically via an API call
-func (m *RouteManager) GetDNSInstructions(route *Route) ([]string, error) {
-	var instructions []string
-
+func (m *RouteManager) GetDNSChallenges(route *Route) ([]utils.DomainValidationChallenge, error) {
 	lsession := m.logger.Session("get-dns-instructions", lager.Data{
 		"instance-id": route.InstanceId,
 		"domains":     route.GetDomains(),
@@ -392,44 +389,11 @@ func (m *RouteManager) GetDNSInstructions(route *Route) ([]string, error) {
 	validationChallenges, err := m.certsManager.GetDomainValidationChallenges(validatingCert.CertificateArn)
 	if err != nil {
 		lsession.Error("certsmanager-get-validation-challenges", err)
-		return []string{}, err
-	}
-
-	for _, e := range validationChallenges {
-
-		if e.RecordName == "" {
-			instructions = append(instructions, fmt.Sprintf(
-				"Awaiting challenges for %s",
-				e.DomainName,
-			))
-		} else {
-			// Keep the new lines in this format
-			format := `
-
-For domain %s, set DNS record
-    Name:  %s
-    Type:  %s
-    Value: %s
-    TTL:   %d
-
-Current validation status of %s: %s
-
-`
-			instructions = append(instructions, fmt.Sprintf(
-				format,
-				e.DomainName,
-				e.RecordName,
-				e.RecordType,
-				strings.Trim(e.RecordValue, " "),
-				route.DefaultTTL,
-				e.DomainName,
-				e.ValidationStatus,
-			))
-		}
+		return nil, err
 	}
 
 	lsession.Info("finished")
-	return instructions, nil
+	return validationChallenges, nil
 }
 
 func (m *RouteManager) GetCurrentlyDeployedDomains(r *Route) ([]string, error) {

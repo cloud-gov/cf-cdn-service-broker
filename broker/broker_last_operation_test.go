@@ -3,6 +3,7 @@ package broker_test
 import (
 	"context"
 	"errors"
+	"github.com/alphagov/paas-cdn-broker/utils"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -97,7 +98,15 @@ var _ = Describe("Last operation", func() {
 			},
 		}
 		manager.GetReturns(route, nil)
-		manager.GetDNSInstructionsReturns([]string{"token"}, nil)
+		manager.GetDNSChallengesReturns([]utils.DomainValidationChallenge{
+			{
+				DomainName:       "cdn.cloud.gov",
+				RecordName:       "_validation.cdn.cloud,gov",
+				RecordType:       "CNAME",
+				RecordValue:      "abc123",
+				ValidationStatus: "PENDING",
+			},
+		}, nil)
 		b := broker.New(
 			&manager,
 			&s.cfclient,
@@ -123,7 +132,15 @@ var _ = Describe("Last operation", func() {
 			},
 		}
 		manager.GetReturns(route, nil)
-		manager.GetDNSInstructionsReturns([]string{"token"}, nil)
+		manager.GetDNSChallengesReturns([]utils.DomainValidationChallenge{
+			{
+				DomainName:       "cdn.cloud.gov",
+				RecordName:       "_validation.cdn.cloud,gov",
+				RecordType:       "CNAME",
+				RecordValue:      "abc123",
+				ValidationStatus: "PENDING",
+			},
+		}, nil)
 		b := broker.New(
 			&manager,
 			&s.cfclient,
@@ -148,7 +165,15 @@ var _ = Describe("Last operation", func() {
 			},
 		}
 		manager.GetReturns(route, nil)
-		manager.GetDNSInstructionsReturns([]string{"token"}, nil)
+		manager.GetDNSChallengesReturns([]utils.DomainValidationChallenge{
+			{
+				DomainName:       "cdn.cloud.gov",
+				RecordName:       "_validation.cdn.cloud,gov",
+				RecordType:       "CNAME",
+				RecordValue:      "abc123",
+				ValidationStatus: "PENDING",
+			},
+		}, nil)
 		b := broker.New(
 			&manager,
 			&s.cfclient,

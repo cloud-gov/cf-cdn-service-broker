@@ -185,7 +185,7 @@ func (b *CdnServiceBroker) LastOperation(
 
 	switch route.State {
 	case models.Provisioning:
-		instructions, err := b.manager.GetDNSInstructions(route)
+		challenges, err := b.manager.GetDNSChallenges(route)
 		if err != nil {
 			lsession.Error("get-dns-instructions-err", err, lager.Data{
 				"domain": route.DomainExternal,
@@ -193,6 +193,8 @@ func (b *CdnServiceBroker) LastOperation(
 			})
 			return brokerapi.LastOperation{}, err
 		}
+
+		instructions := formatChallenges(challenges, route.DefaultTTL)
 
 		var description string
 
@@ -295,7 +297,7 @@ Create/update operations usually expire because the domain validation DNS record
 		)
 
 		return brokerapi.LastOperation{
-			State: brokerapi.Failed,
+			State:       brokerapi.Failed,
 			Description: description,
 		}, nil
 
@@ -313,6 +315,44 @@ Create/update operations usually expire because the domain validation DNS record
 			Description: description,
 		}, nil
 	}
+}
+
+func formatChallenges(challenges []utils.DomainValidationChallenge, ttl int64) []string {
+	instructions := []string{}
+	for _, e := range challenges {
+
+		if e.RecordName == "" {
+			instructions = append(instructions, fmt.Sprintf(
+				"Awaiting challenges for %s",
+				e.DomainName,
+			))
+		} else {
+			// Keep the new lines in this format
+			format := `
+
+For domain %s, set DNS record
+    Name:  %s
+    Type:  %s
+    Value: %s
+    TTL:   %d
+
+Current validation status of %s: %s
+
+`
+			instructions = append(instructions, fmt.Sprintf(
+				format,
+				e.DomainName,
+				e.RecordName,
+				e.RecordType,
+				strings.Trim(e.RecordValue, " "),
+				ttl,
+				e.DomainName,
+				e.ValidationStatus,
+			))
+		}
+	}
+
+	return instructions
 }
 
 func (b *CdnServiceBroker) Deprovision(
