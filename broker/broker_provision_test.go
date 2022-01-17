@@ -3,9 +3,8 @@ package broker_test
 import (
 	"context"
 	"errors"
-	"github.com/stretchr/testify/mock"
-
 	"github.com/stretchr/testify/suite"
+	"reflect"
 
 	"code.cloudfoundry.org/lager"
 	"github.com/cloudfoundry-community/go-cfclient"
@@ -34,7 +33,21 @@ type ProvisionSuite struct {
 
 func (s *ProvisionSuite) allowCreateWithExpectedHeaders(expectedHeaders utils.Headers) {
 	route := &models.Route{State: models.Provisioning}
-	s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", s.settings.DefaultDefaultTTL, expectedHeaders, true, mock.AnythingOfType("map[string]string")).Return(route, nil)
+	s.Manager.CreateStub = func(
+		_ string,
+		_ string,
+		_ string,
+		_ int64,
+		headers utils.Headers,
+		_ bool,
+		_ map[string]string) (*models.Route, error) {
+
+		if reflect.DeepEqual(headers, expectedHeaders) {
+			return route, nil
+		}
+
+		return nil, errors.New("unexpected header values")
+	}
 }
 
 var _ = Describe("Last operation", func() {
@@ -88,7 +101,7 @@ var _ = Describe("Last operation", func() {
 			State: models.Provisioned,
 		}
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
-		s.Manager.On("Get", "123").Return(route, nil)
+		s.Manager.GetReturns(route, nil)
 
 		details := brokerapi.ProvisionDetails{
 			RawParameters: []byte(`{"domain": "domain.gov"}`),
@@ -100,10 +113,10 @@ var _ = Describe("Last operation", func() {
 	})
 
 	It("Should succeed", func() {
-		s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
+		s.Manager.GetReturns(&models.Route{}, errors.New("not found"))
 		route := &models.Route{State: models.Provisioning}
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
-		s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", s.settings.DefaultDefaultTTL, utils.Headers{"Host": true}, true, mock.AnythingOfType("map[string]string")).Return(route, nil)
+		s.Manager.CreateReturns(route, nil)
 
 		details := brokerapi.ProvisionDetails{
 			RawParameters: []byte(`{"domain": "domain.gov"}`),
@@ -114,10 +127,10 @@ var _ = Describe("Last operation", func() {
 	})
 
 	It("Should create a cloudfront instance with a custom DefaultTTL", func() {
-		s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
+		s.Manager.GetReturns(&models.Route{}, errors.New("not found"))
 		route := &models.Route{State: models.Provisioning}
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
-		s.Manager.On("Create", "123", "domain.gov", "origin.cloud.gov", int64(52), utils.Headers{"Host": true}, true, mock.AnythingOfType("map[string]string")).Return(route, nil)
+		s.Manager.CreateReturns(route, nil)
 
 		details := brokerapi.ProvisionDetails{
 			RawParameters: []byte(`{
@@ -128,14 +141,17 @@ var _ = Describe("Last operation", func() {
 		_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
 		Expect(err).NotTo(HaveOccurred())
+		Expect(s.Manager.CreateCallCount()).To(Equal(1))
+		_, _, _, ttl, _, _, _ := s.Manager.CreateArgsForCall(0)
+		Expect(ttl).To(Equal(int64(52)))
 	})
 
 	It("Should set the correct tags", func() {
 		instanceId := "123"
-		s.Manager.On("Get", instanceId).Return(&models.Route{}, errors.New("not found"))
+		s.Manager.GetReturns(&models.Route{}, errors.New("not found"))
 		route := &models.Route{State: models.Provisioning}
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
-		s.Manager.On("Create", instanceId, "domain.gov", "origin.cloud.gov", s.settings.DefaultDefaultTTL, utils.Headers{"Host": true}, true, mock.AnythingOfType("map[string]string")).Return(route, nil)
+		s.Manager.CreateReturns(route, nil)
 
 		details := brokerapi.ProvisionDetails{
 			RawParameters:    []byte(`{"domain": "domain.gov"}`),
@@ -149,17 +165,8 @@ var _ = Describe("Last operation", func() {
 
 		Expect(err).NotTo(HaveOccurred())
 
-		var createCall *mock.Call
-		for i, call := range s.Manager.Calls {
-			if call.Method == "Create" {
-				createCall = &s.Manager.Calls[i]
-				break
-			}
-		}
-
-		Expect(createCall).ToNot(BeNil())
-
-		inputTags := createCall.Arguments[6].(map[string]string)
+		Expect(s.Manager.CreateCallCount()).To(Equal(1))
+		_, _, _, _, _, _, inputTags := s.Manager.CreateArgsForCall(0)
 		Expect(inputTags).To(HaveKeyWithValue("Organization", "org-1"))
 		Expect(inputTags).To(HaveKeyWithValue("Space", "space-1"))
 		Expect(inputTags).To(HaveKeyWithValue("Service", "service-1"))
@@ -214,7 +221,7 @@ var _ = Describe("Last operation", func() {
 
 	Context("Headers", func() {
 		BeforeEach(func() {
-			s.Manager.On("Get", "123").Return(&models.Route{}, errors.New("not found"))
+			s.Manager.GetReturns(&models.Route{}, errors.New("not found"))
 			s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 		})
 

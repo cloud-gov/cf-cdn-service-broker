@@ -13,6 +13,7 @@ import (
 	"time"
 )
 
+//counterfeiter:generate -o mocks/RouteManagerIface.go --fake-name RouteManagerIface route_manager.go RouteManagerIface
 type RouteManagerIface interface {
 	Create(
 		instanceId string,
@@ -317,7 +318,7 @@ func (m *RouteManager) CheckRoutesToUpdate() {
 	for _, route := range routes {
 		loopLog := lsession.WithData(lager.Data{
 			"instance-id": route.InstanceId,
-			"domains": route.GetDomains(),
+			"domains":     route.GetDomains(),
 		})
 
 		loopLog.Info("check")
@@ -538,8 +539,8 @@ func (m *RouteManager) fetchRoutesToUpdate(lsession lager.Logger) ([]Route, erro
 func (m *RouteManager) updateProvisioning(r *Route) error {
 	lsession := m.logger.Session("route-manager-update-provisioning", lager.Data{
 		"instance-id": r.InstanceId,
-		"domains": r.GetDomains(),
-		"state": r.State,
+		"domains":     r.GetDomains(),
+		"state":       r.State,
 	})
 
 	lsession.Info("check-distribution")
@@ -643,8 +644,8 @@ func findValidatingAndAttachedCerts(r *Route) (*Certificate, *Certificate) {
 func (m *RouteManager) updateDeprovisioning(r *Route) error {
 	lsession := m.logger.Session("route-manager-update-deprovisioning", lager.Data{
 		"instance-id": r.InstanceId,
-		"domains": r.GetDomains(),
-		"state": r.State,
+		"domains":     r.GetDomains(),
+		"state":       r.State,
 	})
 
 	lsession.Info("cloudfront-delete")

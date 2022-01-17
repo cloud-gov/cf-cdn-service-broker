@@ -49,7 +49,7 @@ var _ = Describe("Last operation", func() {
 
 	It("Should fail when the routes are missing", func() {
 		manager := mocks.RouteManagerIface{}
-		manager.On("Get", "").Return(&models.Route{}, errors.New("not found"))
+		manager.GetReturns(&models.Route{}, errors.New("not found"))
 		b := broker.New(
 			&manager,
 			&s.cfclient,
@@ -71,7 +71,7 @@ var _ = Describe("Last operation", func() {
 			DomainInternal: "abc.cloudfront.net",
 			Origin:         "cdn.apps.cloud.gov",
 		}
-		manager.On("Get", "123").Return(route, nil)
+		manager.GetReturns(route, nil)
 		b := broker.New(
 			&manager,
 			&s.cfclient,
@@ -96,8 +96,8 @@ var _ = Describe("Last operation", func() {
 				CreatedAt: time.Now().Add(-5 * time.Minute),
 			},
 		}
-		manager.On("Get", "123").Return(route, nil)
-		manager.On("GetDNSInstructions", route).Return([]string{"token"}, nil)
+		manager.GetReturns(route, nil)
+		manager.GetDNSInstructionsReturns([]string{"token"}, nil)
 		b := broker.New(
 			&manager,
 			&s.cfclient,
@@ -122,8 +122,8 @@ var _ = Describe("Last operation", func() {
 				CreatedAt: time.Now().Add(-5 * time.Minute),
 			},
 		}
-		manager.On("Get", "123").Return(route, nil)
-		manager.On("GetDNSInstructions", route).Return([]string{"token"}, nil)
+		manager.GetReturns(route, nil)
+		manager.GetDNSInstructionsReturns([]string{"token"}, nil)
 		b := broker.New(
 			&manager,
 			&s.cfclient,
@@ -147,8 +147,8 @@ var _ = Describe("Last operation", func() {
 				CreatedAt: time.Now().Add(-5 * time.Minute),
 			},
 		}
-		manager.On("Get", "123").Return(route, nil)
-		manager.On("GetDNSInstructions", route).Return([]string{"token"}, nil)
+		manager.GetReturns(route, nil)
+		manager.GetDNSInstructionsReturns([]string{"token"}, nil)
 		b := broker.New(
 			&manager,
 			&s.cfclient,
@@ -169,7 +169,7 @@ var _ = Describe("Last operation", func() {
 			DomainInternal: "abc.cloudfront.net",
 			Origin:         "cdn.apps.cloud.gov",
 		}
-		manager.On("Get", "123").Return(route, nil)
+		manager.GetReturns(route, nil)
 		b := broker.New(
 			&manager,
 			&s.cfclient,

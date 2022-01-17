@@ -64,13 +64,23 @@ var _ = Describe("Update", func() {
 		}
 
 		domain := "domain.gov"
-		s.Manager.On(
-			"Update", "",
-			&domain,
-			defaultTTLNotPassed,
-			forwardedHeadersNotPassed,
-			forwardCookiesNotPassed,
-		).Return(nil)
+		s.Manager.UpdateStub = func(
+			_ string,
+			updateDomain *string,
+			ttl *int64,
+			headers *utils.Headers,
+			forwardCookies *bool) (bool, error) {
+
+			if *updateDomain == domain &&
+				ttl == defaultTTLNotPassed &&
+				headers == forwardedHeadersNotPassed &&
+				forwardCookies == forwardCookiesNotPassed {
+
+				return false, nil
+			} else {
+				return false, errors.New("unexpected arguments")
+			}
+		}
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 
 		_, err := s.Broker.Update(s.ctx, "", details, true)
@@ -84,7 +94,7 @@ var _ = Describe("Update", func() {
 			},
 			RawParameters: json.RawMessage(`{"domain": "domain.gov"}`),
 		}
-		s.Manager.On("Update", "", "domain.gov", s.settings.DefaultDefaultTTL, utils.Headers{"Host": true}, true).Return(nil)
+		s.Manager.UpdateReturns(true, nil)
 		s.cfclient.On("GetOrgByGuid", "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5").Return(cfclient.Org{Name: "my-org"}, nil)
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, errors.New("bad"))
 		_, err := s.Broker.Update(s.ctx, "", details, true)
@@ -106,14 +116,7 @@ var _ = Describe("Update", func() {
 		}`),
 			}
 
-			domain := "domain.gov"
-			s.Manager.On(
-				"Update", "",
-				&domain,
-				defaultTTLNotPassed,
-				&utils.Headers{"Host": true},
-				forwardCookiesNotPassed,
-			).Return(nil)
+			s.Manager.UpdateReturns(false, nil)
 
 			_, err := s.Broker.Update(s.ctx, "", details, true)
 			Expect(err).NotTo(HaveOccurred())
@@ -127,14 +130,7 @@ var _ = Describe("Update", func() {
 		}`),
 			}
 
-			domain := "domain.gov"
-			s.Manager.On(
-				"Update", "",
-				&domain,
-				defaultTTLNotPassed,
-				&utils.Headers{"User-Agent": true, "Host": true},
-				forwardCookiesNotPassed,
-			).Return(nil)
+			s.Manager.UpdateReturns(false, nil)
 
 			_, err := s.Broker.Update(s.ctx, "", details, true)
 			Expect(err).NotTo(HaveOccurred())
@@ -148,14 +144,7 @@ var _ = Describe("Update", func() {
 		}`),
 			}
 
-			domain := "domain.gov"
-			s.Manager.On(
-				"Update", "",
-				&domain,
-				defaultTTLNotPassed,
-				&utils.Headers{"*": true},
-				forwardCookiesNotPassed,
-			).Return(nil)
+			s.Manager.UpdateReturns(false, nil)
 
 			_, err := s.Broker.Update(s.ctx, "", details, true)
 			Expect(err).NotTo(HaveOccurred())
@@ -169,14 +158,7 @@ var _ = Describe("Update", func() {
 		}`),
 			}
 
-			domain := "domain.gov"
-			s.Manager.On(
-				"Update", "",
-				&domain,
-				defaultTTLNotPassed,
-				&utils.Headers{"One": true, "Two": true, "Three": true, "Four": true, "Five": true, "Six": true, "Seven": true, "Eight": true, "Nine": true, "Host": true},
-				forwardCookiesNotPassed,
-			).Return(nil)
+			s.Manager.UpdateReturns(false, nil)
 
 			_, err := s.Broker.Update(s.ctx, "", details, true)
 			Expect(err).NotTo(HaveOccurred())
