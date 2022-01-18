@@ -70,10 +70,11 @@ type RouteManagerIface struct {
 		result1 *cloudfront.Distribution
 		result2 error
 	}
-	GetDNSChallengesStub        func(*models.Route) ([]utils.DomainValidationChallenge, error)
+	GetDNSChallengesStub        func(*models.Route, bool) ([]utils.DomainValidationChallenge, error)
 	getDNSChallengesMutex       sync.RWMutex
 	getDNSChallengesArgsForCall []struct {
 		arg1 *models.Route
+		arg2 bool
 	}
 	getDNSChallengesReturns struct {
 		result1 []utils.DomainValidationChallenge
@@ -398,18 +399,19 @@ func (fake *RouteManagerIface) GetCDNConfigurationReturnsOnCall(i int, result1 *
 	}{result1, result2}
 }
 
-func (fake *RouteManagerIface) GetDNSChallenges(arg1 *models.Route) ([]utils.DomainValidationChallenge, error) {
+func (fake *RouteManagerIface) GetDNSChallenges(arg1 *models.Route, arg2 bool) ([]utils.DomainValidationChallenge, error) {
 	fake.getDNSChallengesMutex.Lock()
 	ret, specificReturn := fake.getDNSChallengesReturnsOnCall[len(fake.getDNSChallengesArgsForCall)]
 	fake.getDNSChallengesArgsForCall = append(fake.getDNSChallengesArgsForCall, struct {
 		arg1 *models.Route
-	}{arg1})
+		arg2 bool
+	}{arg1, arg2})
 	stub := fake.GetDNSChallengesStub
 	fakeReturns := fake.getDNSChallengesReturns
-	fake.recordInvocation("GetDNSChallenges", []interface{}{arg1})
+	fake.recordInvocation("GetDNSChallenges", []interface{}{arg1, arg2})
 	fake.getDNSChallengesMutex.Unlock()
 	if stub != nil {
-		return stub(arg1)
+		return stub(arg1, arg2)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
@@ -423,17 +425,17 @@ func (fake *RouteManagerIface) GetDNSChallengesCallCount() int {
 	return len(fake.getDNSChallengesArgsForCall)
 }
 
-func (fake *RouteManagerIface) GetDNSChallengesCalls(stub func(*models.Route) ([]utils.DomainValidationChallenge, error)) {
+func (fake *RouteManagerIface) GetDNSChallengesCalls(stub func(*models.Route, bool) ([]utils.DomainValidationChallenge, error)) {
 	fake.getDNSChallengesMutex.Lock()
 	defer fake.getDNSChallengesMutex.Unlock()
 	fake.GetDNSChallengesStub = stub
 }
 
-func (fake *RouteManagerIface) GetDNSChallengesArgsForCall(i int) *models.Route {
+func (fake *RouteManagerIface) GetDNSChallengesArgsForCall(i int) (*models.Route, bool) {
 	fake.getDNSChallengesMutex.RLock()
 	defer fake.getDNSChallengesMutex.RUnlock()
 	argsForCall := fake.getDNSChallengesArgsForCall[i]
-	return argsForCall.arg1
+	return argsForCall.arg1, argsForCall.arg2
 }
 
 func (fake *RouteManagerIface) GetDNSChallengesReturns(result1 []utils.DomainValidationChallenge, result2 error) {

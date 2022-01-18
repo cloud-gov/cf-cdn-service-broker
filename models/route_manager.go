@@ -41,7 +41,7 @@ type RouteManagerIface interface {
 
 	DeleteOrphanedCerts()
 
-	GetDNSChallenges(route *Route) ([]utils.DomainValidationChallenge, error)
+	GetDNSChallenges(route *Route, onlyValidatingCertificates bool) ([]utils.DomainValidationChallenge, error)
 
 	GetCDNConfiguration(route *Route) (*cloudfront.Distribution, error)
 }
@@ -373,26 +373,46 @@ func (m *RouteManager) CheckRoutesToUpdate() {
 	}
 }
 
-// ACM certs challenges are aquired dynamically via an API call
-func (m *RouteManager) GetDNSChallenges(route *Route) ([]utils.DomainValidationChallenge, error) {
+func (m *RouteManager) GetDNSChallenges(route *Route, onlyValidatingCertificates bool) ([]utils.DomainValidationChallenge, error) {
 	lsession := m.logger.Session("get-dns-instructions", lager.Data{
-		"instance-id": route.InstanceId,
-		"domains":     route.GetDomains(),
+		"instance-id":               route.InstanceId,
+		"domains":                   route.GetDomains(),
+		"only-get-validating-certs": onlyValidatingCertificates,
 	})
 
-	validatingCert, _ := findValidatingAndAttachedCerts(route)
+	validatingCert, attachedCert := findValidatingAndAttachedCerts(route)
 
-	if validatingCert == nil {
-		err := errors.New("couldn't find the most recent validating certificate")
-		lsession.Error("missing-validating-certificate", err)
-		return nil, err
+	certArnsToRequest := []string{}
+
+	if onlyValidatingCertificates {
+		if validatingCert == nil {
+			err := errors.New("couldn't find the most recent validating certificate")
+			lsession.Error("missing-validating-certificate", err)
+			return nil, err
+		}
+
+		certArnsToRequest = append(certArnsToRequest, validatingCert.CertificateArn)
+	} else {
+		if validatingCert != nil {
+			certArnsToRequest = append(certArnsToRequest, validatingCert.CertificateArn)
+		}
+
+		if attachedCert != nil {
+			certArnsToRequest = append(certArnsToRequest, attachedCert.CertificateArn)
+		}
 	}
 
-	lsession.Info("certsmanager-get-validation-challenges")
-	validationChallenges, err := m.certsManager.GetDomainValidationChallenges(validatingCert.CertificateArn)
-	if err != nil {
-		lsession.Error("certsmanager-get-validation-challenges", err)
-		return nil, err
+	validationChallenges := []utils.DomainValidationChallenge{}
+
+	for _, arn := range certArnsToRequest {
+		lsession.Info("certsmanager-get-validation-challenges", lager.Data{"certificate-arn": arn})
+		challenges, err := m.certsManager.GetDomainValidationChallenges(arn)
+		if err != nil {
+			lsession.Error("certsmanager-get-validation-challenges", err, lager.Data{"certificate-arn": arn})
+			return nil, err
+		}
+
+		validationChallenges = append(validationChallenges, challenges...)
 	}
 
 	lsession.Info("finished")

@@ -81,7 +81,7 @@ func (b *CdnServiceBroker) GetInstance(ctx context.Context, instanceID string) (
 	}
 
 	lsession.Info("get-dns-challenges")
-	challenges, err := b.manager.GetDNSChallenges(route)
+	challenges, err := b.manager.GetDNSChallenges(route, false)
 	if err != nil {
 		lsession.Error("get-dns-challenges", err)
 		return brokerapi.GetInstanceDetailsSpec{}, fmt.Errorf("could not get dns challenges for domain")
@@ -235,7 +235,7 @@ func (b *CdnServiceBroker) LastOperation(
 
 	switch route.State {
 	case models.Provisioning:
-		challenges, err := b.manager.GetDNSChallenges(route)
+		challenges, err := b.manager.GetDNSChallenges(route, true)
 		if err != nil {
 			lsession.Error("get-dns-instructions-err", err, lager.Data{
 				"domain": route.DomainExternal,
