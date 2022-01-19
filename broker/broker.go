@@ -56,7 +56,7 @@ func New(
 }
 
 var (
-	MAX_HEADER_COUNT = 10
+	MaxHeaderCount = 10
 )
 
 func (b *CdnServiceBroker) GetBinding(ctx context.Context, first, second string, details domain.FetchBindingDetails) (domain.GetBindingSpec, error) {
@@ -355,8 +355,8 @@ Create/update operations usually expire because the domain validation DNS record
 	case models.Failed:
 		fallthrough
 	default:
-		description := "Service instance stuck in unmanagable state."
-		lsession.Info("unmanagable-state", lager.Data{
+		description := "Service instance stuck in unmanageable state."
+		lsession.Info("unmanageable-state", lager.Data{
 			"domain":      route.DomainExternal,
 			"state":       route.State,
 			"description": description,
@@ -576,7 +576,7 @@ func (b *CdnServiceBroker) parseUpdateDetails(details domain.UpdateDetails) (Upd
 func (b *CdnServiceBroker) checkDomain(domain, orgGUID string) error {
 	// domain can be a comma separated list so we need to check each one individually
 	domains := strings.Split(domain, ",")
-	var errorlist []string
+	var errorList []string
 
 	orgName := "<organization>"
 
@@ -590,15 +590,15 @@ func (b *CdnServiceBroker) checkDomain(domain, orgGUID string) error {
 				}
 			}
 
-			errorlist = append(errorlist, fmt.Sprintf("`cf create-domain %s %s`", orgName, domains[i]))
+			errorList = append(errorList, fmt.Sprintf("`cf create-domain %s %s`", orgName, domains[i]))
 		}
 	}
 
-	if len(errorlist) > 0 {
-		if len(errorlist) > 1 {
-			return fmt.Errorf("Multiple domains do not exist; create them with:\n%s", strings.Join(errorlist, "\n"))
+	if len(errorList) > 0 {
+		if len(errorList) > 1 {
+			return fmt.Errorf("Multiple domains do not exist; create them with:\n%s", strings.Join(errorList, "\n"))
 		}
-		return fmt.Errorf("Domain does not exist; create it with %s", errorlist[0])
+		return fmt.Errorf("Domain does not exist; create it with %s", errorList[0])
 	}
 
 	return nil
@@ -626,8 +626,8 @@ func (b *CdnServiceBroker) getHeaders(headerNames []string) (utils.Headers, erro
 		headers.Add("Host")
 	}
 
-	if len(headers) > MAX_HEADER_COUNT {
-		err = fmt.Errorf("must not set more than %d headers; got %d", MAX_HEADER_COUNT, len(headers))
+	if len(headers) > MaxHeaderCount {
+		err = fmt.Errorf("must not set more than %d headers; got %d", MaxHeaderCount, len(headers))
 		return headers, err
 	}
 
