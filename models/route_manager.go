@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/acm"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"github.com/jinzhu/gorm"
-	"github.com/pivotal-cf/brokerapi"
+	"github.com/pivotal-cf/brokerapi/v8"
 	"strings"
 	"time"
 )

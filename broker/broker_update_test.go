@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/pivotal-cf/brokerapi/domain"
+	"github.com/pivotal-cf/brokerapi/v8/domain"
 
 	"github.com/stretchr/testify/suite"
 

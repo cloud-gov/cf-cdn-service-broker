@@ -3,8 +3,8 @@ package broker_test
 import (
 	"context"
 	"errors"
-	"github.com/pivotal-cf/brokerapi/domain"
-	"github.com/pivotal-cf/brokerapi/domain/apiresponses"
+	"github.com/pivotal-cf/brokerapi/v8/domain"
+	"github.com/pivotal-cf/brokerapi/v8/domain/apiresponses"
 	"github.com/stretchr/testify/suite"
 	"reflect"
 

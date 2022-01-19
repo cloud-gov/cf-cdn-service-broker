@@ -8,7 +8,7 @@ import (
 	"github.com/alphagov/paas-cdn-broker/utils"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
-	"github.com/pivotal-cf/brokerapi/domain/apiresponses"
+	"github.com/pivotal-cf/brokerapi/v8/domain/apiresponses"
 	"github.com/stretchr/testify/suite"
 
 	"code.cloudfoundry.org/lager"

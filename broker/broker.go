@@ -6,12 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/pivotal-cf/brokerapi/domain/apiresponses"
+	"github.com/pivotal-cf/brokerapi/v8/domain/apiresponses"
 	"io/ioutil"
 	"strings"
 
 	"code.cloudfoundry.org/lager"
-	"github.com/pivotal-cf/brokerapi/domain"
+	"github.com/pivotal-cf/brokerapi/v8/domain"
 
 	"github.com/alphagov/paas-cdn-broker/cf"
 	"github.com/alphagov/paas-cdn-broker/config"

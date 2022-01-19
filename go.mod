@@ -4,15 +4,14 @@ go 1.17
 
 require (
 	cloud.google.com/go v0.43.0 // indirect
-	code.cloudfoundry.org/lager v0.0.0-20170223024724-de8e9c6c6e47
+	code.cloudfoundry.org/lager v2.0.0+incompatible
 	github.com/aws/aws-sdk-go v1.38.66
 	github.com/cloudfoundry-community/go-cfclient v0.0.0-20170502130034-23156ed0e73b
 	github.com/codegangsta/inject v0.0.0-20150114235600-33e0aa1cb7c0 // indirect
 	github.com/denisenkom/go-mssqldb v0.0.0-20190515213511-eb9f6a1743f3 // indirect
-	github.com/drewolson/testflight v1.0.0 // indirect
 	github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5 // indirect
 	github.com/go-martini/martini v0.0.0-20170121215854-22fa46961aab // indirect
-	github.com/gorilla/mux v1.7.3 // indirect
+	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/jinzhu/gorm v0.0.0-20160404144928-5174cc5c242a
 	github.com/jinzhu/inflection v0.0.0-20170102125226-1c35d901db3d // indirect
 	github.com/jinzhu/now v1.0.1 // indirect
@@ -24,8 +23,7 @@ require (
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.16.0
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c // indirect
-	github.com/pborman/uuid v1.2.0 // indirect
-	github.com/pivotal-cf/brokerapi v6.4.2+incompatible
+	github.com/pborman/uuid v1.2.1 // indirect
 	github.com/robfig/cron v1.0.0
 	github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a // indirect
 	github.com/stretchr/objx v0.2.0 // indirect
@@ -33,6 +31,8 @@ require (
 	golang.org/x/sys v0.0.0-20210423082822-04245dca01da // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
+
+require github.com/pivotal-cf/brokerapi/v8 v8.2.0
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
