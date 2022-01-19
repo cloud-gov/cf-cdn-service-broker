@@ -8,7 +8,7 @@ import (
 	"github.com/alphagov/paas-cdn-broker/utils"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
-	"github.com/pivotal-cf/brokerapi"
+	"github.com/pivotal-cf/brokerapi/domain/apiresponses"
 	"github.com/stretchr/testify/suite"
 
 	"code.cloudfoundry.org/lager"
@@ -54,11 +54,11 @@ var _ = Describe("GetInstance", func() {
 
 	It("should error when the instance can't be found", func() {
 		instanceId := "some-instance-id"
-		s.Manager.GetReturns(nil, brokerapi.ErrInstanceDoesNotExist)
+		s.Manager.GetReturns(nil, apiresponses.ErrInstanceDoesNotExist)
 
 		_, err := s.Broker.GetInstance(s.ctx, instanceId)
 		Expect(err).To(HaveOccurred())
-		Expect(err).To(MatchError(brokerapi.ErrInstanceDoesNotExist))
+		Expect(err).To(MatchError(apiresponses.ErrInstanceDoesNotExist))
 	})
 
 	It("should error when the DNS challenges can't be found", func() {

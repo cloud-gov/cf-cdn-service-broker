@@ -3,19 +3,19 @@ package broker_test
 import (
 	"context"
 	"errors"
+	"github.com/pivotal-cf/brokerapi/domain"
+	"github.com/pivotal-cf/brokerapi/domain/apiresponses"
 	"github.com/stretchr/testify/suite"
 	"reflect"
 
 	"code.cloudfoundry.org/lager"
-	"github.com/cloudfoundry-community/go-cfclient"
-	"github.com/pivotal-cf/brokerapi"
-
 	"github.com/alphagov/paas-cdn-broker/broker"
 	cfmock "github.com/alphagov/paas-cdn-broker/cf/mocks"
 	"github.com/alphagov/paas-cdn-broker/config"
 	"github.com/alphagov/paas-cdn-broker/models"
 	"github.com/alphagov/paas-cdn-broker/models/mocks"
 	"github.com/alphagov/paas-cdn-broker/utils"
+	"github.com/cloudfoundry-community/go-cfclient"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -73,21 +73,21 @@ var _ = Describe("Last operation", func() {
 	})
 
 	It("Should error when the broker is called synchronously", func() {
-		_, err := s.Broker.Provision(s.ctx, "", brokerapi.ProvisionDetails{}, false)
+		_, err := s.Broker.Provision(s.ctx, "", domain.ProvisionDetails{}, false)
 
 		Expect(err).To(HaveOccurred())
-		Expect(err).To(MatchError(brokerapi.ErrAsyncRequired))
+		Expect(err).To(MatchError(apiresponses.ErrAsyncRequired))
 	})
 
 	It("Should error when the broker is called without config", func() {
-		_, err := s.Broker.Provision(s.ctx, "", brokerapi.ProvisionDetails{}, true)
+		_, err := s.Broker.Provision(s.ctx, "", domain.ProvisionDetails{}, true)
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(ContainSubstring("must be invoked with configuration parameters")))
 	})
 
 	It("Should error when the broker is called without a domain", func() {
-		details := brokerapi.ProvisionDetails{
+		details := domain.ProvisionDetails{
 			RawParameters: []byte(`{}`),
 		}
 		_, err := s.Broker.Provision(s.ctx, "", details, true)
@@ -103,13 +103,13 @@ var _ = Describe("Last operation", func() {
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 		s.Manager.GetReturns(route, nil)
 
-		details := brokerapi.ProvisionDetails{
+		details := domain.ProvisionDetails{
 			RawParameters: []byte(`{"domain": "domain.gov"}`),
 		}
 		_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
 		Expect(err).To(HaveOccurred())
-		Expect(err).To(MatchError(brokerapi.ErrInstanceAlreadyExists))
+		Expect(err).To(MatchError(apiresponses.ErrInstanceAlreadyExists))
 	})
 
 	It("Should succeed", func() {
@@ -118,7 +118,7 @@ var _ = Describe("Last operation", func() {
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 		s.Manager.CreateReturns(route, nil)
 
-		details := brokerapi.ProvisionDetails{
+		details := domain.ProvisionDetails{
 			RawParameters: []byte(`{"domain": "domain.gov"}`),
 		}
 		_, err := s.Broker.Provision(s.ctx, "123", details, true)
@@ -132,7 +132,7 @@ var _ = Describe("Last operation", func() {
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 		s.Manager.CreateReturns(route, nil)
 
-		details := brokerapi.ProvisionDetails{
+		details := domain.ProvisionDetails{
 			RawParameters: []byte(`{
 				"domain": "domain.gov",
 				"default_ttl": 52
@@ -153,7 +153,7 @@ var _ = Describe("Last operation", func() {
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 		s.Manager.CreateReturns(route, nil)
 
-		details := brokerapi.ProvisionDetails{
+		details := domain.ProvisionDetails{
 			RawParameters:    []byte(`{"domain": "domain.gov"}`),
 			OrganizationGUID: "org-1",
 			SpaceGUID:        "space-1",
@@ -177,7 +177,7 @@ var _ = Describe("Last operation", func() {
 
 	It("Should error when Cloud Foundry does not have the domain registered", func() {
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, errors.New("fail"))
-		details := brokerapi.ProvisionDetails{
+		details := domain.ProvisionDetails{
 			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
 			RawParameters:    []byte(`{"domain": "domain.gov"}`),
 		}
@@ -190,7 +190,7 @@ var _ = Describe("Last operation", func() {
 	It("Should error when given multiple domains one of which Cloud Foundry does not have registered", func() {
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 		s.cfclient.On("GetDomainByName", "domain2.gov").Return(cfclient.Domain{}, errors.New("fail"))
-		details := brokerapi.ProvisionDetails{
+		details := domain.ProvisionDetails{
 			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
 			RawParameters:    []byte(`{"domain": "domain.gov,domain2.gov"}`),
 		}
@@ -206,7 +206,7 @@ var _ = Describe("Last operation", func() {
 		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 		s.cfclient.On("GetDomainByName", "domain2.gov").Return(cfclient.Domain{}, errors.New("fail"))
 		s.cfclient.On("GetDomainByName", "domain3.gov").Return(cfclient.Domain{}, errors.New("fail"))
-		details := brokerapi.ProvisionDetails{
+		details := domain.ProvisionDetails{
 			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
 			RawParameters:    []byte(`{"domain": "domain.gov,domain2.gov,domain3.gov"}`),
 		}
@@ -228,7 +228,7 @@ var _ = Describe("Last operation", func() {
 		It("Should succeed forwarding duplicate host header", func() {
 			s.allowCreateWithExpectedHeaders(utils.Headers{"Host": true})
 
-			details := brokerapi.ProvisionDetails{
+			details := domain.ProvisionDetails{
 				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["Host"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
@@ -239,7 +239,7 @@ var _ = Describe("Last operation", func() {
 		It("Should succeed forwarding a single header", func() {
 			s.allowCreateWithExpectedHeaders(utils.Headers{"User-Agent": true, "Host": true})
 
-			details := brokerapi.ProvisionDetails{
+			details := domain.ProvisionDetails{
 				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["User-Agent"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
@@ -250,7 +250,7 @@ var _ = Describe("Last operation", func() {
 		It("Should succeed forwarding wildcard headers", func() {
 			s.allowCreateWithExpectedHeaders(utils.Headers{"*": true})
 
-			details := brokerapi.ProvisionDetails{
+			details := domain.ProvisionDetails{
 				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["*"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
@@ -261,7 +261,7 @@ var _ = Describe("Last operation", func() {
 		It("Should succeed forwarding nine headers", func() {
 			s.allowCreateWithExpectedHeaders(utils.Headers{"One": true, "Two": true, "Three": true, "Four": true, "Five": true, "Six": true, "Seven": true, "Eight": true, "Nine": true, "Host": true})
 
-			details := brokerapi.ProvisionDetails{
+			details := domain.ProvisionDetails{
 				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
@@ -270,7 +270,7 @@ var _ = Describe("Last operation", func() {
 		})
 
 		It("Should error when forwarding duplicate headers", func() {
-			details := brokerapi.ProvisionDetails{
+			details := domain.ProvisionDetails{
 				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["User-Agent", "Host", "User-Agent"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
@@ -280,7 +280,7 @@ var _ = Describe("Last operation", func() {
 		})
 
 		It("Should error when specifying a specific header and also wildcard headers", func() {
-			details := brokerapi.ProvisionDetails{
+			details := domain.ProvisionDetails{
 				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["*", "User-Agent"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
@@ -290,7 +290,7 @@ var _ = Describe("Last operation", func() {
 		})
 
 		It("Should error when forwarding ten or more", func() {
-			details := brokerapi.ProvisionDetails{
+			details := domain.ProvisionDetails{
 				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)

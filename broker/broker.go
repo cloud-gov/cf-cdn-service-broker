@@ -6,11 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/pivotal-cf/brokerapi/domain/apiresponses"
 	"io/ioutil"
 	"strings"
 
 	"code.cloudfoundry.org/lager"
-	"github.com/pivotal-cf/brokerapi"
+	"github.com/pivotal-cf/brokerapi/domain"
 
 	"github.com/alphagov/paas-cdn-broker/cf"
 	"github.com/alphagov/paas-cdn-broker/config"
@@ -58,11 +59,11 @@ var (
 	MAX_HEADER_COUNT = 10
 )
 
-func (b *CdnServiceBroker) GetBinding(ctx context.Context, first, second string) (brokerapi.GetBindingSpec, error) {
-	return brokerapi.GetBindingSpec{}, fmt.Errorf("GetBinding method not implemented")
+func (b *CdnServiceBroker) GetBinding(ctx context.Context, first, second string) (domain.GetBindingSpec, error) {
+	return domain.GetBindingSpec{}, fmt.Errorf("GetBinding method not implemented")
 }
 
-func (b *CdnServiceBroker) GetInstance(ctx context.Context, instanceID string) (brokerapi.GetInstanceDetailsSpec, error) {
+func (b *CdnServiceBroker) GetInstance(ctx context.Context, instanceID string) (domain.GetInstanceDetailsSpec, error) {
 	lsession := b.logger.Session("get-instance", lager.Data{
 		"instance_id": instanceID,
 	})
@@ -71,12 +72,12 @@ func (b *CdnServiceBroker) GetInstance(ctx context.Context, instanceID string) (
 	route, err := b.manager.Get(instanceID)
 
 	if err != nil {
-		if err == brokerapi.ErrInstanceDoesNotExist {
+		if err == apiresponses.ErrInstanceDoesNotExist {
 			lsession.Error("instance-does-not-exist", err)
-			return brokerapi.GetInstanceDetailsSpec{}, brokerapi.ErrInstanceDoesNotExist
+			return domain.GetInstanceDetailsSpec{}, apiresponses.ErrInstanceDoesNotExist
 		} else {
 			lsession.Error("lookup-instance", err)
-			return brokerapi.GetInstanceDetailsSpec{}, err
+			return domain.GetInstanceDetailsSpec{}, err
 		}
 	}
 
@@ -84,14 +85,14 @@ func (b *CdnServiceBroker) GetInstance(ctx context.Context, instanceID string) (
 	challenges, err := b.manager.GetDNSChallenges(route, false)
 	if err != nil {
 		lsession.Error("get-dns-challenges", err)
-		return brokerapi.GetInstanceDetailsSpec{}, fmt.Errorf("could not get dns challenges for domain")
+		return domain.GetInstanceDetailsSpec{}, fmt.Errorf("could not get dns challenges for domain")
 	}
 
 	lsession.Info("get-cdn-configuration")
 	distribution, err := b.manager.GetCDNConfiguration(route)
 	if err != nil {
 		lsession.Error("get-cdn-configuration", err)
-		return brokerapi.GetInstanceDetailsSpec{}, fmt.Errorf("could not get cdn configuration")
+		return domain.GetInstanceDetailsSpec{}, fmt.Errorf("could not get cdn configuration")
 	}
 
 	headers := []string{}
@@ -110,51 +111,51 @@ func (b *CdnServiceBroker) GetInstance(ctx context.Context, instanceID string) (
 		"cache_ttl":         cacheTTL,
 	}
 
-	return brokerapi.GetInstanceDetailsSpec{
+	return domain.GetInstanceDetailsSpec{
 		Parameters: instanceParams,
 	}, nil
 }
 
-func (b *CdnServiceBroker) LastBindingOperation(ctx context.Context, first, second string, pollDetails brokerapi.PollDetails) (brokerapi.LastOperation, error) {
-	return brokerapi.LastOperation{}, fmt.Errorf("LastBindingOperation method not implemented")
+func (b *CdnServiceBroker) LastBindingOperation(ctx context.Context, first, second string, pollDetails domain.PollDetails) (domain.LastOperation, error) {
+	return domain.LastOperation{}, fmt.Errorf("LastBindingOperation method not implemented")
 }
 
-func (b *CdnServiceBroker) Services(context context.Context) ([]brokerapi.Service, error) {
+func (b *CdnServiceBroker) Services(context context.Context) ([]domain.Service, error) {
 	lsession := b.logger.Session("provision")
 	lsession.Info("start")
 
-	var service brokerapi.Service
+	var service domain.Service
 	buf, err := ioutil.ReadFile("./catalog.json")
 	if err != nil {
 		lsession.Error("read-file", err)
-		return []brokerapi.Service{}, err
+		return []domain.Service{}, err
 	}
 	err = json.Unmarshal(buf, &service)
 	if err != nil {
 		lsession.Error("unmarshal", err)
-		return []brokerapi.Service{}, err
+		return []domain.Service{}, err
 	}
 	lsession.Info("ok", lager.Data{"service": service})
-	return []brokerapi.Service{service}, nil
+	return []domain.Service{service}, nil
 }
 
 func (b *CdnServiceBroker) Provision(
 	context context.Context,
 	instanceID string,
-	details brokerapi.ProvisionDetails,
+	details domain.ProvisionDetails,
 	asyncAllowed bool,
-) (brokerapi.ProvisionedServiceSpec, error) {
+) (domain.ProvisionedServiceSpec, error) {
 	lsession := b.logger.Session("provision", lager.Data{
 		"instance_id": instanceID,
 		"details":     details,
 	})
 	lsession.Info("start")
 
-	spec := brokerapi.ProvisionedServiceSpec{}
+	spec := domain.ProvisionedServiceSpec{}
 
 	if !asyncAllowed {
-		lsession.Error("async-not-allowed-err", brokerapi.ErrAsyncRequired)
-		return spec, brokerapi.ErrAsyncRequired
+		lsession.Error("async-not-allowed-err", apiresponses.ErrAsyncRequired)
+		return spec, apiresponses.ErrAsyncRequired
 	}
 
 	options, err := b.parseProvisionDetails(details)
@@ -167,7 +168,7 @@ func (b *CdnServiceBroker) Provision(
 	_, err = b.manager.Get(instanceID)
 	if err == nil {
 		lsession.Error("manager-get-err", err)
-		return spec, brokerapi.ErrInstanceAlreadyExists
+		return spec, apiresponses.ErrInstanceAlreadyExists
 	}
 
 	headers, err := b.getHeaders(options.Headers)
@@ -204,14 +205,14 @@ func (b *CdnServiceBroker) Provision(
 	}
 
 	lsession.Info("ok")
-	return brokerapi.ProvisionedServiceSpec{IsAsync: true}, nil
+	return domain.ProvisionedServiceSpec{IsAsync: true}, nil
 }
 
 func (b *CdnServiceBroker) LastOperation(
 	context context.Context,
 	instanceID string,
-	pollDetails brokerapi.PollDetails,
-) (brokerapi.LastOperation, error) {
+	pollDetails domain.PollDetails,
+) (domain.LastOperation, error) {
 	lsession := b.logger.Session("last-operation", lager.Data{
 		"instance_id":    instanceID,
 		"operation_data": pollDetails.OperationData,
@@ -221,8 +222,8 @@ func (b *CdnServiceBroker) LastOperation(
 	route, err := b.manager.Get(instanceID)
 	if err != nil {
 		lsession.Error("manager-get-err", err)
-		return brokerapi.LastOperation{
-			State:       brokerapi.Failed,
+		return domain.LastOperation{
+			State:       domain.Failed,
 			Description: "Service instance not found",
 		}, nil
 	}
@@ -241,7 +242,7 @@ func (b *CdnServiceBroker) LastOperation(
 				"domain": route.DomainExternal,
 				"state":  route.State,
 			})
-			return brokerapi.LastOperation{}, err
+			return domain.LastOperation{}, err
 		}
 
 		instructions := formatChallenges(challenges, route.DefaultTTL)
@@ -277,8 +278,8 @@ To validate ownership of the domain, set the following DNS records
 			"state":       route.State,
 			"description": description,
 		})
-		return brokerapi.LastOperation{
-			State:       brokerapi.InProgress,
+		return domain.LastOperation{
+			State:       domain.InProgress,
 			Description: description,
 		}, nil
 	case models.Deprovisioning:
@@ -291,8 +292,8 @@ To validate ownership of the domain, set the following DNS records
 			"state":       route.State,
 			"description": description,
 		})
-		return brokerapi.LastOperation{
-			State:       brokerapi.InProgress,
+		return domain.LastOperation{
+			State:       domain.InProgress,
 			Description: description,
 		}, nil
 	case models.Provisioned:
@@ -306,8 +307,8 @@ To validate ownership of the domain, set the following DNS records
 			"state":       route.State,
 			"description": description,
 		})
-		return brokerapi.LastOperation{
-			State:       brokerapi.Succeeded,
+		return domain.LastOperation{
+			State:       domain.Succeeded,
 			Description: description,
 		}, nil
 	case models.Deprovisioned:
@@ -320,8 +321,8 @@ To validate ownership of the domain, set the following DNS records
 			"state":       route.State,
 			"description": description,
 		})
-		return brokerapi.LastOperation{
-			State:       brokerapi.Succeeded,
+		return domain.LastOperation{
+			State:       domain.Succeeded,
 			Description: description,
 		}, nil
 	case models.Conflict:
@@ -331,8 +332,8 @@ To validate ownership of the domain, set the following DNS records
 			"state":       route.State,
 			"description": description,
 		})
-		return brokerapi.LastOperation{
-			State:       brokerapi.Failed,
+		return domain.LastOperation{
+			State:       domain.Failed,
 			Description: description,
 		}, nil
 
@@ -346,8 +347,8 @@ Create/update operations usually expire because the domain validation DNS record
 			int(models.ProvisioningExpirationPeriodHours.Hours()),
 		)
 
-		return brokerapi.LastOperation{
-			State:       brokerapi.Failed,
+		return domain.LastOperation{
+			State:       domain.Failed,
 			Description: description,
 		}, nil
 
@@ -360,8 +361,8 @@ Create/update operations usually expire because the domain validation DNS record
 			"state":       route.State,
 			"description": description,
 		})
-		return brokerapi.LastOperation{
-			State:       brokerapi.Failed,
+		return domain.LastOperation{
+			State:       domain.Failed,
 			Description: description,
 		}, nil
 	}
@@ -408,9 +409,9 @@ Current validation status of %s: %s
 func (b *CdnServiceBroker) Deprovision(
 	context context.Context,
 	instanceID string,
-	details brokerapi.DeprovisionDetails,
+	details domain.DeprovisionDetails,
 	asyncAllowed bool,
-) (brokerapi.DeprovisionServiceSpec, error) {
+) (domain.DeprovisionServiceSpec, error) {
 	lsession := b.logger.Session("deprovision", lager.Data{
 		"instance_id": instanceID,
 		"details":     details,
@@ -418,14 +419,14 @@ func (b *CdnServiceBroker) Deprovision(
 	lsession.Info("start")
 
 	if !asyncAllowed {
-		lsession.Error("async-not-allowed-err", brokerapi.ErrAsyncRequired)
-		return brokerapi.DeprovisionServiceSpec{}, brokerapi.ErrAsyncRequired
+		lsession.Error("async-not-allowed-err", apiresponses.ErrAsyncRequired)
+		return domain.DeprovisionServiceSpec{}, apiresponses.ErrAsyncRequired
 	}
 
 	route, err := b.manager.Get(instanceID)
 	if err != nil {
 		lsession.Error("manager-get-err", err)
-		return brokerapi.DeprovisionServiceSpec{}, err
+		return domain.DeprovisionServiceSpec{}, err
 	}
 
 	err = b.manager.Disable(route)
@@ -433,61 +434,61 @@ func (b *CdnServiceBroker) Deprovision(
 		lsession.Error("manager-disable-err", err, lager.Data{
 			"domain": route.DomainExternal,
 		})
-		return brokerapi.DeprovisionServiceSpec{}, nil
+		return domain.DeprovisionServiceSpec{}, nil
 	}
 
 	lsession.Info("ok", lager.Data{"domain": route.DomainExternal})
-	return brokerapi.DeprovisionServiceSpec{IsAsync: true}, nil
+	return domain.DeprovisionServiceSpec{IsAsync: true}, nil
 }
 
 func (b *CdnServiceBroker) Bind(
 	context context.Context,
 	instanceID, bindingID string,
-	details brokerapi.BindDetails,
+	details domain.BindDetails,
 	asyncAllowed bool,
-) (brokerapi.Binding, error) {
+) (domain.Binding, error) {
 	b.logger.Info("bind", lager.Data{
 		"instance_id": instanceID,
 		"binding_id":  bindingID,
 		"details":     details,
 	})
 
-	return brokerapi.Binding{}, errors.New("service does not support bind")
+	return domain.Binding{}, errors.New("service does not support bind")
 }
 
 func (b *CdnServiceBroker) Unbind(
 	context context.Context,
 	instanceID, bindingID string,
-	details brokerapi.UnbindDetails,
+	details domain.UnbindDetails,
 	asyncAllowed bool,
-) (brokerapi.UnbindSpec, error) {
+) (domain.UnbindSpec, error) {
 	b.logger.Info("unbind", lager.Data{
 		"instance_id": instanceID,
 		"binding_id":  bindingID,
 		"details":     details,
 	})
 
-	return brokerapi.UnbindSpec{}, errors.New("service does not support bind")
+	return domain.UnbindSpec{}, errors.New("service does not support bind")
 }
 
 func (b *CdnServiceBroker) Update(
 	context context.Context,
 	instanceID string,
-	details brokerapi.UpdateDetails,
+	details domain.UpdateDetails,
 	asyncAllowed bool,
-) (brokerapi.UpdateServiceSpec, error) {
+) (domain.UpdateServiceSpec, error) {
 	b.logger.Info("update", lager.Data{
 		"instance_id": instanceID,
 		"details":     details,
 	})
 
 	if !asyncAllowed {
-		return brokerapi.UpdateServiceSpec{}, brokerapi.ErrAsyncRequired
+		return domain.UpdateServiceSpec{}, apiresponses.ErrAsyncRequired
 	}
 
 	options, err := b.parseUpdateDetails(details)
 	if err != nil {
-		return brokerapi.UpdateServiceSpec{}, err
+		return domain.UpdateServiceSpec{}, err
 	}
 	b.logger.Info("update-options", lager.Data{"instance_id": instanceID, "options": options})
 
@@ -496,7 +497,7 @@ func (b *CdnServiceBroker) Update(
 	if options.Headers != nil {
 		parsedHeaders, err := b.getHeaders(*options.Headers)
 		if err != nil {
-			return brokerapi.UpdateServiceSpec{}, err
+			return domain.UpdateServiceSpec{}, err
 		}
 		headers = &parsedHeaders
 	}
@@ -509,15 +510,15 @@ func (b *CdnServiceBroker) Update(
 		options.Cookies,
 	)
 	if err != nil {
-		return brokerapi.UpdateServiceSpec{}, err
+		return domain.UpdateServiceSpec{}, err
 	}
 
-	return brokerapi.UpdateServiceSpec{IsAsync: provisioningAsync}, nil
+	return domain.UpdateServiceSpec{IsAsync: provisioningAsync}, nil
 }
 
 // parseProvisionDetails will attempt to parse the update details and then verify that BOTH least "domain" and "origin"
 // are provided.
-func (b *CdnServiceBroker) parseProvisionDetails(details brokerapi.ProvisionDetails) (CreateOptions, error) {
+func (b *CdnServiceBroker) parseProvisionDetails(details domain.ProvisionDetails) (CreateOptions, error) {
 	var err error
 	options := CreateOptions{
 		Cookies:    true,
@@ -549,7 +550,7 @@ func (b *CdnServiceBroker) parseProvisionDetails(details brokerapi.ProvisionDeta
 
 // parseUpdateDetails will attempt to parse the update details and then verify that at least "domain" or "origin"
 // are provided.
-func (b *CdnServiceBroker) parseUpdateDetails(details brokerapi.UpdateDetails) (UpdateOptions, error) {
+func (b *CdnServiceBroker) parseUpdateDetails(details domain.UpdateDetails) (UpdateOptions, error) {
 	var err error
 	options := UpdateOptions{}
 
