@@ -59,11 +59,11 @@ var (
 	MAX_HEADER_COUNT = 10
 )
 
-func (b *CdnServiceBroker) GetBinding(ctx context.Context, first, second string) (domain.GetBindingSpec, error) {
+func (b *CdnServiceBroker) GetBinding(ctx context.Context, first, second string, details domain.FetchBindingDetails) (domain.GetBindingSpec, error) {
 	return domain.GetBindingSpec{}, fmt.Errorf("GetBinding method not implemented")
 }
 
-func (b *CdnServiceBroker) GetInstance(ctx context.Context, instanceID string) (domain.GetInstanceDetailsSpec, error) {
+func (b *CdnServiceBroker) GetInstance(ctx context.Context, instanceID string, details domain.FetchInstanceDetails) (domain.GetInstanceDetailsSpec, error) {
 	lsession := b.logger.Session("get-instance", lager.Data{
 		"instance_id": instanceID,
 	})
