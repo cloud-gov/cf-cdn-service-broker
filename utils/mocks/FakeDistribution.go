@@ -128,15 +128,16 @@ func (fake *FakeDistribution) Create(arg1 string, arg2 []string, arg3 string, ar
 		arg6 bool
 		arg7 map[string]string
 	}{arg1, arg2Copy, arg3, arg4, arg5, arg6, arg7})
+	stub := fake.CreateStub
+	fakeReturns := fake.createReturns
 	fake.recordInvocation("Create", []interface{}{arg1, arg2Copy, arg3, arg4, arg5, arg6, arg7})
 	fake.createMutex.Unlock()
-	if fake.CreateStub != nil {
-		return fake.CreateStub(arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+	if stub != nil {
+		return stub(arg1, arg2, arg3, arg4, arg5, arg6, arg7)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
 	}
-	fakeReturns := fake.createReturns
 	return fakeReturns.result1, fakeReturns.result2
 }
 
@@ -191,15 +192,16 @@ func (fake *FakeDistribution) Delete(arg1 string) (bool, error) {
 	fake.deleteArgsForCall = append(fake.deleteArgsForCall, struct {
 		arg1 string
 	}{arg1})
+	stub := fake.DeleteStub
+	fakeReturns := fake.deleteReturns
 	fake.recordInvocation("Delete", []interface{}{arg1})
 	fake.deleteMutex.Unlock()
-	if fake.DeleteStub != nil {
-		return fake.DeleteStub(arg1)
+	if stub != nil {
+		return stub(arg1)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
 	}
-	fakeReturns := fake.deleteReturns
 	return fakeReturns.result1, fakeReturns.result2
 }
 
@@ -254,15 +256,16 @@ func (fake *FakeDistribution) Disable(arg1 string) error {
 	fake.disableArgsForCall = append(fake.disableArgsForCall, struct {
 		arg1 string
 	}{arg1})
+	stub := fake.DisableStub
+	fakeReturns := fake.disableReturns
 	fake.recordInvocation("Disable", []interface{}{arg1})
 	fake.disableMutex.Unlock()
-	if fake.DisableStub != nil {
-		return fake.DisableStub(arg1)
+	if stub != nil {
+		return stub(arg1)
 	}
 	if specificReturn {
 		return ret.result1
 	}
-	fakeReturns := fake.disableReturns
 	return fakeReturns.result1
 }
 
@@ -314,15 +317,16 @@ func (fake *FakeDistribution) Get(arg1 string) (*cloudfront.Distribution, error)
 	fake.getArgsForCall = append(fake.getArgsForCall, struct {
 		arg1 string
 	}{arg1})
+	stub := fake.GetStub
+	fakeReturns := fake.getReturns
 	fake.recordInvocation("Get", []interface{}{arg1})
 	fake.getMutex.Unlock()
-	if fake.GetStub != nil {
-		return fake.GetStub(arg1)
+	if stub != nil {
+		return stub(arg1)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
 	}
-	fakeReturns := fake.getReturns
 	return fakeReturns.result1, fakeReturns.result2
 }
 
@@ -377,15 +381,16 @@ func (fake *FakeDistribution) ListDistributions(arg1 func(cloudfront.Distributio
 	fake.listDistributionsArgsForCall = append(fake.listDistributionsArgsForCall, struct {
 		arg1 func(cloudfront.DistributionSummary) bool
 	}{arg1})
+	stub := fake.ListDistributionsStub
+	fakeReturns := fake.listDistributionsReturns
 	fake.recordInvocation("ListDistributions", []interface{}{arg1})
 	fake.listDistributionsMutex.Unlock()
-	if fake.ListDistributionsStub != nil {
-		return fake.ListDistributionsStub(arg1)
+	if stub != nil {
+		return stub(arg1)
 	}
 	if specificReturn {
 		return ret.result1
 	}
-	fakeReturns := fake.listDistributionsReturns
 	return fakeReturns.result1
 }
 
@@ -444,15 +449,16 @@ func (fake *FakeDistribution) SetCertificateAndCname(arg1 string, arg2 string, a
 		arg2 string
 		arg3 []string
 	}{arg1, arg2, arg3Copy})
+	stub := fake.SetCertificateAndCnameStub
+	fakeReturns := fake.setCertificateAndCnameReturns
 	fake.recordInvocation("SetCertificateAndCname", []interface{}{arg1, arg2, arg3Copy})
 	fake.setCertificateAndCnameMutex.Unlock()
-	if fake.SetCertificateAndCnameStub != nil {
-		return fake.SetCertificateAndCnameStub(arg1, arg2, arg3)
+	if stub != nil {
+		return stub(arg1, arg2, arg3)
 	}
 	if specificReturn {
 		return ret.result1
 	}
-	fakeReturns := fake.setCertificateAndCnameReturns
 	return fakeReturns.result1
 }
 
@@ -509,15 +515,16 @@ func (fake *FakeDistribution) Update(arg1 string, arg2 *[]string, arg3 string, a
 		arg5 *utils.Headers
 		arg6 *bool
 	}{arg1, arg2, arg3, arg4, arg5, arg6})
+	stub := fake.UpdateStub
+	fakeReturns := fake.updateReturns
 	fake.recordInvocation("Update", []interface{}{arg1, arg2, arg3, arg4, arg5, arg6})
 	fake.updateMutex.Unlock()
-	if fake.UpdateStub != nil {
-		return fake.UpdateStub(arg1, arg2, arg3, arg4, arg5, arg6)
+	if stub != nil {
+		return stub(arg1, arg2, arg3, arg4, arg5, arg6)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
 	}
-	fakeReturns := fake.updateReturns
 	return fakeReturns.result1, fakeReturns.result2
 }
 

@@ -5,3 +5,7 @@ test:
 
 	POSTGRES_URL="postgres://postgres:foobar@localhost/postgres?sslmode=disable" \
 		ginkgo -v -r
+
+.PHONY: fakes
+fakes:
+	go generate ./...

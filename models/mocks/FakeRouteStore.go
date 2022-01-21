@@ -66,15 +66,16 @@ func (fake *FakeRouteStore) Create(arg1 *models.Route) error {
 	fake.createArgsForCall = append(fake.createArgsForCall, struct {
 		arg1 *models.Route
 	}{arg1})
+	stub := fake.CreateStub
+	fakeReturns := fake.createReturns
 	fake.recordInvocation("Create", []interface{}{arg1})
 	fake.createMutex.Unlock()
-	if fake.CreateStub != nil {
-		return fake.CreateStub(arg1)
+	if stub != nil {
+		return stub(arg1)
 	}
 	if specificReturn {
 		return ret.result1
 	}
-	fakeReturns := fake.createReturns
 	return fakeReturns.result1
 }
 
@@ -126,15 +127,16 @@ func (fake *FakeRouteStore) FindAllMatching(arg1 models.Route) ([]models.Route, 
 	fake.findAllMatchingArgsForCall = append(fake.findAllMatchingArgsForCall, struct {
 		arg1 models.Route
 	}{arg1})
+	stub := fake.FindAllMatchingStub
+	fakeReturns := fake.findAllMatchingReturns
 	fake.recordInvocation("FindAllMatching", []interface{}{arg1})
 	fake.findAllMatchingMutex.Unlock()
-	if fake.FindAllMatchingStub != nil {
-		return fake.FindAllMatchingStub(arg1)
+	if stub != nil {
+		return stub(arg1)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
 	}
-	fakeReturns := fake.findAllMatchingReturns
 	return fakeReturns.result1, fakeReturns.result2
 }
 
@@ -189,15 +191,16 @@ func (fake *FakeRouteStore) FindOneMatching(arg1 models.Route) (models.Route, er
 	fake.findOneMatchingArgsForCall = append(fake.findOneMatchingArgsForCall, struct {
 		arg1 models.Route
 	}{arg1})
+	stub := fake.FindOneMatchingStub
+	fakeReturns := fake.findOneMatchingReturns
 	fake.recordInvocation("FindOneMatching", []interface{}{arg1})
 	fake.findOneMatchingMutex.Unlock()
-	if fake.FindOneMatchingStub != nil {
-		return fake.FindOneMatchingStub(arg1)
+	if stub != nil {
+		return stub(arg1)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
 	}
-	fakeReturns := fake.findOneMatchingReturns
 	return fakeReturns.result1, fakeReturns.result2
 }
 
@@ -252,15 +255,16 @@ func (fake *FakeRouteStore) Save(arg1 *models.Route) error {
 	fake.saveArgsForCall = append(fake.saveArgsForCall, struct {
 		arg1 *models.Route
 	}{arg1})
+	stub := fake.SaveStub
+	fakeReturns := fake.saveReturns
 	fake.recordInvocation("Save", []interface{}{arg1})
 	fake.saveMutex.Unlock()
-	if fake.SaveStub != nil {
-		return fake.SaveStub(arg1)
+	if stub != nil {
+		return stub(arg1)
 	}
 	if specificReturn {
 		return ret.result1
 	}
-	fakeReturns := fake.saveReturns
 	return fakeReturns.result1
 }
 

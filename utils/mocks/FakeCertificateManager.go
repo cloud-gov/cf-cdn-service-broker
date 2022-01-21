@@ -81,15 +81,16 @@ func (fake *FakeCertificateManager) DeleteCertificate(arg1 string) error {
 	fake.deleteCertificateArgsForCall = append(fake.deleteCertificateArgsForCall, struct {
 		arg1 string
 	}{arg1})
+	stub := fake.DeleteCertificateStub
+	fakeReturns := fake.deleteCertificateReturns
 	fake.recordInvocation("DeleteCertificate", []interface{}{arg1})
 	fake.deleteCertificateMutex.Unlock()
-	if fake.DeleteCertificateStub != nil {
-		return fake.DeleteCertificateStub(arg1)
+	if stub != nil {
+		return stub(arg1)
 	}
 	if specificReturn {
 		return ret.result1
 	}
-	fakeReturns := fake.deleteCertificateReturns
 	return fakeReturns.result1
 }
 
@@ -141,15 +142,16 @@ func (fake *FakeCertificateManager) GetDomainValidationChallenges(arg1 string) (
 	fake.getDomainValidationChallengesArgsForCall = append(fake.getDomainValidationChallengesArgsForCall, struct {
 		arg1 string
 	}{arg1})
+	stub := fake.GetDomainValidationChallengesStub
+	fakeReturns := fake.getDomainValidationChallengesReturns
 	fake.recordInvocation("GetDomainValidationChallenges", []interface{}{arg1})
 	fake.getDomainValidationChallengesMutex.Unlock()
-	if fake.GetDomainValidationChallengesStub != nil {
-		return fake.GetDomainValidationChallengesStub(arg1)
+	if stub != nil {
+		return stub(arg1)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
 	}
-	fakeReturns := fake.getDomainValidationChallengesReturns
 	return fakeReturns.result1, fakeReturns.result2
 }
 
@@ -204,15 +206,16 @@ func (fake *FakeCertificateManager) IsCertificateIssued(arg1 string) (bool, erro
 	fake.isCertificateIssuedArgsForCall = append(fake.isCertificateIssuedArgsForCall, struct {
 		arg1 string
 	}{arg1})
+	stub := fake.IsCertificateIssuedStub
+	fakeReturns := fake.isCertificateIssuedReturns
 	fake.recordInvocation("IsCertificateIssued", []interface{}{arg1})
 	fake.isCertificateIssuedMutex.Unlock()
-	if fake.IsCertificateIssuedStub != nil {
-		return fake.IsCertificateIssuedStub(arg1)
+	if stub != nil {
+		return stub(arg1)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
 	}
-	fakeReturns := fake.isCertificateIssuedReturns
 	return fakeReturns.result1, fakeReturns.result2
 }
 
@@ -266,15 +269,16 @@ func (fake *FakeCertificateManager) ListIssuedCertificates() ([]utils.Certificat
 	ret, specificReturn := fake.listIssuedCertificatesReturnsOnCall[len(fake.listIssuedCertificatesArgsForCall)]
 	fake.listIssuedCertificatesArgsForCall = append(fake.listIssuedCertificatesArgsForCall, struct {
 	}{})
+	stub := fake.ListIssuedCertificatesStub
+	fakeReturns := fake.listIssuedCertificatesReturns
 	fake.recordInvocation("ListIssuedCertificates", []interface{}{})
 	fake.listIssuedCertificatesMutex.Unlock()
-	if fake.ListIssuedCertificatesStub != nil {
-		return fake.ListIssuedCertificatesStub()
+	if stub != nil {
+		return stub()
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
 	}
-	fakeReturns := fake.listIssuedCertificatesReturns
 	return fakeReturns.result1, fakeReturns.result2
 }
 
@@ -328,15 +332,16 @@ func (fake *FakeCertificateManager) RequestCertificate(arg1 []string, arg2 strin
 		arg1 []string
 		arg2 string
 	}{arg1Copy, arg2})
+	stub := fake.RequestCertificateStub
+	fakeReturns := fake.requestCertificateReturns
 	fake.recordInvocation("RequestCertificate", []interface{}{arg1Copy, arg2})
 	fake.requestCertificateMutex.Unlock()
-	if fake.RequestCertificateStub != nil {
-		return fake.RequestCertificateStub(arg1, arg2)
+	if stub != nil {
+		return stub(arg1, arg2)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
 	}
-	fakeReturns := fake.requestCertificateReturns
 	return fakeReturns.result1, fakeReturns.result2
 }
 

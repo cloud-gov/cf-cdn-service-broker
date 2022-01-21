@@ -839,97 +839,100 @@ var _ = Describe("RouteManager", func() {
 		})
 	})
 
-	Context("GetDNSInstructions", func() {
-		It("requests DNS challenges for the right certificate when there are multiple", func() {
+	Context("GetDNSChallenges", func() {
+		var (
+			validatingCert models.Certificate
+			attachedCert   models.Certificate
+			route          models.Route
+			manager        models.RouteManager
+			certsManager   *utilsmocks.FakeCertificateManager
+		)
+		BeforeEach(func() {
+			firstOfMay := time.Date(2020, 05, 01, 12, 00, 00, 00, time.UTC)
 			firstOfJune := time.Date(2020, 06, 01, 12, 00, 00, 00, time.UTC)
 			now := time.Now()
 
-			acmCertOne := models.Certificate{
+			validatingCert = models.Certificate{
 				Model: gorm.Model{
-					ID:        3,
+					ID:        4,
 					CreatedAt: firstOfJune,
 					UpdatedAt: now,
 				},
 				CertificateStatus: models.CertificateStatusValidating,
-				CertificateArn:    "arn:aws:acm::my-cert",
+				CertificateArn:    "arn:aws:acm::validating-cert",
 			}
 
-			route := models.Route{
+			attachedCert = models.Certificate{
+				Model: gorm.Model{
+					ID:        3,
+					CreatedAt: firstOfMay,
+					UpdatedAt: firstOfJune,
+				},
+				CertificateStatus: models.CertificateStatusAttached,
+				CertificateArn:    "arn:aws:acm::attached-cert",
+			}
+
+			route = models.Route{
 				Certificates: []models.Certificate{
-					acmCertOne,
+					validatingCert,
+					attachedCert,
 				},
 			}
 
-			certsManager := &utilsmocks.FakeCertificateManager{}
-			manager := models.NewManager(
+			certsManager = &utilsmocks.FakeCertificateManager{}
+			manager = models.NewManager(
 				lager.NewLogger(""),
 				&utils.Distribution{},
 				config.Settings{},
 				&models.RouteStore{},
 				certsManager,
 			)
+		})
+		Context("when onlyValidatingCertificates = true", func() {
+			It("only requests DNS challenges for certificates which are in the 'VALIDATING' state", func() {
+				domainValidationChallenge := utils.DomainValidationChallenge{
+					DomainName:       "domain.com",
+					RecordName:       "domain.com",
+					RecordType:       "CNAME",
+					RecordValue:      "BlahBlahBlah",
+					ValidationStatus: "PENDING_VALIDATION",
+				}
 
-			domainValidationChallenge := utils.DomainValidationChallenge{
-				DomainName:       "domain.com",
-				RecordName:       "domain.com",
-				RecordType:       "CNAME",
-				RecordValue:      "BlahBlahBlah",
-				ValidationStatus: "PENDING_VALIDATION",
-			}
+				certsManager.GetDomainValidationChallengesReturns([]utils.DomainValidationChallenge{domainValidationChallenge}, nil)
 
-			certsManager.GetDomainValidationChallengesReturns([]utils.DomainValidationChallenge{domainValidationChallenge}, nil)
+				_, err := manager.GetDNSChallenges(&route, true)
 
-			_, err := manager.GetDNSInstructions(&route)
-
-			Expect(err).ToNot(HaveOccurred())
-			Expect(certsManager.GetDomainValidationChallengesCallCount()).To(Equal(1))
-			requestedArn := certsManager.GetDomainValidationChallengesArgsForCall(0)
-			Expect(requestedArn).To(Equal("arn:aws:acm::my-cert"))
+				Expect(err).ToNot(HaveOccurred())
+				Expect(certsManager.GetDomainValidationChallengesCallCount()).To(Equal(1))
+				requestedArn := certsManager.GetDomainValidationChallengesArgsForCall(0)
+				Expect(requestedArn).To(Equal(validatingCert.CertificateArn))
+			})
 		})
 
-		It("Getting the DNS challenges from ACM when the Routes Certificates are managed by ACM", func() {
+		Context("when onlyValidatingCertificates = false", func() {
+			It("requests DNS challenges for any validating certificates as well as the currently attached cert", func() {
+				domainValidationChallenge := utils.DomainValidationChallenge{
+					DomainName:       "domain.com",
+					RecordName:       "domain.com",
+					RecordType:       "CNAME",
+					RecordValue:      "BlahBlahBlah",
+					ValidationStatus: "PENDING_VALIDATION",
+				}
 
-			certsManager := &utilsmocks.FakeCertificateManager{}
-			manager := models.NewManager(
-				lager.NewLogger(""),
-				&utils.Distribution{},
-				config.Settings{},
-				&models.RouteStore{},
-				certsManager,
-			)
+				certsManager.GetDomainValidationChallengesReturns([]utils.DomainValidationChallenge{domainValidationChallenge}, nil)
 
-			domainValidationChallenge := utils.DomainValidationChallenge{
-				DomainName:       "domain.com",
-				RecordName:       "domain.com",
-				RecordType:       "CNAME",
-				RecordValue:      "BlahBlahBlah",
-				ValidationStatus: "PENDING_VALIDATION",
-			}
+				_, err := manager.GetDNSChallenges(&route, false)
 
-			certsManager.GetDomainValidationChallengesReturns([]utils.DomainValidationChallenge{domainValidationChallenge}, nil)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(certsManager.GetDomainValidationChallengesCallCount()).To(Equal(2))
 
-			route := &models.Route{
-				InstanceId:     "instanceID",
-				State:          models.Provisioning,
-				DomainExternal: "domain.com",
-				Origin:         "origin.com",
-				Path:           "",
-				DefaultTTL:     600,
-				InsecureOrigin: false,
-				Certificates: []models.Certificate{
-					{
-						CertificateArn:    "arn:aws:acm:::foo",
-						CertificateStatus: models.CertificateStatusValidating,
-					},
-				},
-			}
+				requestedArns := []string{}
+				for i := 0; i < certsManager.GetDomainValidationChallengesCallCount(); i++ {
+					requestedArns = append(requestedArns, certsManager.GetDomainValidationChallengesArgsForCall(i))
+				}
 
-			instructions, err := manager.GetDNSInstructions(route)
-
-			Expect(certsManager.GetDomainValidationChallengesCallCount()).To(Equal(1))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(instructions).NotTo(BeNil())
-
+				Expect(requestedArns).To(ContainElements(attachedCert.CertificateArn, validatingCert.CertificateArn))
+			})
 		})
 	})
 })

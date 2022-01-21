@@ -3,16 +3,17 @@ package models
 import (
 	"code.cloudfoundry.org/lager"
 	"errors"
-	"fmt"
 	"github.com/alphagov/paas-cdn-broker/config"
 	"github.com/alphagov/paas-cdn-broker/utils"
 	"github.com/aws/aws-sdk-go/service/acm"
+	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"github.com/jinzhu/gorm"
-	"github.com/pivotal-cf/brokerapi"
+	"github.com/pivotal-cf/brokerapi/v8"
 	"strings"
 	"time"
 )
 
+//counterfeiter:generate -o mocks/RouteManagerIface.go --fake-name RouteManagerIface route_manager.go RouteManagerIface
 type RouteManagerIface interface {
 	Create(
 		instanceId string,
@@ -40,7 +41,9 @@ type RouteManagerIface interface {
 
 	DeleteOrphanedCerts()
 
-	GetDNSInstructions(route *Route) ([]string, error)
+	GetDNSChallenges(route *Route, onlyValidatingCertificates bool) ([]utils.DomainValidationChallenge, error)
+
+	GetCDNConfiguration(route *Route) (*cloudfront.Distribution, error)
 }
 
 type RouteManager struct {
@@ -317,7 +320,7 @@ func (m *RouteManager) CheckRoutesToUpdate() {
 	for _, route := range routes {
 		loopLog := lsession.WithData(lager.Data{
 			"instance-id": route.InstanceId,
-			"domains": route.GetDomains(),
+			"domains":     route.GetDomains(),
 		})
 
 		loopLog.Info("check")
@@ -370,65 +373,50 @@ func (m *RouteManager) CheckRoutesToUpdate() {
 	}
 }
 
-// ACM certs challenges are aquired dynamically via an API call
-func (m *RouteManager) GetDNSInstructions(route *Route) ([]string, error) {
-	var instructions []string
-
+func (m *RouteManager) GetDNSChallenges(route *Route, onlyValidatingCertificates bool) ([]utils.DomainValidationChallenge, error) {
 	lsession := m.logger.Session("get-dns-instructions", lager.Data{
-		"instance-id": route.InstanceId,
-		"domains":     route.GetDomains(),
+		"instance-id":               route.InstanceId,
+		"domains":                   route.GetDomains(),
+		"only-get-validating-certs": onlyValidatingCertificates,
 	})
 
-	validatingCert, _ := findValidatingAndAttachedCerts(route)
+	validatingCert, attachedCert := findValidatingAndAttachedCerts(route)
 
-	if validatingCert == nil {
-		err := errors.New("couldn't find the most recent validating certificate")
-		lsession.Error("missing-validating-certificate", err)
-		return nil, err
-	}
+	certArnsToRequest := []string{}
 
-	lsession.Info("certsmanager-get-validation-challenges")
-	validationChallenges, err := m.certsManager.GetDomainValidationChallenges(validatingCert.CertificateArn)
-	if err != nil {
-		lsession.Error("certsmanager-get-validation-challenges", err)
-		return []string{}, err
-	}
+	if onlyValidatingCertificates {
+		if validatingCert == nil {
+			err := errors.New("couldn't find the most recent validating certificate")
+			lsession.Error("missing-validating-certificate", err)
+			return nil, err
+		}
 
-	for _, e := range validationChallenges {
+		certArnsToRequest = append(certArnsToRequest, validatingCert.CertificateArn)
+	} else {
+		if validatingCert != nil {
+			certArnsToRequest = append(certArnsToRequest, validatingCert.CertificateArn)
+		}
 
-		if e.RecordName == "" {
-			instructions = append(instructions, fmt.Sprintf(
-				"Awaiting challenges for %s",
-				e.DomainName,
-			))
-		} else {
-			// Keep the new lines in this format
-			format := `
-
-For domain %s, set DNS record
-    Name:  %s
-    Type:  %s
-    Value: %s
-    TTL:   %d
-
-Current validation status of %s: %s
-
-`
-			instructions = append(instructions, fmt.Sprintf(
-				format,
-				e.DomainName,
-				e.RecordName,
-				e.RecordType,
-				strings.Trim(e.RecordValue, " "),
-				route.DefaultTTL,
-				e.DomainName,
-				e.ValidationStatus,
-			))
+		if attachedCert != nil {
+			certArnsToRequest = append(certArnsToRequest, attachedCert.CertificateArn)
 		}
 	}
 
+	validationChallenges := []utils.DomainValidationChallenge{}
+
+	for _, arn := range certArnsToRequest {
+		lsession.Info("certsmanager-get-validation-challenges", lager.Data{"certificate-arn": arn})
+		challenges, err := m.certsManager.GetDomainValidationChallenges(arn)
+		if err != nil {
+			lsession.Error("certsmanager-get-validation-challenges", err, lager.Data{"certificate-arn": arn})
+			return nil, err
+		}
+
+		validationChallenges = append(validationChallenges, challenges...)
+	}
+
 	lsession.Info("finished")
-	return instructions, nil
+	return validationChallenges, nil
 }
 
 func (m *RouteManager) GetCurrentlyDeployedDomains(r *Route) ([]string, error) {
@@ -450,6 +438,10 @@ func (m *RouteManager) GetCurrentlyDeployedDomains(r *Route) ([]string, error) {
 
 	lsession.Info("finished")
 	return deployedDomains, nil
+}
+
+func (m *RouteManager) GetCDNConfiguration(route *Route) (*cloudfront.Distribution, error) {
+	return m.cloudFront.Get(route.DistId)
 }
 
 func (m *RouteManager) deleteOrphanedACMCerts() {
@@ -538,8 +530,8 @@ func (m *RouteManager) fetchRoutesToUpdate(lsession lager.Logger) ([]Route, erro
 func (m *RouteManager) updateProvisioning(r *Route) error {
 	lsession := m.logger.Session("route-manager-update-provisioning", lager.Data{
 		"instance-id": r.InstanceId,
-		"domains": r.GetDomains(),
-		"state": r.State,
+		"domains":     r.GetDomains(),
+		"state":       r.State,
 	})
 
 	lsession.Info("check-distribution")
@@ -643,8 +635,8 @@ func findValidatingAndAttachedCerts(r *Route) (*Certificate, *Certificate) {
 func (m *RouteManager) updateDeprovisioning(r *Route) error {
 	lsession := m.logger.Session("route-manager-update-deprovisioning", lager.Data{
 		"instance-id": r.InstanceId,
-		"domains": r.GetDomains(),
-		"state": r.State,
+		"domains":     r.GetDomains(),
+		"state":       r.State,
 	})
 
 	lsession.Info("cloudfront-delete")

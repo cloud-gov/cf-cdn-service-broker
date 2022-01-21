@@ -43,14 +43,14 @@ type CertificateDetails struct {
 }
 
 type DomainValidationChallenge struct {
-	DomainName string
+	DomainName string `json:"validating_domain_name"`
 
-	RecordName string
+	RecordName string `json:"challenge_dns_record"`
 	// RecordType can be only of CNAME type
 	// const acm.RecordTypeCname represents that
-	RecordType string
+	RecordType string `json:"challenges_dns_record_type"`
 
-	RecordValue string
+	RecordValue string `json:"challenges_dns_record_value"`
 	// The validation status of the domain name. This can be one of the following
 	// values:
 	//
@@ -59,7 +59,7 @@ type DomainValidationChallenge struct {
 	//    * SUCCESS
 	//
 	//    * FAILED
-	ValidationStatus string
+	ValidationStatus string `json:"status"`
 }
 
 type CertificateManager struct {

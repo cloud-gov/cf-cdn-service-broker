@@ -3,14 +3,14 @@ package broker_test
 import (
 	"context"
 	"errors"
+	"github.com/alphagov/paas-cdn-broker/utils"
+	"github.com/pivotal-cf/brokerapi/v8/domain"
 	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/suite"
 
 	"code.cloudfoundry.org/lager"
-	"github.com/pivotal-cf/brokerapi"
-
 	"github.com/alphagov/paas-cdn-broker/broker"
 	cfmock "github.com/alphagov/paas-cdn-broker/cf/mocks"
 	"github.com/alphagov/paas-cdn-broker/config"
@@ -49,7 +49,7 @@ var _ = Describe("Last operation", func() {
 
 	It("Should fail when the routes are missing", func() {
 		manager := mocks.RouteManagerIface{}
-		manager.On("Get", "").Return(&models.Route{}, errors.New("not found"))
+		manager.GetReturns(&models.Route{}, errors.New("not found"))
 		b := broker.New(
 			&manager,
 			&s.cfclient,
@@ -57,8 +57,8 @@ var _ = Describe("Last operation", func() {
 			s.logger,
 		)
 
-		operation, err := b.LastOperation(s.ctx, "", brokerapi.PollDetails{OperationData: ""})
-		Expect(operation.State).To(Equal(brokerapi.Failed))
+		operation, err := b.LastOperation(s.ctx, "", domain.PollDetails{OperationData: ""})
+		Expect(operation.State).To(Equal(domain.Failed))
 		Expect(operation.Description).To(Equal("Service instance not found"))
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -71,7 +71,7 @@ var _ = Describe("Last operation", func() {
 			DomainInternal: "abc.cloudfront.net",
 			Origin:         "cdn.apps.cloud.gov",
 		}
-		manager.On("Get", "123").Return(route, nil)
+		manager.GetReturns(route, nil)
 		b := broker.New(
 			&manager,
 			&s.cfclient,
@@ -79,8 +79,8 @@ var _ = Describe("Last operation", func() {
 			s.logger,
 		)
 
-		operation, err := b.LastOperation(s.ctx, "123", brokerapi.PollDetails{OperationData: ""})
-		Expect(operation.State).To(Equal(brokerapi.Succeeded))
+		operation, err := b.LastOperation(s.ctx, "123", domain.PollDetails{OperationData: ""})
+		Expect(operation.State).To(Equal(domain.Succeeded))
 		Expect(operation.Description).To(ContainSubstring("Service instance provisioned [cdn.cloud.gov => cdn.apps.cloud.gov]; CDN domain abc.cloudfront.net"))
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -96,8 +96,16 @@ var _ = Describe("Last operation", func() {
 				CreatedAt: time.Now().Add(-5 * time.Minute),
 			},
 		}
-		manager.On("Get", "123").Return(route, nil)
-		manager.On("GetDNSInstructions", route).Return([]string{"token"}, nil)
+		manager.GetReturns(route, nil)
+		manager.GetDNSChallengesReturns([]utils.DomainValidationChallenge{
+			{
+				DomainName:       "cdn.cloud.gov",
+				RecordName:       "_validation.cdn.cloud,gov",
+				RecordType:       "CNAME",
+				RecordValue:      "abc123",
+				ValidationStatus: "PENDING",
+			},
+		}, nil)
 		b := broker.New(
 			&manager,
 			&s.cfclient,
@@ -105,8 +113,8 @@ var _ = Describe("Last operation", func() {
 			s.logger,
 		)
 
-		operation, err := b.LastOperation(s.ctx, "123", brokerapi.PollDetails{OperationData: ""})
-		Expect(operation.State).To(Equal(brokerapi.InProgress))
+		operation, err := b.LastOperation(s.ctx, "123", domain.PollDetails{OperationData: ""})
+		Expect(operation.State).To(Equal(domain.InProgress))
 		Expect(operation.Description).To(ContainSubstring("Provisioning in progress"))
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -122,8 +130,16 @@ var _ = Describe("Last operation", func() {
 				CreatedAt: time.Now().Add(-5 * time.Minute),
 			},
 		}
-		manager.On("Get", "123").Return(route, nil)
-		manager.On("GetDNSInstructions", route).Return([]string{"token"}, nil)
+		manager.GetReturns(route, nil)
+		manager.GetDNSChallengesReturns([]utils.DomainValidationChallenge{
+			{
+				DomainName:       "cdn.cloud.gov",
+				RecordName:       "_validation.cdn.cloud,gov",
+				RecordType:       "CNAME",
+				RecordValue:      "abc123",
+				ValidationStatus: "PENDING",
+			},
+		}, nil)
 		b := broker.New(
 			&manager,
 			&s.cfclient,
@@ -131,8 +147,8 @@ var _ = Describe("Last operation", func() {
 			s.logger,
 		)
 
-		operation, err := b.LastOperation(s.ctx, "123", brokerapi.PollDetails{OperationData: ""})
-		Expect(operation.State).To(Equal(brokerapi.Failed))
+		operation, err := b.LastOperation(s.ctx, "123", domain.PollDetails{OperationData: ""})
+		Expect(operation.State).To(Equal(domain.Failed))
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -147,8 +163,16 @@ var _ = Describe("Last operation", func() {
 				CreatedAt: time.Now().Add(-5 * time.Minute),
 			},
 		}
-		manager.On("Get", "123").Return(route, nil)
-		manager.On("GetDNSInstructions", route).Return([]string{"token"}, nil)
+		manager.GetReturns(route, nil)
+		manager.GetDNSChallengesReturns([]utils.DomainValidationChallenge{
+			{
+				DomainName:       "cdn.cloud.gov",
+				RecordName:       "_validation.cdn.cloud,gov",
+				RecordType:       "CNAME",
+				RecordValue:      "abc123",
+				ValidationStatus: "PENDING",
+			},
+		}, nil)
 		b := broker.New(
 			&manager,
 			&s.cfclient,
@@ -156,8 +180,8 @@ var _ = Describe("Last operation", func() {
 			s.logger,
 		)
 
-		operation, err := b.LastOperation(s.ctx, "123", brokerapi.PollDetails{OperationData: ""})
-		Expect(operation.State).To(Equal(brokerapi.Failed))
+		operation, err := b.LastOperation(s.ctx, "123", domain.PollDetails{OperationData: ""})
+		Expect(operation.State).To(Equal(domain.Failed))
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -169,7 +193,7 @@ var _ = Describe("Last operation", func() {
 			DomainInternal: "abc.cloudfront.net",
 			Origin:         "cdn.apps.cloud.gov",
 		}
-		manager.On("Get", "123").Return(route, nil)
+		manager.GetReturns(route, nil)
 		b := broker.New(
 			&manager,
 			&s.cfclient,
@@ -177,8 +201,8 @@ var _ = Describe("Last operation", func() {
 			s.logger,
 		)
 
-		operation, err := b.LastOperation(s.ctx, "123", brokerapi.PollDetails{OperationData: ""})
-		Expect(operation.State).To(Equal(brokerapi.InProgress))
+		operation, err := b.LastOperation(s.ctx, "123", domain.PollDetails{OperationData: ""})
+		Expect(operation.State).To(Equal(domain.InProgress))
 		Expect(operation.Description).To(Equal("Deprovisioning in progress [cdn.cloud.gov => cdn.apps.cloud.gov]; CDN domain abc.cloudfront.net"))
 		Expect(err).NotTo(HaveOccurred())
 	})

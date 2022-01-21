@@ -7,7 +7,7 @@ import (
 	"code.cloudfoundry.org/lager"
 	"github.com/alphagov/paas-cdn-broker/broker"
 	"github.com/alphagov/paas-cdn-broker/config"
-	"github.com/pivotal-cf/brokerapi"
+	"github.com/pivotal-cf/brokerapi/v8"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
