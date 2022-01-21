@@ -4,14 +4,13 @@ import (
 	"context"
 	"errors"
 	"github.com/alphagov/paas-cdn-broker/utils"
+	"github.com/pivotal-cf/brokerapi/v8/domain"
 	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/suite"
 
 	"code.cloudfoundry.org/lager"
-	"github.com/pivotal-cf/brokerapi"
-
 	"github.com/alphagov/paas-cdn-broker/broker"
 	cfmock "github.com/alphagov/paas-cdn-broker/cf/mocks"
 	"github.com/alphagov/paas-cdn-broker/config"
@@ -58,8 +57,8 @@ var _ = Describe("Last operation", func() {
 			s.logger,
 		)
 
-		operation, err := b.LastOperation(s.ctx, "", brokerapi.PollDetails{OperationData: ""})
-		Expect(operation.State).To(Equal(brokerapi.Failed))
+		operation, err := b.LastOperation(s.ctx, "", domain.PollDetails{OperationData: ""})
+		Expect(operation.State).To(Equal(domain.Failed))
 		Expect(operation.Description).To(Equal("Service instance not found"))
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -80,8 +79,8 @@ var _ = Describe("Last operation", func() {
 			s.logger,
 		)
 
-		operation, err := b.LastOperation(s.ctx, "123", brokerapi.PollDetails{OperationData: ""})
-		Expect(operation.State).To(Equal(brokerapi.Succeeded))
+		operation, err := b.LastOperation(s.ctx, "123", domain.PollDetails{OperationData: ""})
+		Expect(operation.State).To(Equal(domain.Succeeded))
 		Expect(operation.Description).To(ContainSubstring("Service instance provisioned [cdn.cloud.gov => cdn.apps.cloud.gov]; CDN domain abc.cloudfront.net"))
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -114,8 +113,8 @@ var _ = Describe("Last operation", func() {
 			s.logger,
 		)
 
-		operation, err := b.LastOperation(s.ctx, "123", brokerapi.PollDetails{OperationData: ""})
-		Expect(operation.State).To(Equal(brokerapi.InProgress))
+		operation, err := b.LastOperation(s.ctx, "123", domain.PollDetails{OperationData: ""})
+		Expect(operation.State).To(Equal(domain.InProgress))
 		Expect(operation.Description).To(ContainSubstring("Provisioning in progress"))
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -148,8 +147,8 @@ var _ = Describe("Last operation", func() {
 			s.logger,
 		)
 
-		operation, err := b.LastOperation(s.ctx, "123", brokerapi.PollDetails{OperationData: ""})
-		Expect(operation.State).To(Equal(brokerapi.Failed))
+		operation, err := b.LastOperation(s.ctx, "123", domain.PollDetails{OperationData: ""})
+		Expect(operation.State).To(Equal(domain.Failed))
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -181,8 +180,8 @@ var _ = Describe("Last operation", func() {
 			s.logger,
 		)
 
-		operation, err := b.LastOperation(s.ctx, "123", brokerapi.PollDetails{OperationData: ""})
-		Expect(operation.State).To(Equal(brokerapi.Failed))
+		operation, err := b.LastOperation(s.ctx, "123", domain.PollDetails{OperationData: ""})
+		Expect(operation.State).To(Equal(domain.Failed))
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -202,8 +201,8 @@ var _ = Describe("Last operation", func() {
 			s.logger,
 		)
 
-		operation, err := b.LastOperation(s.ctx, "123", brokerapi.PollDetails{OperationData: ""})
-		Expect(operation.State).To(Equal(brokerapi.InProgress))
+		operation, err := b.LastOperation(s.ctx, "123", domain.PollDetails{OperationData: ""})
+		Expect(operation.State).To(Equal(domain.InProgress))
 		Expect(operation.Description).To(Equal("Deprovisioning in progress [cdn.cloud.gov => cdn.apps.cloud.gov]; CDN domain abc.cloudfront.net"))
 		Expect(err).NotTo(HaveOccurred())
 	})

@@ -59,9 +59,10 @@ func (c *ACM) AddTagsToCertificateRequest(input *AddTagsToCertificateInput) (req
 // AddTagsToCertificate API operation for AWS Certificate Manager.
 //
 // Adds one or more tags to an ACM certificate. Tags are labels that you can
-// use to identify and organize your AWS resources. Each tag consists of a key
-// and an optional value. You specify the certificate on input by its Amazon
-// Resource Name (ARN). You specify the tag by using a key-value pair.
+// use to identify and organize your Amazon Web Services resources. Each tag
+// consists of a key and an optional value. You specify the certificate on input
+// by its Amazon Resource Name (ARN). You specify the tag by using a key-value
+// pair.
 //
 // You can apply a tag to just one certificate if you want to identify a specific
 // characteristic of that certificate, or you can apply the same tag to multiple
@@ -177,12 +178,12 @@ func (c *ACM) DeleteCertificateRequest(input *DeleteCertificateInput) (req *requ
 // Deletes a certificate and its associated private key. If this action succeeds,
 // the certificate no longer appears in the list that can be displayed by calling
 // the ListCertificates action or be retrieved by calling the GetCertificate
-// action. The certificate will not be available for use by AWS services integrated
-// with ACM.
+// action. The certificate will not be available for use by Amazon Web Services
+// services integrated with ACM.
 //
-// You cannot delete an ACM certificate that is being used by another AWS service.
-// To delete a certificate that is in use, the certificate association must
-// first be removed.
+// You cannot delete an ACM certificate that is being used by another Amazon
+// Web Services service. To delete a certificate that is in use, the certificate
+// association must first be removed.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -197,8 +198,8 @@ func (c *ACM) DeleteCertificateRequest(input *DeleteCertificateInput) (req *requ
 //   caller's account cannot be found.
 //
 //   * ResourceInUseException
-//   The certificate is in use by another AWS service in the caller's account.
-//   Remove the association and try again.
+//   The certificate is in use by another Amazon Web Services service in the caller's
+//   account. Remove the association and try again.
 //
 //   * InvalidArnException
 //   The requested Amazon Resource Name (ARN) does not refer to an existing resource.
@@ -446,7 +447,8 @@ func (c *ACM) GetAccountConfigurationRequest(input *GetAccountConfigurationInput
 
 // GetAccountConfiguration API operation for AWS Certificate Manager.
 //
-// Returns the account configuration options associated with an AWS account.
+// Returns the account configuration options associated with an Amazon Web Services
+// account.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -619,14 +621,15 @@ func (c *ACM) ImportCertificateRequest(input *ImportCertificateInput) (req *requ
 
 // ImportCertificate API operation for AWS Certificate Manager.
 //
-// Imports a certificate into AWS Certificate Manager (ACM) to use with services
-// that are integrated with ACM. Note that integrated services (https://docs.aws.amazon.com/acm/latest/userguide/acm-services.html)
-// allow only certificate types and keys they support to be associated with
-// their resources. Further, their support differs depending on whether the
-// certificate is imported into IAM or into ACM. For more information, see the
-// documentation for each service. For more information about importing certificates
-// into ACM, see Importing Certificates (https://docs.aws.amazon.com/acm/latest/userguide/import-certificate.html)
-// in the AWS Certificate Manager User Guide.
+// Imports a certificate into Amazon Web Services Certificate Manager (ACM)
+// to use with services that are integrated with ACM. Note that integrated services
+// (https://docs.aws.amazon.com/acm/latest/userguide/acm-services.html) allow
+// only certificate types and keys they support to be associated with their
+// resources. Further, their support differs depending on whether the certificate
+// is imported into IAM or into ACM. For more information, see the documentation
+// for each service. For more information about importing certificates into
+// ACM, see Importing Certificates (https://docs.aws.amazon.com/acm/latest/userguide/import-certificate.html)
+// in the Amazon Web Services Certificate Manager User Guide.
 //
 // ACM does not provide managed renewal (https://docs.aws.amazon.com/acm/latest/userguide/acm-renewal.html)
 // for certificates that you import.
@@ -1018,7 +1021,8 @@ func (c *ACM) PutAccountConfigurationRequest(input *PutAccountConfigurationInput
 //
 // Returned Error Types:
 //   * ValidationException
-//   The supplied input failed to satisfy constraints of an AWS service.
+//   The supplied input failed to satisfy constraints of an Amazon Web Services
+//   service.
 //
 //   * ThrottlingException
 //   The request was denied because it exceeded a quota.
@@ -1289,10 +1293,10 @@ func (c *ACM) RequestCertificateRequest(input *RequestCertificateInput) (req *re
 
 // RequestCertificate API operation for AWS Certificate Manager.
 //
-// Requests an ACM certificate for use with other AWS services. To request an
-// ACM certificate, you must specify a fully qualified domain name (FQDN) in
-// the DomainName parameter. You can also specify additional FQDNs in the SubjectAlternativeNames
-// parameter.
+// Requests an ACM certificate for use with other Amazon Web Services services.
+// To request an ACM certificate, you must specify a fully qualified domain
+// name (FQDN) in the DomainName parameter. You can also specify additional
+// FQDNs in the SubjectAlternativeNames parameter.
 //
 // If you are requesting a private certificate, domain validation is not required.
 // If you are requesting a public certificate, each domain name that you specify
@@ -1301,6 +1305,11 @@ func (c *ACM) RequestCertificateRequest(input *RequestCertificateInput) (req *re
 // or email validation (https://docs.aws.amazon.com/acm/latest/userguide/gs-acm-validate-email.html).
 // We recommend that you use DNS validation. ACM issues public certificates
 // after receiving approval from the domain owner.
+//
+// ACM behavior differs from the https://tools.ietf.org/html/rfc6125#appendix-B.2
+// (https://tools.ietf.org/html/rfc6125#appendix-B.2)RFC 6125 specification
+// of the certificate validation process. first checks for a subject alternative
+// name, and, if it finds one, ignores the common name (CN)
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -1555,12 +1564,20 @@ type AccessDeniedException struct {
 	Message_ *string `locationName:"Message" type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s AccessDeniedException) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s AccessDeniedException) GoString() string {
 	return s.String()
 }
@@ -1622,12 +1639,20 @@ type AddTagsToCertificateInput struct {
 	Tags []*Tag `min:"1" type:"list" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s AddTagsToCertificateInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s AddTagsToCertificateInput) GoString() string {
 	return s.String()
 }
@@ -1680,12 +1705,20 @@ type AddTagsToCertificateOutput struct {
 	_ struct{} `type:"structure"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s AddTagsToCertificateOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s AddTagsToCertificateOutput) GoString() string {
 	return s.String()
 }
@@ -1697,7 +1730,7 @@ type CertificateDetail struct {
 
 	// The Amazon Resource Name (ARN) of the certificate. For more information about
 	// ARNs, see Amazon Resource Names (ARNs) (https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html)
-	// in the AWS General Reference.
+	// in the Amazon Web Services General Reference.
 	CertificateArn *string `min:"20" type:"string"`
 
 	// The Amazon Resource Name (ARN) of the ACM PCA private certificate authority
@@ -1726,15 +1759,15 @@ type CertificateDetail struct {
 	// The reason the certificate request failed. This value exists only when the
 	// certificate status is FAILED. For more information, see Certificate Request
 	// Failed (https://docs.aws.amazon.com/acm/latest/userguide/troubleshooting.html#troubleshooting-failed)
-	// in the AWS Certificate Manager User Guide.
+	// in the Amazon Web Services Certificate Manager User Guide.
 	FailureReason *string `type:"string" enum:"FailureReason"`
 
 	// The date and time at which the certificate was imported. This value exists
 	// only when the certificate type is IMPORTED.
 	ImportedAt *time.Time `type:"timestamp"`
 
-	// A list of ARNs for the AWS resources that are using the certificate. A certificate
-	// can be used by multiple AWS resources.
+	// A list of ARNs for the Amazon Web Services resources that are using the certificate.
+	// A certificate can be used by multiple Amazon Web Services resources.
 	InUseBy []*string `type:"list"`
 
 	// The time at which the certificate was issued. This value exists only when
@@ -1810,16 +1843,24 @@ type CertificateDetail struct {
 	// for imported certificates. For more information about the differences between
 	// certificates that you import and those that ACM provides, see Importing Certificates
 	// (https://docs.aws.amazon.com/acm/latest/userguide/import-certificate.html)
-	// in the AWS Certificate Manager User Guide.
+	// in the Amazon Web Services Certificate Manager User Guide.
 	Type *string `type:"string" enum:"CertificateType"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s CertificateDetail) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s CertificateDetail) GoString() string {
 	return s.String()
 }
@@ -1995,12 +2036,20 @@ type CertificateOptions struct {
 	CertificateTransparencyLoggingPreference *string `type:"string" enum:"CertificateTransparencyLoggingPreference"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s CertificateOptions) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s CertificateOptions) GoString() string {
 	return s.String()
 }
@@ -2027,12 +2076,20 @@ type CertificateSummary struct {
 	DomainName *string `min:"1" type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s CertificateSummary) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s CertificateSummary) GoString() string {
 	return s.String()
 }
@@ -2058,12 +2115,20 @@ type ConflictException struct {
 	Message_ *string `locationName:"message" type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ConflictException) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ConflictException) GoString() string {
 	return s.String()
 }
@@ -2120,12 +2185,20 @@ type DeleteCertificateInput struct {
 	CertificateArn *string `min:"20" type:"string" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DeleteCertificateInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DeleteCertificateInput) GoString() string {
 	return s.String()
 }
@@ -2156,12 +2229,20 @@ type DeleteCertificateOutput struct {
 	_ struct{} `type:"structure"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DeleteCertificateOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DeleteCertificateOutput) GoString() string {
 	return s.String()
 }
@@ -2180,12 +2261,20 @@ type DescribeCertificateInput struct {
 	CertificateArn *string `min:"20" type:"string" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeCertificateInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeCertificateInput) GoString() string {
 	return s.String()
 }
@@ -2219,12 +2308,20 @@ type DescribeCertificateOutput struct {
 	Certificate *CertificateDetail `type:"structure"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeCertificateOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeCertificateOutput) GoString() string {
 	return s.String()
 }
@@ -2274,12 +2371,20 @@ type DomainValidation struct {
 	ValidationStatus *string `type:"string" enum:"DomainStatus"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DomainValidation) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DomainValidation) GoString() string {
 	return s.String()
 }
@@ -2351,12 +2456,20 @@ type DomainValidationOption struct {
 	ValidationDomain *string `min:"1" type:"string" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DomainValidationOption) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DomainValidationOption) GoString() string {
 	return s.String()
 }
@@ -2395,7 +2508,8 @@ func (s *DomainValidationOption) SetValidationDomain(v string) *DomainValidation
 	return s
 }
 
-// Object containing expiration events options associated with an AWS account.
+// Object containing expiration events options associated with an Amazon Web
+// Services account.
 type ExpiryEventsConfiguration struct {
 	_ struct{} `type:"structure"`
 
@@ -2406,12 +2520,20 @@ type ExpiryEventsConfiguration struct {
 	DaysBeforeExpiry *int64 `min:"1" type:"integer"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ExpiryEventsConfiguration) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ExpiryEventsConfiguration) GoString() string {
 	return s.String()
 }
@@ -2452,18 +2574,30 @@ type ExportCertificateInput struct {
 	//
 	// openssl rsa -in encrypted_key.pem -out decrypted_key.pem
 	//
+	// Passphrase is a sensitive parameter and its value will be
+	// replaced with "sensitive" in string returned by ExportCertificateInput's
+	// String and GoString methods.
+	//
 	// Passphrase is automatically base64 encoded/decoded by the SDK.
 	//
 	// Passphrase is a required field
 	Passphrase []byte `min:"4" type:"blob" required:"true" sensitive:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ExportCertificateInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ExportCertificateInput) GoString() string {
 	return s.String()
 }
@@ -2514,15 +2648,27 @@ type ExportCertificateOutput struct {
 
 	// The encrypted private key associated with the public key in the certificate.
 	// The key is output in PKCS #8 format and is base64 PEM-encoded.
+	//
+	// PrivateKey is a sensitive parameter and its value will be
+	// replaced with "sensitive" in string returned by ExportCertificateOutput's
+	// String and GoString methods.
 	PrivateKey *string `min:"1" type:"string" sensitive:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ExportCertificateOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ExportCertificateOutput) GoString() string {
 	return s.String()
 }
@@ -2578,12 +2724,20 @@ type ExtendedKeyUsage struct {
 	OID *string `type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ExtendedKeyUsage) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ExtendedKeyUsage) GoString() string {
 	return s.String()
 }
@@ -2620,12 +2774,20 @@ type Filters struct {
 	KeyUsage []*string `locationName:"keyUsage" type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s Filters) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s Filters) GoString() string {
 	return s.String()
 }
@@ -2652,12 +2814,20 @@ type GetAccountConfigurationInput struct {
 	_ struct{} `type:"structure"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s GetAccountConfigurationInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s GetAccountConfigurationInput) GoString() string {
 	return s.String()
 }
@@ -2665,16 +2835,25 @@ func (s GetAccountConfigurationInput) GoString() string {
 type GetAccountConfigurationOutput struct {
 	_ struct{} `type:"structure"`
 
-	// Expiration events configuration options associated with the AWS account.
+	// Expiration events configuration options associated with the Amazon Web Services
+	// account.
 	ExpiryEvents *ExpiryEventsConfiguration `type:"structure"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s GetAccountConfigurationOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s GetAccountConfigurationOutput) GoString() string {
 	return s.String()
 }
@@ -2698,12 +2877,20 @@ type GetCertificateInput struct {
 	CertificateArn *string `min:"20" type:"string" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s GetCertificateInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s GetCertificateInput) GoString() string {
 	return s.String()
 }
@@ -2742,12 +2929,20 @@ type GetCertificateOutput struct {
 	CertificateChain *string `min:"1" type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s GetCertificateOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s GetCertificateOutput) GoString() string {
 	return s.String()
 }
@@ -2768,7 +2963,6 @@ type ImportCertificateInput struct {
 	_ struct{} `type:"structure"`
 
 	// The certificate to import.
-	//
 	// Certificate is automatically base64 encoded/decoded by the SDK.
 	//
 	// Certificate is a required field
@@ -2780,11 +2974,14 @@ type ImportCertificateInput struct {
 	CertificateArn *string `min:"20" type:"string"`
 
 	// The PEM encoded certificate chain.
-	//
 	// CertificateChain is automatically base64 encoded/decoded by the SDK.
 	CertificateChain []byte `min:"1" type:"blob"`
 
 	// The private key that matches the public key in the certificate.
+	//
+	// PrivateKey is a sensitive parameter and its value will be
+	// replaced with "sensitive" in string returned by ImportCertificateInput's
+	// String and GoString methods.
 	//
 	// PrivateKey is automatically base64 encoded/decoded by the SDK.
 	//
@@ -2797,12 +2994,20 @@ type ImportCertificateInput struct {
 	Tags []*Tag `min:"1" type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ImportCertificateInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ImportCertificateInput) GoString() string {
 	return s.String()
 }
@@ -2886,12 +3091,20 @@ type ImportCertificateOutput struct {
 	CertificateArn *string `min:"20" type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ImportCertificateOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ImportCertificateOutput) GoString() string {
 	return s.String()
 }
@@ -2910,12 +3123,20 @@ type InvalidArgsException struct {
 	Message_ *string `locationName:"message" type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s InvalidArgsException) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s InvalidArgsException) GoString() string {
 	return s.String()
 }
@@ -2966,12 +3187,20 @@ type InvalidArnException struct {
 	Message_ *string `locationName:"message" type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s InvalidArnException) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s InvalidArnException) GoString() string {
 	return s.String()
 }
@@ -3022,12 +3251,20 @@ type InvalidDomainValidationOptionsException struct {
 	Message_ *string `locationName:"message" type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s InvalidDomainValidationOptionsException) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s InvalidDomainValidationOptionsException) GoString() string {
 	return s.String()
 }
@@ -3078,12 +3315,20 @@ type InvalidParameterException struct {
 	Message_ *string `locationName:"message" type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s InvalidParameterException) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s InvalidParameterException) GoString() string {
 	return s.String()
 }
@@ -3134,12 +3379,20 @@ type InvalidStateException struct {
 	Message_ *string `locationName:"message" type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s InvalidStateException) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s InvalidStateException) GoString() string {
 	return s.String()
 }
@@ -3191,12 +3444,20 @@ type InvalidTagException struct {
 	Message_ *string `locationName:"message" type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s InvalidTagException) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s InvalidTagException) GoString() string {
 	return s.String()
 }
@@ -3248,12 +3509,20 @@ type KeyUsage struct {
 	Name *string `type:"string" enum:"KeyUsageName"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s KeyUsage) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s KeyUsage) GoString() string {
 	return s.String()
 }
@@ -3272,12 +3541,20 @@ type LimitExceededException struct {
 	Message_ *string `locationName:"message" type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s LimitExceededException) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s LimitExceededException) GoString() string {
 	return s.String()
 }
@@ -3341,12 +3618,20 @@ type ListCertificatesInput struct {
 	NextToken *string `min:"1" type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ListCertificatesInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ListCertificatesInput) GoString() string {
 	return s.String()
 }
@@ -3402,12 +3687,20 @@ type ListCertificatesOutput struct {
 	NextToken *string `min:"1" type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ListCertificatesOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ListCertificatesOutput) GoString() string {
 	return s.String()
 }
@@ -3438,12 +3731,20 @@ type ListTagsForCertificateInput struct {
 	CertificateArn *string `min:"20" type:"string" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ListTagsForCertificateInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ListTagsForCertificateInput) GoString() string {
 	return s.String()
 }
@@ -3477,12 +3778,20 @@ type ListTagsForCertificateOutput struct {
 	Tags []*Tag `min:"1" type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ListTagsForCertificateOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ListTagsForCertificateOutput) GoString() string {
 	return s.String()
 }
@@ -3509,12 +3818,20 @@ type PutAccountConfigurationInput struct {
 	IdempotencyToken *string `min:"1" type:"string" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s PutAccountConfigurationInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s PutAccountConfigurationInput) GoString() string {
 	return s.String()
 }
@@ -3556,12 +3873,20 @@ type PutAccountConfigurationOutput struct {
 	_ struct{} `type:"structure"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s PutAccountConfigurationOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s PutAccountConfigurationOutput) GoString() string {
 	return s.String()
 }
@@ -3585,12 +3910,20 @@ type RemoveTagsFromCertificateInput struct {
 	Tags []*Tag `min:"1" type:"list" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RemoveTagsFromCertificateInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RemoveTagsFromCertificateInput) GoString() string {
 	return s.String()
 }
@@ -3643,12 +3976,20 @@ type RemoveTagsFromCertificateOutput struct {
 	_ struct{} `type:"structure"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RemoveTagsFromCertificateOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RemoveTagsFromCertificateOutput) GoString() string {
 	return s.String()
 }
@@ -3667,12 +4008,20 @@ type RenewCertificateInput struct {
 	CertificateArn *string `min:"20" type:"string" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RenewCertificateInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RenewCertificateInput) GoString() string {
 	return s.String()
 }
@@ -3703,12 +4052,20 @@ type RenewCertificateOutput struct {
 	_ struct{} `type:"structure"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RenewCertificateOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RenewCertificateOutput) GoString() string {
 	return s.String()
 }
@@ -3743,12 +4100,20 @@ type RenewalSummary struct {
 	UpdatedAt *time.Time `type:"timestamp" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RenewalSummary) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RenewalSummary) GoString() string {
 	return s.String()
 }
@@ -3784,8 +4149,9 @@ type RequestCertificateInput struct {
 	// that will be used to issue the certificate. If you do not provide an ARN
 	// and you are trying to request a private certificate, ACM will attempt to
 	// issue a public certificate. For more information about private CAs, see the
-	// AWS Certificate Manager Private Certificate Authority (PCA) (https://docs.aws.amazon.com/acm-pca/latest/userguide/PcaWelcome.html)
-	// user guide. The ARN must have the following form:
+	// Amazon Web Services Certificate Manager Private Certificate Authority (PCA)
+	// (https://docs.aws.amazon.com/acm-pca/latest/userguide/PcaWelcome.html) user
+	// guide. The ARN must have the following form:
 	//
 	// arn:aws:acm-pca:region:account:certificate-authority/12345678-1234-1234-1234-123456789012
 	CertificateAuthorityArn *string `min:"20" type:"string"`
@@ -3856,12 +4222,20 @@ type RequestCertificateInput struct {
 	ValidationMethod *string `type:"string" enum:"ValidationMethod"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RequestCertificateInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RequestCertificateInput) GoString() string {
 	return s.String()
 }
@@ -3975,12 +4349,20 @@ type RequestCertificateOutput struct {
 	CertificateArn *string `min:"20" type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RequestCertificateOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RequestCertificateOutput) GoString() string {
 	return s.String()
 }
@@ -4000,12 +4382,20 @@ type RequestInProgressException struct {
 	Message_ *string `locationName:"message" type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RequestInProgressException) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RequestInProgressException) GoString() string {
 	return s.String()
 }
@@ -4089,12 +4479,20 @@ type ResendValidationEmailInput struct {
 	ValidationDomain *string `min:"1" type:"string" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ResendValidationEmailInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ResendValidationEmailInput) GoString() string {
 	return s.String()
 }
@@ -4149,18 +4547,26 @@ type ResendValidationEmailOutput struct {
 	_ struct{} `type:"structure"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ResendValidationEmailOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ResendValidationEmailOutput) GoString() string {
 	return s.String()
 }
 
-// The certificate is in use by another AWS service in the caller's account.
-// Remove the association and try again.
+// The certificate is in use by another Amazon Web Services service in the caller's
+// account. Remove the association and try again.
 type ResourceInUseException struct {
 	_            struct{}                  `type:"structure"`
 	RespMetadata protocol.ResponseMetadata `json:"-" xml:"-"`
@@ -4168,12 +4574,20 @@ type ResourceInUseException struct {
 	Message_ *string `locationName:"message" type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ResourceInUseException) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ResourceInUseException) GoString() string {
 	return s.String()
 }
@@ -4225,12 +4639,20 @@ type ResourceNotFoundException struct {
 	Message_ *string `locationName:"message" type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ResourceNotFoundException) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ResourceNotFoundException) GoString() string {
 	return s.String()
 }
@@ -4273,8 +4695,8 @@ func (s *ResourceNotFoundException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
-// Contains a DNS record value that you can use to can use to validate ownership
-// or control of a domain. This is used by the DescribeCertificate action.
+// Contains a DNS record value that you can use to validate ownership or control
+// of a domain. This is used by the DescribeCertificate action.
 type ResourceRecord struct {
 	_ struct{} `type:"structure"`
 
@@ -4296,12 +4718,20 @@ type ResourceRecord struct {
 	Value *string `type:"string" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ResourceRecord) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ResourceRecord) GoString() string {
 	return s.String()
 }
@@ -4337,12 +4767,20 @@ type Tag struct {
 	Value *string `type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s Tag) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s Tag) GoString() string {
 	return s.String()
 }
@@ -4383,12 +4821,20 @@ type TagPolicyException struct {
 	Message_ *string `locationName:"message" type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s TagPolicyException) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s TagPolicyException) GoString() string {
 	return s.String()
 }
@@ -4439,12 +4885,20 @@ type ThrottlingException struct {
 	Message_ *string `locationName:"message" type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ThrottlingException) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ThrottlingException) GoString() string {
 	return s.String()
 }
@@ -4495,12 +4949,20 @@ type TooManyTagsException struct {
 	Message_ *string `locationName:"message" type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s TooManyTagsException) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s TooManyTagsException) GoString() string {
 	return s.String()
 }
@@ -4563,12 +5025,20 @@ type UpdateCertificateOptionsInput struct {
 	Options *CertificateOptions `type:"structure" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s UpdateCertificateOptionsInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s UpdateCertificateOptionsInput) GoString() string {
 	return s.String()
 }
@@ -4608,17 +5078,26 @@ type UpdateCertificateOptionsOutput struct {
 	_ struct{} `type:"structure"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s UpdateCertificateOptionsOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s UpdateCertificateOptionsOutput) GoString() string {
 	return s.String()
 }
 
-// The supplied input failed to satisfy constraints of an AWS service.
+// The supplied input failed to satisfy constraints of an Amazon Web Services
+// service.
 type ValidationException struct {
 	_            struct{}                  `type:"structure"`
 	RespMetadata protocol.ResponseMetadata `json:"-" xml:"-"`
@@ -4626,12 +5105,20 @@ type ValidationException struct {
 	Message_ *string `locationName:"message" type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ValidationException) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ValidationException) GoString() string {
 	return s.String()
 }
@@ -4899,11 +5386,14 @@ func FailureReason_Values() []string {
 }
 
 const (
+	// KeyAlgorithmRsa1024 is a KeyAlgorithm enum value
+	KeyAlgorithmRsa1024 = "RSA_1024"
+
 	// KeyAlgorithmRsa2048 is a KeyAlgorithm enum value
 	KeyAlgorithmRsa2048 = "RSA_2048"
 
-	// KeyAlgorithmRsa1024 is a KeyAlgorithm enum value
-	KeyAlgorithmRsa1024 = "RSA_1024"
+	// KeyAlgorithmRsa3072 is a KeyAlgorithm enum value
+	KeyAlgorithmRsa3072 = "RSA_3072"
 
 	// KeyAlgorithmRsa4096 is a KeyAlgorithm enum value
 	KeyAlgorithmRsa4096 = "RSA_4096"
@@ -4921,8 +5411,9 @@ const (
 // KeyAlgorithm_Values returns all elements of the KeyAlgorithm enum
 func KeyAlgorithm_Values() []string {
 	return []string{
-		KeyAlgorithmRsa2048,
 		KeyAlgorithmRsa1024,
+		KeyAlgorithmRsa2048,
+		KeyAlgorithmRsa3072,
 		KeyAlgorithmRsa4096,
 		KeyAlgorithmEcPrime256v1,
 		KeyAlgorithmEcSecp384r1,

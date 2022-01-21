@@ -8,7 +8,8 @@ import (
 	"github.com/alphagov/paas-cdn-broker/utils"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
-	"github.com/pivotal-cf/brokerapi"
+	"github.com/pivotal-cf/brokerapi/v8/domain"
+	"github.com/pivotal-cf/brokerapi/v8/domain/apiresponses"
 	"github.com/stretchr/testify/suite"
 
 	"code.cloudfoundry.org/lager"
@@ -54,11 +55,11 @@ var _ = Describe("GetInstance", func() {
 
 	It("should error when the instance can't be found", func() {
 		instanceId := "some-instance-id"
-		s.Manager.GetReturns(nil, brokerapi.ErrInstanceDoesNotExist)
+		s.Manager.GetReturns(nil, apiresponses.ErrInstanceDoesNotExist)
 
-		_, err := s.Broker.GetInstance(s.ctx, instanceId)
+		_, err := s.Broker.GetInstance(s.ctx, instanceId, domain.FetchInstanceDetails{})
 		Expect(err).To(HaveOccurred())
-		Expect(err).To(MatchError(brokerapi.ErrInstanceDoesNotExist))
+		Expect(err).To(MatchError(apiresponses.ErrInstanceDoesNotExist))
 	})
 
 	It("should error when the DNS challenges can't be found", func() {
@@ -66,7 +67,7 @@ var _ = Describe("GetInstance", func() {
 		s.Manager.GetReturns(&models.Route{}, nil)
 		s.Manager.GetDNSChallengesReturns(nil, fmt.Errorf("can't get DNS challenges"))
 
-		_, err := s.Broker.GetInstance(s.ctx, instanceId)
+		_, err := s.Broker.GetInstance(s.ctx, instanceId, domain.FetchInstanceDetails{})
 		Expect(err).To(HaveOccurred())
 	})
 
@@ -139,7 +140,7 @@ var _ = Describe("GetInstance", func() {
 		})
 
 		It("should return the CloudFront domain in the instance parameters", func() {
-			instance, err := s.Broker.GetInstance(s.ctx, instanceId)
+			instance, err := s.Broker.GetInstance(s.ctx, instanceId, domain.FetchInstanceDetails{})
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(instance.Parameters).ToNot(BeNil())
@@ -149,7 +150,7 @@ var _ = Describe("GetInstance", func() {
 		})
 
 		It("should return each of the DNS records that need setting in the instance parameters", func() {
-			instance, err := s.Broker.GetInstance(s.ctx, instanceId)
+			instance, err := s.Broker.GetInstance(s.ctx, instanceId, domain.FetchInstanceDetails{})
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(instance.Parameters).ToNot(BeNil())
@@ -176,7 +177,7 @@ var _ = Describe("GetInstance", func() {
 		})
 
 		It("should return the headers being forwarded in the instance parameters", func() {
-			instance, err := s.Broker.GetInstance(s.ctx, instanceId)
+			instance, err := s.Broker.GetInstance(s.ctx, instanceId, domain.FetchInstanceDetails{})
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(instance.Parameters).ToNot(BeNil())
@@ -188,7 +189,7 @@ var _ = Describe("GetInstance", func() {
 		})
 
 		It("should return the cookie forwarding configuration in the instance parameters", func() {
-			instance, err := s.Broker.GetInstance(s.ctx, instanceId)
+			instance, err := s.Broker.GetInstance(s.ctx, instanceId, domain.FetchInstanceDetails{})
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(instance.Parameters).ToNot(BeNil())
@@ -198,7 +199,7 @@ var _ = Describe("GetInstance", func() {
 		})
 
 		It("should return the TTL configuration in the instance parameters", func() {
-			instance, err := s.Broker.GetInstance(s.ctx, instanceId)
+			instance, err := s.Broker.GetInstance(s.ctx, instanceId, domain.FetchInstanceDetails{})
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(instance.Parameters).ToNot(BeNil())

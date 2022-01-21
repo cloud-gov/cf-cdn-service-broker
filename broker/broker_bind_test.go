@@ -2,10 +2,9 @@ package broker_test
 
 import (
 	"context"
+	"github.com/pivotal-cf/brokerapi/v8/domain"
 
 	"code.cloudfoundry.org/lager"
-	"github.com/pivotal-cf/brokerapi"
-
 	"github.com/alphagov/paas-cdn-broker/broker"
 	cfmock "github.com/alphagov/paas-cdn-broker/cf/mocks"
 	"github.com/alphagov/paas-cdn-broker/config"
@@ -26,7 +25,7 @@ var _ = Describe("Bind", func() {
 			},
 			lager.NewLogger("test"),
 		)
-		_, err := b.Bind(context.Background(), "", "", brokerapi.BindDetails{}, false)
+		_, err := b.Bind(context.Background(), "", "", domain.BindDetails{}, false)
 		Expect(err).To(HaveOccurred())
 	})
 
@@ -39,7 +38,7 @@ var _ = Describe("Bind", func() {
 			},
 			lager.NewLogger("test"),
 		)
-		_, err := b.Unbind(context.Background(), "", "", brokerapi.UnbindDetails{}, false)
+		_, err := b.Unbind(context.Background(), "", "", domain.UnbindDetails{}, false)
 		Expect(err).To(HaveOccurred())
 	})
 

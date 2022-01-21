@@ -4,18 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/pivotal-cf/brokerapi/v8/domain"
 
 	"github.com/stretchr/testify/suite"
 
 	"code.cloudfoundry.org/lager"
-	"github.com/cloudfoundry-community/go-cfclient"
-	"github.com/pivotal-cf/brokerapi"
-
 	"github.com/alphagov/paas-cdn-broker/broker"
 	cfmock "github.com/alphagov/paas-cdn-broker/cf/mocks"
 	"github.com/alphagov/paas-cdn-broker/config"
 	"github.com/alphagov/paas-cdn-broker/models/mocks"
 	"github.com/alphagov/paas-cdn-broker/utils"
+	"github.com/cloudfoundry-community/go-cfclient"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -59,7 +58,7 @@ var _ = Describe("Update", func() {
 	})
 
 	It("Should succeed when given only a domain", func() {
-		details := brokerapi.UpdateDetails{
+		details := domain.UpdateDetails{
 			RawParameters: json.RawMessage(`{"domain": "domain.gov"}`),
 		}
 
@@ -88,8 +87,8 @@ var _ = Describe("Update", func() {
 	})
 
 	It("Should error when Cloud Foundry domain does not exist", func() {
-		details := brokerapi.UpdateDetails{
-			PreviousValues: brokerapi.PreviousValues{
+		details := domain.UpdateDetails{
+			PreviousValues: domain.PreviousValues{
 				OrgID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
 			},
 			RawParameters: json.RawMessage(`{"domain": "domain.gov"}`),
@@ -109,7 +108,7 @@ var _ = Describe("Update", func() {
 		})
 
 		It("Should succeed when forwarding duplicated host headers", func() {
-			details := brokerapi.UpdateDetails{
+			details := domain.UpdateDetails{
 				RawParameters: json.RawMessage(`{
 			"domain": "domain.gov",
 			"headers": ["Host"]
@@ -123,7 +122,7 @@ var _ = Describe("Update", func() {
 		})
 
 		It("Should succeed when forwarding a single header", func() {
-			details := brokerapi.UpdateDetails{
+			details := domain.UpdateDetails{
 				RawParameters: json.RawMessage(`{
 			"domain": "domain.gov",
 			"headers": ["User-Agent"]
@@ -137,7 +136,7 @@ var _ = Describe("Update", func() {
 		})
 
 		It("Should succeed when forwarding wildcard headers", func() {
-			details := brokerapi.UpdateDetails{
+			details := domain.UpdateDetails{
 				RawParameters: json.RawMessage(`{
 			"domain": "domain.gov",
 			"headers": ["*"]
@@ -151,7 +150,7 @@ var _ = Describe("Update", func() {
 		})
 
 		It("Should succeed when forwarding nine headers", func() {
-			details := brokerapi.UpdateDetails{
+			details := domain.UpdateDetails{
 				RawParameters: json.RawMessage(`{
 			"domain": "domain.gov",
 			"headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"]
@@ -165,7 +164,7 @@ var _ = Describe("Update", func() {
 		})
 
 		It("Should error when specifying a specific header and also wildcard headers", func() {
-			details := brokerapi.UpdateDetails{
+			details := domain.UpdateDetails{
 				RawParameters: json.RawMessage(`{
 			"domain": "domain.gov",
 			"headers": ["*", "User-Agent"]
@@ -178,7 +177,7 @@ var _ = Describe("Update", func() {
 		})
 
 		It("Should error when forwarding ten or more headers", func() {
-			details := brokerapi.UpdateDetails{
+			details := domain.UpdateDetails{
 				RawParameters: json.RawMessage(`{
 			"domain": "domain.gov",
 			"headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"]
