@@ -8,9 +8,7 @@ import (
 	"encoding"
 	"errors"
 	"fmt"
-	"os"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -18,9 +16,6 @@ import (
 
 // ErrInvalidSpecification indicates that a specification is of the wrong type.
 var ErrInvalidSpecification = errors.New("specification must be a struct pointer")
-
-var gatherRegexp = regexp.MustCompile("([^A-Z]+|[A-Z]+[^A-Z]+|[A-Z]+)")
-var acronymRegexp = regexp.MustCompile("([A-Z]+)([A-Z][^A-Z]+)")
 
 // A ParseError occurs when an environment variable cannot be converted to
 // the type required by a struct field during assignment.
@@ -48,34 +43,22 @@ func (e *ParseError) Error() string {
 	return fmt.Sprintf("envconfig.Process: assigning %[1]s to %[2]s: converting '%[3]s' to type %[4]s. details: %[5]s", e.KeyName, e.FieldName, e.Value, e.TypeName, e.Err)
 }
 
-// varInfo maintains information about the configuration variable
-type varInfo struct {
-	Name  string
-	Alt   string
-	Key   string
-	Field reflect.Value
-	Tags  reflect.StructTag
-}
-
-// GatherInfo gathers information about the specified struct
-func gatherInfo(prefix string, spec interface{}) ([]varInfo, error) {
+// Process populates the specified struct based on environment variables
+func Process(prefix string, spec interface{}) error {
 	s := reflect.ValueOf(spec)
 
 	if s.Kind() != reflect.Ptr {
-		return nil, ErrInvalidSpecification
+		return ErrInvalidSpecification
 	}
 	s = s.Elem()
 	if s.Kind() != reflect.Struct {
-		return nil, ErrInvalidSpecification
+		return ErrInvalidSpecification
 	}
 	typeOfSpec := s.Type()
-
-	// over allocate an info array, we will extend if needed later
-	infos := make([]varInfo, 0, s.NumField())
 	for i := 0; i < s.NumField(); i++ {
 		f := s.Field(i)
 		ftype := typeOfSpec.Field(i)
-		if !f.CanSet() || isTrue(ftype.Tag.Get("ignored")) {
+		if !f.CanSet() || ftype.Tag.Get("ignored") == "true" {
 			continue
 		}
 
@@ -91,140 +74,71 @@ func gatherInfo(prefix string, spec interface{}) ([]varInfo, error) {
 			f = f.Elem()
 		}
 
-		// Capture information about the config variable
-		info := varInfo{
-			Name:  ftype.Name,
-			Field: f,
-			Tags:  ftype.Tag,
-			Alt:   strings.ToUpper(ftype.Tag.Get("envconfig")),
+		alt := ftype.Tag.Get("envconfig")
+		fieldName := ftype.Name
+		if alt != "" {
+			fieldName = alt
 		}
 
-		// Default to the field name as the env var name (will be upcased)
-		info.Key = info.Name
-
-		// Best effort to un-pick camel casing as separate words
-		if isTrue(ftype.Tag.Get("split_words")) {
-			words := gatherRegexp.FindAllStringSubmatch(ftype.Name, -1)
-			if len(words) > 0 {
-				var name []string
-				for _, words := range words {
-					if m := acronymRegexp.FindStringSubmatch(words[0]); len(m) == 3 {
-						name = append(name, m[1], m[2])
-					} else {
-						name = append(name, words[0])
-					}
-				}
-
-				info.Key = strings.Join(name, "_")
-			}
-		}
-		if info.Alt != "" {
-			info.Key = info.Alt
-		}
+		key := fieldName
 		if prefix != "" {
-			info.Key = fmt.Sprintf("%s_%s", prefix, info.Key)
+			key = fmt.Sprintf("%s_%s", prefix, key)
 		}
-		info.Key = strings.ToUpper(info.Key)
-		infos = append(infos, info)
+		key = strings.ToUpper(key)
 
 		if f.Kind() == reflect.Struct {
 			// honor Decode if present
-			if decoderFrom(f) == nil && setterFrom(f) == nil && textUnmarshaler(f) == nil && binaryUnmarshaler(f) == nil {
+			if decoderFrom(f) == nil && setterFrom(f) == nil && textUnmarshaler(f) == nil {
 				innerPrefix := prefix
 				if !ftype.Anonymous {
-					innerPrefix = info.Key
+					innerPrefix = key
 				}
 
 				embeddedPtr := f.Addr().Interface()
-				embeddedInfos, err := gatherInfo(innerPrefix, embeddedPtr)
-				if err != nil {
-					return nil, err
+				if err := Process(innerPrefix, embeddedPtr); err != nil {
+					return err
 				}
-				infos = append(infos[:len(infos)-1], embeddedInfos...)
+				f.Set(reflect.ValueOf(embeddedPtr).Elem())
 
 				continue
 			}
 		}
-	}
-	return infos, nil
-}
-
-// CheckDisallowed checks that no environment variables with the prefix are set
-// that we don't know how or want to parse. This is likely only meaningful with
-// a non-empty prefix.
-func CheckDisallowed(prefix string, spec interface{}) error {
-	infos, err := gatherInfo(prefix, spec)
-	if err != nil {
-		return err
-	}
-
-	vars := make(map[string]struct{})
-	for _, info := range infos {
-		vars[info.Key] = struct{}{}
-	}
-
-	if prefix != "" {
-		prefix = strings.ToUpper(prefix) + "_"
-	}
-
-	for _, env := range os.Environ() {
-		if !strings.HasPrefix(env, prefix) {
-			continue
-		}
-		v := strings.SplitN(env, "=", 2)[0]
-		if _, found := vars[v]; !found {
-			return fmt.Errorf("unknown environment variable %s", v)
-		}
-	}
-
-	return nil
-}
-
-// Process populates the specified struct based on environment variables
-func Process(prefix string, spec interface{}) error {
-	infos, err := gatherInfo(prefix, spec)
-
-	for _, info := range infos {
 
 		// `os.Getenv` cannot differentiate between an explicitly set empty value
 		// and an unset value. `os.LookupEnv` is preferred to `syscall.Getenv`,
 		// but it is only available in go1.5 or newer. We're using Go build tags
 		// here to use os.LookupEnv for >=go1.5
-		value, ok := lookupEnv(info.Key)
-		if !ok && info.Alt != "" {
-			value, ok = lookupEnv(info.Alt)
+		value, ok := lookupEnv(key)
+		if !ok && alt != "" {
+			key := strings.ToUpper(fieldName)
+			value, ok = lookupEnv(key)
 		}
 
-		def := info.Tags.Get("default")
+		def := ftype.Tag.Get("default")
 		if def != "" && !ok {
 			value = def
 		}
 
-		req := info.Tags.Get("required")
+		req := ftype.Tag.Get("required")
 		if !ok && def == "" {
-			if isTrue(req) {
-				key := info.Key
-				if info.Alt != "" {
-					key = info.Alt
-				}
+			if req == "true" {
 				return fmt.Errorf("required key %s missing value", key)
 			}
 			continue
 		}
 
-		err = processField(value, info.Field)
+		err := processField(value, f)
 		if err != nil {
 			return &ParseError{
-				KeyName:   info.Key,
-				FieldName: info.Name,
-				TypeName:  info.Field.Type().String(),
+				KeyName:   key,
+				FieldName: fieldName,
+				TypeName:  f.Type().String(),
 				Value:     value,
 				Err:       err,
 			}
 		}
 	}
-
-	return err
+	return nil
 }
 
 // MustProcess is the same as Process but panics if an error occurs
@@ -249,10 +163,6 @@ func processField(value string, field reflect.Value) error {
 
 	if t := textUnmarshaler(field); t != nil {
 		return t.UnmarshalText([]byte(value))
-	}
-
-	if b := binaryUnmarshaler(field); b != nil {
-		return b.UnmarshalBinary([]byte(value))
 	}
 
 	if typ.Kind() == reflect.Ptr {
@@ -302,43 +212,15 @@ func processField(value string, field reflect.Value) error {
 		}
 		field.SetFloat(val)
 	case reflect.Slice:
-		sl := reflect.MakeSlice(typ, 0, 0)
-		if typ.Elem().Kind() == reflect.Uint8 {
-			sl = reflect.ValueOf([]byte(value))
-		} else if len(strings.TrimSpace(value)) != 0 {
-			vals := strings.Split(value, ",")
-			sl = reflect.MakeSlice(typ, len(vals), len(vals))
-			for i, val := range vals {
-				err := processField(val, sl.Index(i))
-				if err != nil {
-					return err
-				}
+		vals := strings.Split(value, ",")
+		sl := reflect.MakeSlice(typ, len(vals), len(vals))
+		for i, val := range vals {
+			err := processField(val, sl.Index(i))
+			if err != nil {
+				return err
 			}
 		}
 		field.Set(sl)
-	case reflect.Map:
-		mp := reflect.MakeMap(typ)
-		if len(strings.TrimSpace(value)) != 0 {
-			pairs := strings.Split(value, ",")
-			for _, pair := range pairs {
-				kvpair := strings.Split(pair, ":")
-				if len(kvpair) != 2 {
-					return fmt.Errorf("invalid map item: %q", pair)
-				}
-				k := reflect.New(typ.Key()).Elem()
-				err := processField(kvpair[0], k)
-				if err != nil {
-					return err
-				}
-				v := reflect.New(typ.Elem()).Elem()
-				err = processField(kvpair[1], v)
-				if err != nil {
-					return err
-				}
-				mp.SetMapIndex(k, v)
-			}
-		}
-		field.Set(mp)
 	}
 
 	return nil
@@ -369,14 +251,4 @@ func setterFrom(field reflect.Value) (s Setter) {
 func textUnmarshaler(field reflect.Value) (t encoding.TextUnmarshaler) {
 	interfaceFrom(field, func(v interface{}, ok *bool) { t, *ok = v.(encoding.TextUnmarshaler) })
 	return t
-}
-
-func binaryUnmarshaler(field reflect.Value) (b encoding.BinaryUnmarshaler) {
-	interfaceFrom(field, func(v interface{}, ok *bool) { b, *ok = v.(encoding.BinaryUnmarshaler) })
-	return b
-}
-
-func isTrue(s string) bool {
-	b, _ := strconv.ParseBool(s)
-	return b
 }

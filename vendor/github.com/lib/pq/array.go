@@ -13,7 +13,7 @@ import (
 
 var typeByteSlice = reflect.TypeOf([]byte{})
 var typeDriverValuer = reflect.TypeOf((*driver.Valuer)(nil)).Elem()
-var typeSQLScanner = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
+var typeSqlScanner = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
 
 // Array returns the optimal driver.Valuer and sql.Scanner for an array or
 // slice of any dimension.
@@ -22,7 +22,7 @@ var typeSQLScanner = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
 //  db.Query(`SELECT * FROM t WHERE id = ANY($1)`, pq.Array([]int{235, 401}))
 //
 //  var x []sql.NullInt64
-//  db.QueryRow(`SELECT ARRAY[235, 401]`).Scan(pq.Array(&x))
+//  db.QueryRow('SELECT ARRAY[235, 401]').Scan(pq.Array(&x))
 //
 // Scanning multi-dimensional arrays is not supported.  Arrays where the lower
 // bound is not one (such as `[0:0]={1}') are not supported.
@@ -35,31 +35,19 @@ func Array(a interface{}) interface {
 		return (*BoolArray)(&a)
 	case []float64:
 		return (*Float64Array)(&a)
-	case []float32:
-		return (*Float32Array)(&a)
 	case []int64:
 		return (*Int64Array)(&a)
-	case []int32:
-		return (*Int32Array)(&a)
 	case []string:
 		return (*StringArray)(&a)
-	case [][]byte:
-		return (*ByteaArray)(&a)
 
 	case *[]bool:
 		return (*BoolArray)(a)
 	case *[]float64:
 		return (*Float64Array)(a)
-	case *[]float32:
-		return (*Float32Array)(a)
 	case *[]int64:
 		return (*Int64Array)(a)
-	case *[]int32:
-		return (*Int32Array)(a)
 	case *[]string:
 		return (*StringArray)(a)
-	case *[][]byte:
-		return (*ByteaArray)(a)
 	}
 
 	return GenericArray{a}
@@ -279,70 +267,6 @@ func (a Float64Array) Value() (driver.Value, error) {
 	return "{}", nil
 }
 
-// Float32Array represents a one-dimensional array of the PostgreSQL double
-// precision type.
-type Float32Array []float32
-
-// Scan implements the sql.Scanner interface.
-func (a *Float32Array) Scan(src interface{}) error {
-	switch src := src.(type) {
-	case []byte:
-		return a.scanBytes(src)
-	case string:
-		return a.scanBytes([]byte(src))
-	case nil:
-		*a = nil
-		return nil
-	}
-
-	return fmt.Errorf("pq: cannot convert %T to Float32Array", src)
-}
-
-func (a *Float32Array) scanBytes(src []byte) error {
-	elems, err := scanLinearArray(src, []byte{','}, "Float32Array")
-	if err != nil {
-		return err
-	}
-	if *a != nil && len(elems) == 0 {
-		*a = (*a)[:0]
-	} else {
-		b := make(Float32Array, len(elems))
-		for i, v := range elems {
-			var x float64
-			if x, err = strconv.ParseFloat(string(v), 32); err != nil {
-				return fmt.Errorf("pq: parsing array element index %d: %v", i, err)
-			}
-			b[i] = float32(x)
-		}
-		*a = b
-	}
-	return nil
-}
-
-// Value implements the driver.Valuer interface.
-func (a Float32Array) Value() (driver.Value, error) {
-	if a == nil {
-		return nil, nil
-	}
-
-	if n := len(a); n > 0 {
-		// There will be at least two curly brackets, N bytes of values,
-		// and N-1 bytes of delimiters.
-		b := make([]byte, 1, 1+2*n)
-		b[0] = '{'
-
-		b = strconv.AppendFloat(b, float64(a[0]), 'f', -1, 32)
-		for i := 1; i < n; i++ {
-			b = append(b, ',')
-			b = strconv.AppendFloat(b, float64(a[i]), 'f', -1, 32)
-		}
-
-		return string(append(b, '}')), nil
-	}
-
-	return "{}", nil
-}
-
 // GenericArray implements the driver.Valuer and sql.Scanner interfaces for
 // an array or slice of any dimension.
 type GenericArray struct{ A interface{} }
@@ -354,7 +278,7 @@ func (GenericArray) evaluateDestination(rt reflect.Type) (reflect.Type, func([]b
 	// TODO calculate the assign function for other types
 	// TODO repeat this section on the element type of arrays or slices (multidimensional)
 	{
-		if reflect.PtrTo(rt).Implements(typeSQLScanner) {
+		if reflect.PtrTo(rt).Implements(typeSqlScanner) {
 			// dest is always addressable because it is an element of a slice.
 			assign = func(src []byte, dest reflect.Value) (err error) {
 				ss := dest.Addr().Interface().(sql.Scanner)
@@ -559,69 +483,6 @@ func (a Int64Array) Value() (driver.Value, error) {
 	return "{}", nil
 }
 
-// Int32Array represents a one-dimensional array of the PostgreSQL integer types.
-type Int32Array []int32
-
-// Scan implements the sql.Scanner interface.
-func (a *Int32Array) Scan(src interface{}) error {
-	switch src := src.(type) {
-	case []byte:
-		return a.scanBytes(src)
-	case string:
-		return a.scanBytes([]byte(src))
-	case nil:
-		*a = nil
-		return nil
-	}
-
-	return fmt.Errorf("pq: cannot convert %T to Int32Array", src)
-}
-
-func (a *Int32Array) scanBytes(src []byte) error {
-	elems, err := scanLinearArray(src, []byte{','}, "Int32Array")
-	if err != nil {
-		return err
-	}
-	if *a != nil && len(elems) == 0 {
-		*a = (*a)[:0]
-	} else {
-		b := make(Int32Array, len(elems))
-		for i, v := range elems {
-			x, err := strconv.ParseInt(string(v), 10, 32)
-			if err != nil {
-				return fmt.Errorf("pq: parsing array element index %d: %v", i, err)
-			}
-			b[i] = int32(x)
-		}
-		*a = b
-	}
-	return nil
-}
-
-// Value implements the driver.Valuer interface.
-func (a Int32Array) Value() (driver.Value, error) {
-	if a == nil {
-		return nil, nil
-	}
-
-	if n := len(a); n > 0 {
-		// There will be at least two curly brackets, N bytes of values,
-		// and N-1 bytes of delimiters.
-		b := make([]byte, 1, 1+2*n)
-		b[0] = '{'
-
-		b = strconv.AppendInt(b, int64(a[0]), 10)
-		for i := 1; i < n; i++ {
-			b = append(b, ',')
-			b = strconv.AppendInt(b, int64(a[i]), 10)
-		}
-
-		return string(append(b, '}')), nil
-	}
-
-	return "{}", nil
-}
-
 // StringArray represents a one-dimensional array of the PostgreSQL character types.
 type StringArray []string
 
@@ -726,7 +587,7 @@ func appendArrayElement(b []byte, rv reflect.Value) ([]byte, string, error) {
 		}
 	}
 
-	var del = ","
+	var del string = ","
 	var err error
 	var iv interface{} = rv.Interface()
 

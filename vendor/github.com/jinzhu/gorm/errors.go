@@ -6,11 +6,11 @@ import (
 )
 
 var (
-	// ErrRecordNotFound returns a "record not found error". Occurs only when attempting to query the database with a struct; querying with a slice won't return this error
+	// ErrRecordNotFound record not found error, happens when haven't find any matched data when looking up with a struct
 	ErrRecordNotFound = errors.New("record not found")
-	// ErrInvalidSQL occurs when you attempt a query with invalid SQL
+	// ErrInvalidSQL invalid SQL error, happens when you passed invalid SQL
 	ErrInvalidSQL = errors.New("invalid SQL")
-	// ErrInvalidTransaction occurs when you are trying to `Commit` or `Rollback`
+	// ErrInvalidTransaction invalid transaction when you are trying to `Commit` or `Rollback`
 	ErrInvalidTransaction = errors.New("no valid transaction")
 	// ErrCantStartTransaction can't start transaction when you are trying to start one with `Begin`
 	ErrCantStartTransaction = errors.New("can't start transaction")
@@ -18,54 +18,40 @@ var (
 	ErrUnaddressable = errors.New("using unaddressable value")
 )
 
+type errorsInterface interface {
+	GetErrors() []error
+}
+
 // Errors contains all happened errors
-type Errors []error
-
-// IsRecordNotFoundError returns true if error contains a RecordNotFound error
-func IsRecordNotFoundError(err error) bool {
-	if errs, ok := err.(Errors); ok {
-		for _, err := range errs {
-			if err == ErrRecordNotFound {
-				return true
-			}
-		}
-	}
-	return err == ErrRecordNotFound
+type Errors struct {
+	errors []error
 }
 
-// GetErrors gets all errors that have occurred and returns a slice of errors (Error type)
+// GetErrors get all happened errors
 func (errs Errors) GetErrors() []error {
-	return errs
+	return errs.errors
 }
 
-// Add adds an error to a given slice of errors
-func (errs Errors) Add(newErrors ...error) Errors {
-	for _, err := range newErrors {
-		if err == nil {
-			continue
+// Add add an error
+func (errs *Errors) Add(err error) {
+	if errors, ok := err.(errorsInterface); ok {
+		for _, err := range errors.GetErrors() {
+			errs.Add(err)
 		}
-
-		if errors, ok := err.(Errors); ok {
-			errs = errs.Add(errors...)
-		} else {
-			ok = true
-			for _, e := range errs {
-				if err == e {
-					ok = false
-				}
-			}
-			if ok {
-				errs = append(errs, err)
+	} else {
+		for _, e := range errs.errors {
+			if err == e {
+				return
 			}
 		}
+		errs.errors = append(errs.errors, err)
 	}
-	return errs
 }
 
-// Error takes a slice of all errors that have occurred and returns it as a formatted string
+// Error format happened errors
 func (errs Errors) Error() string {
 	var errors = []string{}
-	for _, e := range errs {
+	for _, e := range errs.errors {
 		errors = append(errors, e.Error())
 	}
 	return strings.Join(errors, "; ")

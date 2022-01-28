@@ -22,8 +22,6 @@
 // as shorthands for vMAJOR.0.0 and vMAJOR.MINOR.0.
 package semver
 
-import "sort"
-
 // parsed returns the parsed form of a semantic version string.
 type parsed struct {
 	major      string
@@ -140,9 +138,6 @@ func Compare(v, w string) int {
 
 // Max canonicalizes its arguments and then returns the version string
 // that compares greater.
-//
-// Deprecated: use Compare instead. In most cases, returning a canonicalized
-// version is not expected or desired.
 func Max(v, w string) string {
 	v = Canonical(v)
 	w = Canonical(w)
@@ -150,24 +145,6 @@ func Max(v, w string) string {
 		return v
 	}
 	return w
-}
-
-// ByVersion implements sort.Interface for sorting semantic version strings.
-type ByVersion []string
-
-func (vs ByVersion) Len() int      { return len(vs) }
-func (vs ByVersion) Swap(i, j int) { vs[i], vs[j] = vs[j], vs[i] }
-func (vs ByVersion) Less(i, j int) bool {
-	cmp := Compare(vs[i], vs[j])
-	if cmp != 0 {
-		return cmp < 0
-	}
-	return vs[i] < vs[j]
-}
-
-// Sort sorts a list of semantic version strings using ByVersion.
-func Sort(list []string) {
-	sort.Sort(ByVersion(list))
 }
 
 func parse(v string) (p parsed, ok bool) {

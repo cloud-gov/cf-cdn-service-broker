@@ -121,7 +121,7 @@ func (b *CdnServiceBroker) LastBindingOperation(ctx context.Context, first, seco
 }
 
 func (b *CdnServiceBroker) Services(context context.Context) ([]domain.Service, error) {
-	lsession := b.logger.Session("provision")
+	lsession := b.logger.Session("services")
 	lsession.Info("start")
 
 	var service domain.Service
@@ -158,7 +158,7 @@ func (b *CdnServiceBroker) Provision(
 		return spec, apiresponses.ErrAsyncRequired
 	}
 
-	options, err := b.parseProvisionDetails(details)
+	options, err := b.parseProvisionDetails(lsession, details)
 	if err != nil {
 		lsession.Error("parse-options-err", err)
 		return spec, err
@@ -486,7 +486,7 @@ func (b *CdnServiceBroker) Update(
 		return domain.UpdateServiceSpec{}, apiresponses.ErrAsyncRequired
 	}
 
-	options, err := b.parseUpdateDetails(details)
+	options, err := b.parseUpdateDetails(b.logger, details)
 	if err != nil {
 		return domain.UpdateServiceSpec{}, err
 	}
@@ -518,7 +518,7 @@ func (b *CdnServiceBroker) Update(
 
 // parseProvisionDetails will attempt to parse the update details and then verify that BOTH least "domain" and "origin"
 // are provided.
-func (b *CdnServiceBroker) parseProvisionDetails(details domain.ProvisionDetails) (CreateOptions, error) {
+func (b *CdnServiceBroker) parseProvisionDetails(logger lager.Logger, details domain.ProvisionDetails) (CreateOptions, error) {
 	var err error
 	options := CreateOptions{
 		Cookies:    true,
@@ -540,7 +540,7 @@ func (b *CdnServiceBroker) parseProvisionDetails(details domain.ProvisionDetails
 		return options, err
 	}
 
-	err = b.checkDomain(options.Domain, details.OrganizationGUID)
+	err = b.checkDomain(logger, options.Domain, details.OrganizationGUID)
 	if err != nil {
 		return options, err
 	}
@@ -550,7 +550,7 @@ func (b *CdnServiceBroker) parseProvisionDetails(details domain.ProvisionDetails
 
 // parseUpdateDetails will attempt to parse the update details and then verify that at least "domain" or "origin"
 // are provided.
-func (b *CdnServiceBroker) parseUpdateDetails(details domain.UpdateDetails) (UpdateOptions, error) {
+func (b *CdnServiceBroker) parseUpdateDetails(logger lager.Logger, details domain.UpdateDetails) (UpdateOptions, error) {
 	var err error
 	options := UpdateOptions{}
 
@@ -564,7 +564,7 @@ func (b *CdnServiceBroker) parseUpdateDetails(details domain.UpdateDetails) (Upd
 	}
 
 	if options.Domain != nil {
-		err = b.checkDomain(*options.Domain, details.PreviousValues.OrgID)
+		err = b.checkDomain(logger, *options.Domain, details.PreviousValues.OrgID)
 		if err != nil {
 			return options, err
 		}
@@ -573,7 +573,7 @@ func (b *CdnServiceBroker) parseUpdateDetails(details domain.UpdateDetails) (Upd
 	return options, err
 }
 
-func (b *CdnServiceBroker) checkDomain(domain, orgGUID string) error {
+func (b *CdnServiceBroker) checkDomain(logger lager.Logger, domain, orgGUID string) error {
 	// domain can be a comma separated list so we need to check each one individually
 	domains := strings.Split(domain, ",")
 	var errorList []string
@@ -582,6 +582,7 @@ func (b *CdnServiceBroker) checkDomain(domain, orgGUID string) error {
 
 	for i := range domains {
 		if _, err := b.cfclient.GetDomainByName(domains[i]); err != nil {
+			logger.Error("get-domain-by-name-error", err)
 
 			if orgName == "<organization>" {
 				org, err := b.cfclient.GetOrgByGuid(orgGUID)
