@@ -52,11 +52,8 @@ type copyin struct {
 
 	closed bool
 
-	mu struct {
-		sync.Mutex
-		err error
-		driver.Result
-	}
+	sync.Mutex // guards err
+	err        error
 }
 
 const ciBufferSize = 64 * 1024
@@ -100,13 +97,13 @@ awaitCopyInResponse:
 			err = parseError(r)
 		case 'Z':
 			if err == nil {
-				ci.setBad(driver.ErrBadConn)
+				ci.setBad()
 				errorf("unexpected ReadyForQuery in response to COPY")
 			}
 			cn.processReadyForQuery(r)
 			return nil, err
 		default:
-			ci.setBad(driver.ErrBadConn)
+			ci.setBad()
 			errorf("unknown response for copy query: %q", t)
 		}
 	}
@@ -125,7 +122,7 @@ awaitCopyInResponse:
 			cn.processReadyForQuery(r)
 			return nil, err
 		default:
-			ci.setBad(driver.ErrBadConn)
+			ci.setBad()
 			errorf("unknown response for CopyFail: %q", t)
 		}
 	}
@@ -146,7 +143,7 @@ func (ci *copyin) resploop() {
 		var r readBuf
 		t, err := ci.cn.recvMessage(&r)
 		if err != nil {
-			ci.setBad(driver.ErrBadConn)
+			ci.setBad()
 			ci.setError(err)
 			ci.done <- true
 			return
@@ -154,12 +151,8 @@ func (ci *copyin) resploop() {
 		switch t {
 		case 'C':
 			// complete
-			res, _ := ci.cn.parseComplete(r.string())
-			ci.setResult(res)
 		case 'N':
-			if n := ci.cn.noticeHandler; n != nil {
-				n(parseError(&r))
-			}
+			// NoticeResponse
 		case 'Z':
 			ci.cn.processReadyForQuery(&r)
 			ci.done <- true
@@ -168,7 +161,7 @@ func (ci *copyin) resploop() {
 			err := parseError(&r)
 			ci.setError(err)
 		default:
-			ci.setBad(driver.ErrBadConn)
+			ci.setBad()
 			ci.setError(fmt.Errorf("unknown response during CopyIn: %q", t))
 			ci.done <- true
 			return
@@ -176,45 +169,34 @@ func (ci *copyin) resploop() {
 	}
 }
 
-func (ci *copyin) setBad(err error) {
-	ci.cn.err.set(err)
+func (ci *copyin) setBad() {
+	ci.Lock()
+	ci.cn.bad = true
+	ci.Unlock()
 }
 
-func (ci *copyin) getBad() error {
-	return ci.cn.err.get()
+func (ci *copyin) isBad() bool {
+	ci.Lock()
+	b := ci.cn.bad
+	ci.Unlock()
+	return b
 }
 
-func (ci *copyin) err() error {
-	ci.mu.Lock()
-	err := ci.mu.err
-	ci.mu.Unlock()
-	return err
+func (ci *copyin) isErrorSet() bool {
+	ci.Lock()
+	isSet := (ci.err != nil)
+	ci.Unlock()
+	return isSet
 }
 
 // setError() sets ci.err if one has not been set already.  Caller must not be
 // holding ci.Mutex.
 func (ci *copyin) setError(err error) {
-	ci.mu.Lock()
-	if ci.mu.err == nil {
-		ci.mu.err = err
+	ci.Lock()
+	if ci.err == nil {
+		ci.err = err
 	}
-	ci.mu.Unlock()
-}
-
-func (ci *copyin) setResult(result driver.Result) {
-	ci.mu.Lock()
-	ci.mu.Result = result
-	ci.mu.Unlock()
-}
-
-func (ci *copyin) getResult() driver.Result {
-	ci.mu.Lock()
-	result := ci.mu.Result
-	ci.mu.Unlock()
-	if result == nil {
-		return driver.RowsAffected(0)
-	}
-	return result
+	ci.Unlock()
 }
 
 func (ci *copyin) NumInput() int {
@@ -237,21 +219,17 @@ func (ci *copyin) Exec(v []driver.Value) (r driver.Result, err error) {
 		return nil, errCopyInClosed
 	}
 
-	if err := ci.getBad(); err != nil {
-		return nil, err
+	if ci.isBad() {
+		return nil, driver.ErrBadConn
 	}
 	defer ci.cn.errRecover(&err)
 
-	if err := ci.err(); err != nil {
-		return nil, err
+	if ci.isErrorSet() {
+		return nil, ci.err
 	}
 
 	if len(v) == 0 {
-		if err := ci.Close(); err != nil {
-			return driver.RowsAffected(0), err
-		}
-
-		return ci.getResult(), nil
+		return nil, ci.Close()
 	}
 
 	numValues := len(v)
@@ -279,8 +257,8 @@ func (ci *copyin) Close() (err error) {
 	}
 	ci.closed = true
 
-	if err := ci.getBad(); err != nil {
-		return err
+	if ci.isBad() {
+		return driver.ErrBadConn
 	}
 	defer ci.cn.errRecover(&err)
 
@@ -296,7 +274,8 @@ func (ci *copyin) Close() (err error) {
 	<-ci.done
 	ci.cn.inCopy = false
 
-	if err := ci.err(); err != nil {
+	if ci.isErrorSet() {
+		err = ci.err
 		return err
 	}
 	return nil

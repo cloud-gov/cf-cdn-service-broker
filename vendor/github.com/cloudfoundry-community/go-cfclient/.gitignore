@@ -24,7 +24,3 @@ _testmain.go
 *.test
 *.prof
 
-vendor
-
-# GoLand
-.idea

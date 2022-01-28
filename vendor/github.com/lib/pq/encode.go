@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -16,8 +15,6 @@ import (
 
 	"github.com/lib/pq/oid"
 )
-
-var time2400Regex = regexp.MustCompile(`^(24:00(?::00(?:\.0+)?)?)(?:[Z+-].*)?$`)
 
 func binaryEncode(parameterStatus *parameterStatus, x interface{}) []byte {
 	switch v := x.(type) {
@@ -120,10 +117,11 @@ func textDecode(parameterStatus *parameterStatus, s []byte, typ oid.Oid) interfa
 		}
 		return i
 	case oid.T_float4, oid.T_float8:
-		// We always use 64 bit parsing, regardless of whether the input text is for
-		// a float4 or float8, because clients expect float64s for all float datatypes
-		// and returning a 32-bit parsed float64 produces lossy results.
-		f, err := strconv.ParseFloat(string(s), 64)
+		bits := 64
+		if typ == oid.T_float4 {
+			bits = 32
+		}
+		f, err := strconv.ParseFloat(string(s), bits)
 		if err != nil {
 			errorf("%s", err)
 		}
@@ -200,37 +198,14 @@ func appendEscapedText(buf []byte, text string) []byte {
 func mustParse(f string, typ oid.Oid, s []byte) time.Time {
 	str := string(s)
 
-	// Check for a minute and second offset in the timezone.
-	if typ == oid.T_timestamptz || typ == oid.T_timetz {
-		for i := 3; i <= 6; i += 3 {
-			if str[len(str)-i] == ':' {
-				f += ":00"
-				continue
-			}
-			break
-		}
-	}
-
-	// Special case for 24:00 time.
-	// Unfortunately, golang does not parse 24:00 as a proper time.
-	// In this case, we want to try "round to the next day", to differentiate.
-	// As such, we find if the 24:00 time matches at the beginning; if so,
-	// we default it back to 00:00 but add a day later.
-	var is2400Time bool
-	switch typ {
-	case oid.T_timetz, oid.T_time:
-		if matches := time2400Regex.FindStringSubmatch(str); matches != nil {
-			// Concatenate timezone information at the back.
-			str = "00:00:00" + str[len(matches[1]):]
-			is2400Time = true
-		}
+	// check for a 30-minute-offset timezone
+	if (typ == oid.T_timestamptz || typ == oid.T_timetz) &&
+		str[len(str)-3] == ':' {
+		f += ":00"
 	}
 	t, err := time.Parse(f, str)
 	if err != nil {
 		errorf("decode: %s", err)
-	}
-	if is2400Time {
-		t = t.Add(24 * time.Hour)
 	}
 	return t
 }
@@ -392,15 +367,8 @@ func ParseTimestamp(currentLocation *time.Location, str string) (time.Time, erro
 	timeSep := daySep + 3
 	day := p.mustAtoi(str, daySep+1, timeSep)
 
-	minLen := monSep + len("01-01") + 1
-
-	isBC := strings.HasSuffix(str, " BC")
-	if isBC {
-		minLen += 3
-	}
-
 	var hour, minute, second int
-	if len(str) > minLen {
+	if len(str) > monSep+len("01-01")+1 {
 		p.expect(str, ' ', timeSep)
 		minSep := timeSep + 3
 		p.expect(str, ':', minSep)
@@ -456,8 +424,7 @@ func ParseTimestamp(currentLocation *time.Location, str string) (time.Time, erro
 		tzOff = tzSign * ((tzHours * 60 * 60) + (tzMin * 60) + tzSec)
 	}
 	var isoYear int
-
-	if isBC {
+	if remainderIdx+3 <= len(str) && str[remainderIdx:remainderIdx+3] == " BC" {
 		isoYear = 1 - year
 		remainderIdx += 3
 	} else {
@@ -513,7 +480,7 @@ func FormatTimestamp(t time.Time) []byte {
 	b := []byte(t.Format("2006-01-02 15:04:05.999999999Z07:00"))
 
 	_, offset := t.Zone()
-	offset %= 60
+	offset = offset % 60
 	if offset != 0 {
 		// RFC3339Nano already printed the minus sign
 		if offset < 0 {
@@ -559,7 +526,7 @@ func parseBytea(s []byte) (result []byte, err error) {
 				if len(s) < 4 {
 					return nil, fmt.Errorf("invalid bytea sequence %v", s)
 				}
-				r, err := strconv.ParseUint(string(s[1:4]), 8, 8)
+				r, err := strconv.ParseInt(string(s[1:4]), 8, 9)
 				if err != nil {
 					return nil, fmt.Errorf("could not parse bytea value: %s", err.Error())
 				}

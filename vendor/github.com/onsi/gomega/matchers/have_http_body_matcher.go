@@ -2,7 +2,7 @@ package matchers
 
 import (
 	"fmt"
-	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 
@@ -81,7 +81,7 @@ func (matcher *HaveHTTPBodyMatcher) body(actual interface{}) ([]byte, error) {
 		if a.Body != nil {
 			defer a.Body.Close()
 			var err error
-			matcher.cachedBody, err = io.ReadAll(a.Body)
+			matcher.cachedBody, err = ioutil.ReadAll(a.Body)
 			if err != nil {
 				return nil, fmt.Errorf("error reading response body: %w", err)
 			}

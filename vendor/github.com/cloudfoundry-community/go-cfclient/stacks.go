@@ -2,7 +2,6 @@ package cfclient
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/url"
 
@@ -24,29 +23,25 @@ type StacksResource struct {
 type Stack struct {
 	Guid        string `json:"guid"`
 	Name        string `json:"name"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
 	Description string `json:"description"`
 	c           *Client
 }
 
 func (c *Client) ListStacksByQuery(query url.Values) ([]Stack, error) {
 	var stacks []Stack
-	requestURL := "/v2/stacks?" + query.Encode()
+	requestUrl := "/v2/stacks?" + query.Encode()
 	for {
-		stacksResp, err := c.getStacksResponse(requestURL)
+		stacksResp, err := c.getStacksResponse(requestUrl)
 		if err != nil {
 			return []Stack{}, err
 		}
 		for _, stack := range stacksResp.Resources {
 			stack.Entity.Guid = stack.Meta.Guid
-			stack.Entity.CreatedAt = stack.Meta.CreatedAt
-			stack.Entity.UpdatedAt = stack.Meta.UpdatedAt
 			stack.Entity.c = c
 			stacks = append(stacks, stack.Entity)
 		}
-		requestURL = stacksResp.NextUrl
-		if requestURL == "" {
+		requestUrl = stacksResp.NextUrl
+		if requestUrl == "" {
 			break
 		}
 	}
@@ -57,35 +52,9 @@ func (c *Client) ListStacks() ([]Stack, error) {
 	return c.ListStacksByQuery(nil)
 }
 
-func (c *Client) GetStackByGuid(stackGUID string) (Stack, error) {
-	var stacksRes StacksResource
-	requestURL := fmt.Sprintf("/v2/stacks/%s", stackGUID)
-	r := c.NewRequest("GET", requestURL)
-	resp, err := c.DoRequest(r)
-	if err != nil {
-		return Stack{}, errors.Wrap(err, "Error requesting stack info")
-	}
-	resBody, err := ioutil.ReadAll(resp.Body)
-	defer resp.Body.Close()
-	if err != nil {
-		return Stack{}, errors.Wrap(err, "Error reading stack body")
-	}
-	err = json.Unmarshal(resBody, &stacksRes)
-	if err != nil {
-		return Stack{}, errors.Wrap(err, "Error unmarshalling stack")
-	}
-
-	stacksRes.Entity.Guid = stacksRes.Meta.Guid
-	stacksRes.Entity.CreatedAt = stacksRes.Meta.CreatedAt
-	stacksRes.Entity.UpdatedAt = stacksRes.Meta.UpdatedAt
-	stacksRes.Entity.c = c
-
-	return stacksRes.Entity, nil
-}
-
-func (c *Client) getStacksResponse(requestURL string) (StacksResponse, error) {
+func (c *Client) getStacksResponse(requestUrl string) (StacksResponse, error) {
 	var stacksResp StacksResponse
-	r := c.NewRequest("GET", requestURL)
+	r := c.NewRequest("GET", requestUrl)
 	resp, err := c.DoRequest(r)
 	if err != nil {
 		return StacksResponse{}, errors.Wrap(err, "Error requesting stacks")

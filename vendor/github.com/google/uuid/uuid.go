@@ -1,4 +1,4 @@
-// Copyright 2018 Google Inc.  All rights reserved.
+// Copyright 2016 Google Inc.  All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"sync"
 )
 
 // A UUID is a 128 bit (16 byte) Universal Unique IDentifier as defined in RFC
@@ -34,65 +33,22 @@ const (
 	Future                    // Reserved for future definition.
 )
 
-const randPoolSize = 16 * 16
+var rander = rand.Reader // random function
 
-var (
-	rander      = rand.Reader // random function
-	poolEnabled = false
-	poolMu      sync.Mutex
-	poolPos     = randPoolSize     // protected with poolMu
-	pool        [randPoolSize]byte // protected with poolMu
-)
-
-type invalidLengthError struct{ len int }
-
-func (err invalidLengthError) Error() string {
-	return fmt.Sprintf("invalid UUID length: %d", err.len)
-}
-
-// IsInvalidLengthError is matcher function for custom error invalidLengthError
-func IsInvalidLengthError(err error) bool {
-	_, ok := err.(invalidLengthError)
-	return ok
-}
-
-// Parse decodes s into a UUID or returns an error.  Both the standard UUID
-// forms of xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx and
-// urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx are decoded as well as the
-// Microsoft encoding {xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx} and the raw hex
-// encoding: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.
+// Parse decodes s into a UUID or returns an error.  Both the UUID form of
+// xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx and
+// urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx are decoded.
 func Parse(s string) (UUID, error) {
 	var uuid UUID
-	switch len(s) {
-	// xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-	case 36:
-
-	// urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-	case 36 + 9:
+	if len(s) != 36 {
+		if len(s) != 36+9 {
+			return uuid, fmt.Errorf("invalid UUID length: %d", len(s))
+		}
 		if strings.ToLower(s[:9]) != "urn:uuid:" {
 			return uuid, fmt.Errorf("invalid urn prefix: %q", s[:9])
 		}
 		s = s[9:]
-
-	// {xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx}
-	case 36 + 2:
-		s = s[1:]
-
-	// xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-	case 32:
-		var ok bool
-		for i := range uuid {
-			uuid[i], ok = xtob(s[i*2], s[i*2+1])
-			if !ok {
-				return uuid, errors.New("invalid UUID format")
-			}
-		}
-		return uuid, nil
-	default:
-		return uuid, invalidLengthError{len(s)}
 	}
-	// s is now at least 36 bytes long
-	// it must be of the form  xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 	if s[8] != '-' || s[13] != '-' || s[18] != '-' || s[23] != '-' {
 		return uuid, errors.New("invalid UUID format")
 	}
@@ -114,29 +70,15 @@ func Parse(s string) (UUID, error) {
 // ParseBytes is like Parse, except it parses a byte slice instead of a string.
 func ParseBytes(b []byte) (UUID, error) {
 	var uuid UUID
-	switch len(b) {
-	case 36: // xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-	case 36 + 9: // urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+	if len(b) != 36 {
+		if len(b) != 36+9 {
+			return uuid, fmt.Errorf("invalid UUID length: %d", len(b))
+		}
 		if !bytes.Equal(bytes.ToLower(b[:9]), []byte("urn:uuid:")) {
 			return uuid, fmt.Errorf("invalid urn prefix: %q", b[:9])
 		}
 		b = b[9:]
-	case 36 + 2: // {xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx}
-		b = b[1:]
-	case 32: // xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-		var ok bool
-		for i := 0; i < 32; i += 2 {
-			uuid[i/2], ok = xtob(b[i], b[i+1])
-			if !ok {
-				return uuid, errors.New("invalid UUID format")
-			}
-		}
-		return uuid, nil
-	default:
-		return uuid, invalidLengthError{len(b)}
 	}
-	// s is now at least 36 bytes long
-	// it must be of the form  xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 	if b[8] != '-' || b[13] != '-' || b[18] != '-' || b[23] != '-' {
 		return uuid, errors.New("invalid UUID format")
 	}
@@ -153,16 +95,6 @@ func ParseBytes(b []byte) (UUID, error) {
 		uuid[i] = v
 	}
 	return uuid, nil
-}
-
-// MustParse is like Parse but panics if the string cannot be parsed.
-// It simplifies safe initialization of global variables holding compiled UUIDs.
-func MustParse(s string) UUID {
-	uuid, err := Parse(s)
-	if err != nil {
-		panic(`uuid: Parse(` + s + `): ` + err.Error())
-	}
-	return uuid
 }
 
 // FromBytes creates a new UUID from a byte slice. Returns an error if the slice
@@ -198,7 +130,7 @@ func (uuid UUID) URN() string {
 }
 
 func encodeHex(dst []byte, uuid UUID) {
-	hex.Encode(dst, uuid[:4])
+	hex.Encode(dst[:], uuid[:4])
 	dst[8] = '-'
 	hex.Encode(dst[9:13], uuid[4:6])
 	dst[13] = '-'
@@ -263,32 +195,4 @@ func SetRand(r io.Reader) {
 		return
 	}
 	rander = r
-}
-
-// EnableRandPool enables internal randomness pool used for Random
-// (Version 4) UUID generation. The pool contains random bytes read from
-// the random number generator on demand in batches. Enabling the pool
-// may improve the UUID generation throughput significantly.
-//
-// Since the pool is stored on the Go heap, this feature may be a bad fit
-// for security sensitive applications.
-//
-// Both EnableRandPool and DisableRandPool are not thread-safe and should
-// only be called when there is no possibility that New or any other
-// UUID Version 4 generation function will be called concurrently.
-func EnableRandPool() {
-	poolEnabled = true
-}
-
-// DisableRandPool disables the randomness pool if it was previously
-// enabled with EnableRandPool.
-//
-// Both EnableRandPool and DisableRandPool are not thread-safe and should
-// only be called when there is no possibility that New or any other
-// UUID Version 4 generation function will be called concurrently.
-func DisableRandPool() {
-	poolEnabled = false
-	defer poolMu.Unlock()
-	poolMu.Lock()
-	poolPos = randPoolSize
 }
