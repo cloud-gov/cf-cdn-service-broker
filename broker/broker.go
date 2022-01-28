@@ -121,7 +121,7 @@ func (b *CdnServiceBroker) LastBindingOperation(ctx context.Context, first, seco
 }
 
 func (b *CdnServiceBroker) Services(context context.Context) ([]domain.Service, error) {
-	lsession := b.logger.Session("provision")
+	lsession := b.logger.Session("services")
 	lsession.Info("start")
 
 	var service domain.Service
