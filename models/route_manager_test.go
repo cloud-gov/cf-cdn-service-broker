@@ -3,6 +3,7 @@ package models_test
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -932,6 +933,38 @@ var _ = Describe("RouteManager", func() {
 				}
 
 				Expect(requestedArns).To(ContainElements(attachedCert.CertificateArn, validatingCert.CertificateArn))
+			})
+		})
+
+		Context("when a certificate ARN stored in the database does not exist in ACM", func() {
+			BeforeEach(func() {
+				certsManager.GetDomainValidationChallengesCalls(func(arn string) ([]utils.DomainValidationChallenge, error) {
+					switch arn {
+					case "arn:aws:acm::validating-cert":
+						return nil, &acm.ResourceNotFoundException{}
+					case "arn:aws:acm::attached-cert":
+						return []utils.DomainValidationChallenge{
+							utils.DomainValidationChallenge{
+								DomainName:       "domain.com",
+								RecordName:       "domain.com",
+								RecordType:       "CNAME",
+								RecordValue:      "BlahBlahBlah",
+								ValidationStatus: "PENDING_VALIDATION",
+							},
+						}, nil
+					}
+
+					return nil, fmt.Errorf("unexpected arn: '%s'", arn)
+				})
+			})
+
+			It("does not return an error, and returns the rest of the results", func() {
+				challenges, err := manager.GetDNSChallenges(&route, false)
+
+				Expect(err).ToNot(HaveOccurred())
+				Expect(certsManager.GetDomainValidationChallengesCallCount()).To(Equal(2))
+
+				Expect(challenges).To(HaveLen(1))
 			})
 		})
 	})

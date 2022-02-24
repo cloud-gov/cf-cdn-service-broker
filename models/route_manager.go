@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/alphagov/paas-cdn-broker/config"
 	"github.com/alphagov/paas-cdn-broker/utils"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/acm"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"github.com/jinzhu/gorm"
@@ -408,10 +409,18 @@ func (m *RouteManager) GetDNSChallenges(route *Route, onlyValidatingCertificates
 		lsession.Info("certsmanager-get-validation-challenges", lager.Data{"certificate-arn": arn})
 		challenges, err := m.certsManager.GetDomainValidationChallenges(arn)
 		if err != nil {
-			lsession.Error("certsmanager-get-validation-challenges", err, lager.Data{"certificate-arn": arn})
-			return nil, err
+			// Only handle a ResourceNotFound exception specially
+			if awsErr, ok := err.(awserr.Error); ok {
+				if awsErr.Code() == acm.ErrCodeResourceNotFoundException {
+					lsession.Info("certsmanager-get-validation-certificate-not-found", lager.Data{"certificate-arn": arn})
+					continue
+				}
+			} else {
+				lsession.Error("certsmanager-get-validation-challenges", err, lager.Data{"certificate-arn": arn})
+				return nil, err
+			}
 		}
-
+		
 		validationChallenges = append(validationChallenges, challenges...)
 	}
 
