@@ -129,7 +129,7 @@ func (c *Client) GetDomainByName(name string) (Domain, error) {
 	q.Set("q", "name:"+name)
 	domains, err := c.ListDomainsByQuery(q)
 	if err != nil {
-		return Domain{}, nil
+		return Domain{}, err
 	}
 	if len(domains) == 0 {
 		return Domain{}, errors.Wrapf(err, "Unable to find domain %s", name)
