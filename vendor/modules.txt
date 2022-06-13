@@ -1,8 +1,14 @@
 # cloud.google.com/go v0.43.0
 ## explicit; go 1.9
+# code.cloudfoundry.org/gofileutils v0.0.0-20170111115228-4d0c80011a0f
+## explicit
+code.cloudfoundry.org/gofileutils/fileutils
 # code.cloudfoundry.org/lager v2.0.0+incompatible
 ## explicit
 code.cloudfoundry.org/lager
+# github.com/Masterminds/semver v1.4.2
+## explicit
+github.com/Masterminds/semver
 # github.com/aws/aws-sdk-go v1.38.66
 ## explicit; go 1.11
 github.com/aws/aws-sdk-go/aws
@@ -48,8 +54,8 @@ github.com/aws/aws-sdk-go/service/sso
 github.com/aws/aws-sdk-go/service/sso/ssoiface
 github.com/aws/aws-sdk-go/service/sts
 github.com/aws/aws-sdk-go/service/sts/stsiface
-# github.com/cloudfoundry-community/go-cfclient v0.0.0-20170502130034-23156ed0e73b
-## explicit
+# github.com/cloudfoundry-community/go-cfclient v0.0.0-20220601192014-596c068bcda2
+## explicit; go 1.15
 github.com/cloudfoundry-community/go-cfclient
 # github.com/codegangsta/inject v0.0.0-20150114235600-33e0aa1cb7c0
 ## explicit
