@@ -5,8 +5,6 @@ import (
 	"errors"
 	"github.com/pivotal-cf/brokerapi/v8/domain"
 	"github.com/pivotal-cf/brokerapi/v8/domain/apiresponses"
-	"github.com/stretchr/testify/suite"
-	"reflect"
 
 	"code.cloudfoundry.org/lager"
 	"github.com/alphagov/paas-cdn-broker/broker"
@@ -15,43 +13,13 @@ import (
 	"github.com/alphagov/paas-cdn-broker/models"
 	"github.com/alphagov/paas-cdn-broker/models/mocks"
 	"github.com/alphagov/paas-cdn-broker/utils"
-	"github.com/cloudfoundry-community/go-cfclient"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-type ProvisionSuite struct {
-	suite.Suite
-	Manager  mocks.RouteManagerIface
-	Broker   *broker.CdnServiceBroker
-	cfclient cfmock.Client
-	settings config.Settings
-	logger   lager.Logger
-	ctx      context.Context
-}
-
-func (s *ProvisionSuite) allowCreateWithExpectedHeaders(expectedHeaders utils.Headers) {
-	route := &models.Route{State: models.Provisioning}
-	s.Manager.CreateStub = func(
-		_ string,
-		_ string,
-		_ string,
-		_ int64,
-		headers utils.Headers,
-		_ bool,
-		_ map[string]string) (*models.Route, error) {
-
-		if reflect.DeepEqual(headers, expectedHeaders) {
-			return route, nil
-		}
-
-		return nil, errors.New("unexpected header values")
-	}
-}
-
-var _ = Describe("Last operation", func() {
-	var s *ProvisionSuite = &ProvisionSuite{}
+var _ = Describe("Provision", func() {
+	var s *ProvisionUpdateSuite = &ProvisionUpdateSuite{}
 
 	BeforeEach(func() {
 		s.Manager = mocks.RouteManagerIface{}
@@ -68,8 +36,6 @@ var _ = Describe("Last operation", func() {
 			s.logger,
 		)
 		s.ctx = context.Background()
-
-		s.cfclient.On("GetOrgByGuid", "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5").Return(cfclient.Org{Name: "my-org"}, nil)
 	})
 
 	It("Should error when the broker is called synchronously", func() {
@@ -77,6 +43,7 @@ var _ = Describe("Last operation", func() {
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(apiresponses.ErrAsyncRequired))
+		s.cfclient.AssertExpectations(GinkgoT())
 	})
 
 	It("Should error when the broker is called without config", func() {
@@ -84,6 +51,7 @@ var _ = Describe("Last operation", func() {
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(ContainSubstring("must be invoked with configuration parameters")))
+		s.cfclient.AssertExpectations(GinkgoT())
 	})
 
 	It("Should error when the broker is called without a domain", func() {
@@ -94,47 +62,56 @@ var _ = Describe("Last operation", func() {
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(ContainSubstring("must pass non-empty `domain`")))
+		s.cfclient.AssertExpectations(GinkgoT())
 	})
 
-	It("Should error when the broker is called with an already existing domain", func() {
+	It("Should error when the broker is called with an already existing service instance id", func() {
 		route := &models.Route{
 			State: models.Provisioned,
 		}
-		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 		s.Manager.GetReturns(route, nil)
 
+		s.setupCFClientListV3DomainsDomain1()
+
 		details := domain.ProvisionDetails{
-			RawParameters: []byte(`{"domain": "domain.gov"}`),
+			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+			RawParameters: []byte(`{"domain": "domain1.gov"}`),
 		}
 		_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(apiresponses.ErrInstanceAlreadyExists))
+		s.cfclient.AssertExpectations(GinkgoT())
 	})
 
-	It("Should succeed", func() {
+	It("Should succeed with default settings", func() {
 		s.Manager.GetReturns(&models.Route{}, errors.New("not found"))
 		route := &models.Route{State: models.Provisioning}
-		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 		s.Manager.CreateReturns(route, nil)
 
+		s.setupCFClientListV3DomainsDomain1()
+
 		details := domain.ProvisionDetails{
-			RawParameters: []byte(`{"domain": "domain.gov"}`),
+			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+			RawParameters: []byte(`{"domain": "domain1.gov"}`),
 		}
 		_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
 		Expect(err).NotTo(HaveOccurred())
+		s.cfclient.AssertExpectations(GinkgoT())
 	})
 
 	It("Should create a cloudfront instance with a custom DefaultTTL", func() {
 		s.Manager.GetReturns(&models.Route{}, errors.New("not found"))
 		route := &models.Route{State: models.Provisioning}
-		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 		s.Manager.CreateReturns(route, nil)
 
+		s.setupCFClientListV3DomainsDomain1()
+
 		details := domain.ProvisionDetails{
+			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
 			RawParameters: []byte(`{
-				"domain": "domain.gov",
+				"domain": "domain1.gov",
 				"default_ttl": 52
 			}`),
 		}
@@ -144,18 +121,20 @@ var _ = Describe("Last operation", func() {
 		Expect(s.Manager.CreateCallCount()).To(Equal(1))
 		_, _, _, ttl, _, _, _ := s.Manager.CreateArgsForCall(0)
 		Expect(ttl).To(Equal(int64(52)))
+		s.cfclient.AssertExpectations(GinkgoT())
 	})
 
 	It("Should set the correct tags", func() {
 		instanceId := "123"
 		s.Manager.GetReturns(&models.Route{}, errors.New("not found"))
 		route := &models.Route{State: models.Provisioning}
-		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 		s.Manager.CreateReturns(route, nil)
 
+		s.setupCFClientListV3DomainsDomain1()
+
 		details := domain.ProvisionDetails{
-			RawParameters:    []byte(`{"domain": "domain.gov"}`),
-			OrganizationGUID: "org-1",
+			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+			RawParameters:    []byte(`{"domain": "domain1.gov"}`),
 			SpaceGUID:        "space-1",
 			ServiceID:        "service-1",
 			PlanID:           "plan-1",
@@ -167,136 +146,273 @@ var _ = Describe("Last operation", func() {
 
 		Expect(s.Manager.CreateCallCount()).To(Equal(1))
 		_, _, _, _, _, _, inputTags := s.Manager.CreateArgsForCall(0)
-		Expect(inputTags).To(HaveKeyWithValue("Organization", "org-1"))
+		Expect(inputTags).To(HaveKeyWithValue("Organization", "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5"))
 		Expect(inputTags).To(HaveKeyWithValue("Space", "space-1"))
 		Expect(inputTags).To(HaveKeyWithValue("Service", "service-1"))
 		Expect(inputTags).To(HaveKeyWithValue("ServiceInstance", instanceId))
 		Expect(inputTags).To(HaveKeyWithValue("Plan", "plan-1"))
 		Expect(inputTags).To(HaveKeyWithValue("chargeable_entity", instanceId))
+		s.cfclient.AssertExpectations(GinkgoT())
 	})
 
 	It("Should error when Cloud Foundry does not have the domain registered", func() {
-		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, errors.New("fail"))
+		s.setupCFClientOrg()
+		s.setupCFClientListV3DomainsDomain3()
+		
 		details := domain.ProvisionDetails{
 			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-			RawParameters:    []byte(`{"domain": "domain.gov"}`),
+			RawParameters:    []byte(`{"domain": "domain3.gov"}`),
 		}
 		_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
 		Expect(err).To(HaveOccurred())
-		Expect(err).To(MatchError(ContainSubstring("cf create-domain")))
+		Expect(err).To(MatchError(
+			"Domain domain3.gov does not exist in CloudFoundry; create it with: cf create-domain domain3.gov my-org",
+		))
+		s.cfclient.AssertExpectations(GinkgoT())
 	})
 
 	It("Should error when given multiple domains one of which Cloud Foundry does not have registered", func() {
-		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
-		s.cfclient.On("GetDomainByName", "domain2.gov").Return(cfclient.Domain{}, errors.New("fail"))
+		s.setupCFClientOrg()
+		s.setupCFClientListV3DomainsDomain1()
+		s.setupCFClientListV3DomainsDomain3()
+
 		details := domain.ProvisionDetails{
 			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-			RawParameters:    []byte(`{"domain": "domain.gov,domain2.gov"}`),
+			RawParameters:    []byte(`{"domain": "domain1.gov,domain3.gov"}`),
 		}
 		_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
 		Expect(err).To(HaveOccurred())
-		Expect(err).To(MatchError(ContainSubstring("Domain does not exist")))
-		Expect(err).NotTo(MatchError(ContainSubstring("domain.gov")))
-		Expect(err).To(MatchError(ContainSubstring("domain2.gov")))
+		Expect(err).To(MatchError(
+			"Domain domain3.gov does not exist in CloudFoundry; create it with: cf create-domain domain3.gov my-org",
+		))
+		s.cfclient.AssertExpectations(GinkgoT())
 	})
 
 	It("Should error when given multiple domains many of which Cloud Foundry does not have registered", func() {
-		s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
-		s.cfclient.On("GetDomainByName", "domain2.gov").Return(cfclient.Domain{}, errors.New("fail"))
-		s.cfclient.On("GetDomainByName", "domain3.gov").Return(cfclient.Domain{}, errors.New("fail"))
+		s.setupCFClientOrg()
+		s.setupCFClientListV3DomainsDomain1()
+		s.setupCFClientListV3DomainsDomain3()
+		s.setupCFClientListV3DomainsDomain4()
+
 		details := domain.ProvisionDetails{
 			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-			RawParameters:    []byte(`{"domain": "domain.gov,domain2.gov,domain3.gov"}`),
+			RawParameters:    []byte(`{"domain": "domain1.gov,domain4.gov,domain3.gov"}`),
 		}
 		_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
 		Expect(err).To(HaveOccurred())
-		Expect(err).To(MatchError(ContainSubstring("Multiple domains do not exist")))
-		Expect(err).NotTo(MatchError(ContainSubstring("domain.gov")))
-		Expect(err).To(MatchError(ContainSubstring("domain2.gov")))
-		Expect(err).To(MatchError(ContainSubstring("domain3.gov")))
+		Expect(err).To(MatchError(
+`Multiple domains do not exist in CloudFoundry; create them with:
+cf create-domain domain4.gov my-org
+cf create-domain domain3.gov my-org`,
+		))
+		s.cfclient.AssertExpectations(GinkgoT())
+	})
+
+	It("Should sensibly handle errors fetching the organization name for error messages", func() {
+		s.setupCFClientOrgErr()
+		s.setupCFClientListV3DomainsDomain4()
+
+		details := domain.ProvisionDetails{
+			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+			RawParameters:    []byte(`{"domain": "domain4.gov"}`),
+		}
+		_, err := s.Broker.Provision(s.ctx, "123", details, true)
+
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(
+			"Domain domain4.gov does not exist in CloudFoundry; create it with: cf create-domain domain4.gov <organization>",
+		))
+		s.cfclient.AssertExpectations(GinkgoT())
+	})
+
+	It("Should error when given an domain using invalid characters", func() {
+		details := domain.ProvisionDetails{
+			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+			RawParameters:    []byte(`{"domain": "domain&.gov"}`),
+		}
+		_, err := s.Broker.Provision(s.ctx, "123", details, true)
+
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(
+			"Domain domain&.gov doesn't look like a valid domain",
+		))
+		s.cfclient.AssertExpectations(GinkgoT())
+	})
+
+	It("Should error when the Cloud Foundry domain doesn't belong to the organization", func() {
+		s.setupCFClientListV3DomainsDomain5()
+
+		details := domain.ProvisionDetails{
+			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+			RawParameters:    []byte(`{"domain": "domain5.gov"}`),
+		}
+		_, err := s.Broker.Provision(s.ctx, "123", details, true)
+
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(
+			"Domain domain5.gov is owned by a different organization in CloudFoundry",
+		))
+		s.cfclient.AssertExpectations(GinkgoT())
+	})
+
+	It("Should error when multiple Cloud Foundry domains don't belong to the organization", func() {
+		s.setupCFClientListV3DomainsDomain5()
+		s.setupCFClientListV3DomainsDomain6()
+
+		details := domain.ProvisionDetails{
+			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+			RawParameters:    []byte(`{"domain": "domain6.gov,domain5.gov"}`),
+		}
+		_, err := s.Broker.Provision(s.ctx, "123", details, true)
+
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(
+			"Multiple domains are owned by a different organization in CloudFoundry: domain6.gov, domain5.gov",
+		))
+		s.cfclient.AssertExpectations(GinkgoT())
+	})
+
+	It("Should error when one of several Cloud Foundry domains don't belong to the organization", func() {
+		s.setupCFClientListV3DomainsDomain1()
+		s.setupCFClientListV3DomainsDomain2()
+		s.setupCFClientListV3DomainsDomain6()
+
+		details := domain.ProvisionDetails{
+			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+			RawParameters:    []byte(`{"domain": "domain1.gov,domain6.gov,domain2.gov"}`),
+		}
+		_, err := s.Broker.Provision(s.ctx, "123", details, true)
+
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(
+			"Domain domain6.gov is owned by a different organization in CloudFoundry",
+		))
+		s.cfclient.AssertExpectations(GinkgoT())
+	})
+
+	It("Should prioritize non-existent Cloud Foundry domain errors over ownership errors", func() {
+		s.setupCFClientOrg()
+		s.setupCFClientListV3DomainsDomain1()
+		s.setupCFClientListV3DomainsDomain4()
+		s.setupCFClientListV3DomainsDomain6()
+
+		details := domain.ProvisionDetails{
+			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+			RawParameters:    []byte(`{"domain": "domain1.gov,domain6.gov,domain4.gov"}`),
+		}
+		_, err := s.Broker.Provision(s.ctx, "123", details, true)
+
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(
+			"Domain domain4.gov does not exist in CloudFoundry; create it with: cf create-domain domain4.gov my-org",
+		))
+		s.cfclient.AssertExpectations(GinkgoT())
 	})
 
 	Context("Headers", func() {
 		BeforeEach(func() {
 			s.Manager.GetReturns(&models.Route{}, errors.New("not found"))
-			s.cfclient.On("GetDomainByName", "domain.gov").Return(cfclient.Domain{}, nil)
 		})
 
 		It("Should succeed forwarding duplicate host header", func() {
 			s.allowCreateWithExpectedHeaders(utils.Headers{"Host": true})
+			s.setupCFClientListV3DomainsDomain1()
 
 			details := domain.ProvisionDetails{
-				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["Host"]}`),
+				OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+				RawParameters: []byte(`{"domain": "domain1.gov", "headers": ["Host"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
 			Expect(err).NotTo(HaveOccurred())
+			s.cfclient.AssertExpectations(GinkgoT())
 		})
 
 		It("Should succeed forwarding a single header", func() {
 			s.allowCreateWithExpectedHeaders(utils.Headers{"User-Agent": true, "Host": true})
+			s.setupCFClientListV3DomainsDomain1()
 
 			details := domain.ProvisionDetails{
-				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["User-Agent"]}`),
+				OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+				RawParameters: []byte(`{"domain": "domain1.gov", "headers": ["User-Agent"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
 			Expect(err).NotTo(HaveOccurred())
+			s.cfclient.AssertExpectations(GinkgoT())
 		})
 
 		It("Should succeed forwarding wildcard headers", func() {
 			s.allowCreateWithExpectedHeaders(utils.Headers{"*": true})
+			s.setupCFClientListV3DomainsDomain1()
 
 			details := domain.ProvisionDetails{
-				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["*"]}`),
+				OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+				RawParameters: []byte(`{"domain": "domain1.gov", "headers": ["*"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
 			Expect(err).NotTo(HaveOccurred())
+			s.cfclient.AssertExpectations(GinkgoT())
 		})
 
 		It("Should succeed forwarding nine headers", func() {
 			s.allowCreateWithExpectedHeaders(utils.Headers{"One": true, "Two": true, "Three": true, "Four": true, "Five": true, "Six": true, "Seven": true, "Eight": true, "Nine": true, "Host": true})
+			s.setupCFClientListV3DomainsDomain1()
 
 			details := domain.ProvisionDetails{
-				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"]}`),
+				OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+				RawParameters: []byte(`{"domain": "domain1.gov", "headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
 			Expect(err).NotTo(HaveOccurred())
+			s.cfclient.AssertExpectations(GinkgoT())
 		})
 
 		It("Should error when forwarding duplicate headers", func() {
+			s.setupCFClientListV3DomainsDomain1()
+
 			details := domain.ProvisionDetails{
-				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["User-Agent", "Host", "User-Agent"]}`),
+				OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+				RawParameters: []byte(`{"domain": "domain1.gov", "headers": ["User-Agent", "Host", "User-Agent"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
 			Expect(err).To(HaveOccurred())
 			Expect(err).To(MatchError(ContainSubstring("must not pass duplicated header 'User-Agent'")))
+			s.cfclient.AssertExpectations(GinkgoT())
 		})
 
 		It("Should error when specifying a specific header and also wildcard headers", func() {
+			s.setupCFClientListV3DomainsDomain1()
+
 			details := domain.ProvisionDetails{
-				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["*", "User-Agent"]}`),
+				OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+				RawParameters: []byte(`{"domain": "domain1.gov", "headers": ["*", "User-Agent"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
 			Expect(err).To(HaveOccurred())
 			Expect(err).To(MatchError(ContainSubstring("must not pass whitelisted headers alongside wildcard")))
+			s.cfclient.AssertExpectations(GinkgoT())
 		})
 
 		It("Should error when forwarding ten or more", func() {
+			s.setupCFClientListV3DomainsDomain1()
+
 			details := domain.ProvisionDetails{
-				RawParameters: []byte(`{"domain": "domain.gov", "headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"]}`),
+				OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+				RawParameters: []byte(`{"domain": "domain1.gov", "headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
 			Expect(err).To(HaveOccurred())
 			Expect(err).To(MatchError(ContainSubstring("must not set more than 10 headers; got 11")))
+			s.cfclient.AssertExpectations(GinkgoT())
 		})
 	})
 })
