@@ -20,6 +20,8 @@ type Users []User
 
 type User struct {
 	Guid                  string `json:"guid"`
+	CreatedAt             string `json:"created_at"`
+	UpdatedAt             string `json:"updated_at"`
 	Admin                 bool   `json:"admin"`
 	Active                bool   `json:"active"`
 	DefaultSpaceGUID      string `json:"default_space_guid"`
@@ -46,6 +48,27 @@ type UserResponse struct {
 	Resources []UserResource `json:"resources"`
 }
 
+// GetUserByGUID retrieves the user with the provided guid.
+func (c *Client) GetUserByGUID(guid string) (User, error) {
+	var userRes UserResource
+	r := c.NewRequest("GET", "/v2/users/"+guid)
+	resp, err := c.DoRequest(r)
+	if err != nil {
+		return User{}, err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return User{}, err
+	}
+	err = json.Unmarshal(body, &userRes)
+	if err != nil {
+		return User{}, err
+	}
+	return c.mergeUserResource(userRes), nil
+}
+
 func (c *Client) ListUsersByQuery(query url.Values) (Users, error) {
 	var users []User
 	requestUrl := "/v2/users?" + query.Encode()
@@ -56,11 +79,13 @@ func (c *Client) ListUsersByQuery(query url.Values) (Users, error) {
 		}
 		for _, user := range userResp.Resources {
 			user.Entity.Guid = user.Meta.Guid
+			user.Entity.CreatedAt = user.Meta.CreatedAt
+			user.Entity.UpdatedAt = user.Meta.UpdatedAt
 			user.Entity.c = c
 			users = append(users, user.Entity)
 		}
 		requestUrl = userResp.NextUrl
-		if requestUrl == "" {
+		if requestUrl == "" || query.Get("page") != "" {
 			break
 		}
 	}
@@ -72,15 +97,31 @@ func (c *Client) ListUsers() (Users, error) {
 }
 
 func (c *Client) ListUserSpaces(userGuid string) ([]Space, error) {
-	return c.fetchSpaces(fmt.Sprintf("/v2/users/%s/spaces", userGuid))
+	return c.fetchSpaces(fmt.Sprintf("/v2/users/%s/spaces", userGuid), url.Values{})
 }
 
 func (c *Client) ListUserAuditedSpaces(userGuid string) ([]Space, error) {
-	return c.fetchSpaces(fmt.Sprintf("/v2/users/%s/audited_spaces", userGuid))
+	return c.fetchSpaces(fmt.Sprintf("/v2/users/%s/audited_spaces", userGuid), url.Values{})
 }
 
 func (c *Client) ListUserManagedSpaces(userGuid string) ([]Space, error) {
-	return c.fetchSpaces(fmt.Sprintf("/v2/users/%s/managed_spaces", userGuid))
+	return c.fetchSpaces(fmt.Sprintf("/v2/users/%s/managed_spaces", userGuid), url.Values{})
+}
+
+func (c *Client) ListUserOrgs(userGuid string) ([]Org, error) {
+	return c.fetchOrgs(fmt.Sprintf("/v2/users/%s/organizations", userGuid))
+}
+
+func (c *Client) ListUserManagedOrgs(userGuid string) ([]Org, error) {
+	return c.fetchOrgs(fmt.Sprintf("/v2/users/%s/managed_organizations", userGuid))
+}
+
+func (c *Client) ListUserAuditedOrgs(userGuid string) ([]Org, error) {
+	return c.fetchOrgs(fmt.Sprintf("/v2/users/%s/audited_organizations", userGuid))
+}
+
+func (c *Client) ListUserBillingManagedOrgs(userGuid string) ([]Org, error) {
+	return c.fetchOrgs(fmt.Sprintf("/v2/users/%s/billing_managed_organizations", userGuid))
 }
 
 func (c *Client) CreateUser(req UserRequest) (User, error) {
@@ -94,11 +135,12 @@ func (c *Client) CreateUser(req UserRequest) (User, error) {
 	if err != nil {
 		return User{}, err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusCreated {
 		return User{}, errors.Wrapf(err, "Error creating user, response code: %d", resp.StatusCode)
 	}
 	body, err := ioutil.ReadAll(resp.Body)
-	defer resp.Body.Close()
+
 	if err != nil {
 		return User{}, err
 	}
@@ -118,6 +160,7 @@ func (c *Client) DeleteUser(userGuid string) error {
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusNoContent {
 		return errors.Wrapf(err, "Error deleting user %s, response code: %d", userGuid, resp.StatusCode)
 	}
@@ -140,8 +183,9 @@ func (c *Client) getUserResponse(requestUrl string) (UserResponse, error) {
 	if err != nil {
 		return UserResponse{}, errors.Wrap(err, "Error requesting users")
 	}
-	resBody, err := ioutil.ReadAll(resp.Body)
 	defer resp.Body.Close()
+	resBody, err := ioutil.ReadAll(resp.Body)
+
 	if err != nil {
 		return UserResponse{}, errors.Wrap(err, "Error reading user request")
 	}
@@ -150,4 +194,12 @@ func (c *Client) getUserResponse(requestUrl string) (UserResponse, error) {
 		return UserResponse{}, errors.Wrap(err, "Error unmarshalling user")
 	}
 	return userResp, nil
+}
+
+func (c *Client) mergeUserResource(u UserResource) User {
+	u.Entity.Guid = u.Meta.Guid
+	u.Entity.CreatedAt = u.Meta.CreatedAt
+	u.Entity.UpdatedAt = u.Meta.UpdatedAt
+	u.Entity.c = c
+	return u.Entity
 }

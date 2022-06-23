@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go v0.43.0 // indirect
 	code.cloudfoundry.org/lager v2.0.0+incompatible
 	github.com/aws/aws-sdk-go v1.38.66
-	github.com/cloudfoundry-community/go-cfclient v0.0.0-20170502130034-23156ed0e73b
+	github.com/cloudfoundry-community/go-cfclient v0.0.0-20220601192014-596c068bcda2
 	github.com/codegangsta/inject v0.0.0-20150114235600-33e0aa1cb7c0 // indirect
 	github.com/denisenkom/go-mssqldb v0.0.0-20190515213511-eb9f6a1743f3 // indirect
 	github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5 // indirect
@@ -35,6 +35,8 @@ require (
 require github.com/pivotal-cf/brokerapi/v8 v8.2.0
 
 require (
+	code.cloudfoundry.org/gofileutils v0.0.0-20170111115228-4d0c80011a0f // indirect
+	github.com/Masterminds/semver v1.4.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/go-sql-driver/mysql v1.6.0 // indirect

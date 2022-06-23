@@ -8,6 +8,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/pivotal-cf/brokerapi/v8/domain/apiresponses"
 	"io/ioutil"
+	"net/url"
+	"regexp"
 	"strings"
 
 	"code.cloudfoundry.org/lager"
@@ -57,6 +59,9 @@ func New(
 
 var (
 	MaxHeaderCount = 10
+
+	// not very strict - only to prevent extreme mischief
+	isValidDomain = regexp.MustCompile("^[A-Za-z0-9.-]+$").MatchString
 )
 
 func (b *CdnServiceBroker) GetBinding(ctx context.Context, first, second string, details domain.FetchBindingDetails) (domain.GetBindingSpec, error) {
@@ -573,33 +578,110 @@ func (b *CdnServiceBroker) parseUpdateDetails(logger lager.Logger, details domai
 	return options, err
 }
 
-func (b *CdnServiceBroker) checkDomain(logger lager.Logger, domain, orgGUID string) error {
+func (b *CdnServiceBroker) checkDomain(logger lager.Logger, domainsConcat, orgGUID string) error {
 	// domain can be a comma separated list so we need to check each one individually
-	domains := strings.Split(domain, ",")
-	var errorList []string
+	domainStrings := strings.Split(domainsConcat, ",")
+	var nonExistentDomains []string
+	var nonOwnedDomains []string
 
-	orgName := "<organization>"
+	for i := range domainStrings {
+		if !isValidDomain(domainStrings[i]) {
+			return fmt.Errorf(
+				"Domain %s doesn't look like a valid domain",
+				domainStrings[i],
+			)
+		}
 
-	for i := range domains {
-		if _, err := b.cfclient.GetDomainByName(domains[i]); err != nil {
-			logger.Error("get-domain-by-name-error", err)
+		q := url.Values{}
+		q.Set("names", domainStrings[i])
+		v3domains, err := b.cfclient.ListV3Domains(q)
+		if err != nil {
+			return fmt.Errorf(
+				"Error during CloudFoundry domain lookup of %s: %w",
+				domainStrings[i],
+				err,
+			)
+		}
 
-			if orgName == "<organization>" {
-				org, err := b.cfclient.GetOrgByGuid(orgGUID)
-				if err == nil {
-					orgName = org.Name
+		if len(v3domains) == 0 {
+			logger.Info("cf-domain-not-found", lager.Data{
+				"domain": domainStrings[i],
+			})
+			nonExistentDomains = append(nonExistentDomains, domainStrings[i])
+			continue
+		}
+		if len(v3domains) > 1 {
+			// shouldn't be possible?
+			logger.Info("cf-domain-multiple-found", lager.Data{
+				"domain": domainStrings[i],
+			})
+			return fmt.Errorf(
+				"Domain %s matches multiple CloudFoundry domains",
+				domainStrings[i],
+			)
+		}
+
+		if v3domains[0].Relationships.Organization.Data.GUID != orgGUID {
+			// check the SharedOrganizations
+			// really, golang?.
+			found := false
+			for j := range v3domains[0].Relationships.SharedOrganizations.Data {
+				if v3domains[0].Relationships.SharedOrganizations.Data[j].GUID == orgGUID {
+					found = true
+					break
 				}
 			}
-
-			errorList = append(errorList, fmt.Sprintf("`cf create-domain %s %s`", orgName, domains[i]))
+			if !found {
+				logger.Info("cf-domain-wrong-owner", lager.Data{
+					"domain": domainStrings[i],
+					"owning_organization_guid": v3domains[0].Relationships.Organization.Data.GUID,
+				})
+				nonOwnedDomains = append(nonOwnedDomains, domainStrings[i])
+				continue
+			}
 		}
 	}
 
-	if len(errorList) > 0 {
-		if len(errorList) > 1 {
-			return fmt.Errorf("Multiple domains do not exist; create them with:\n%s", strings.Join(errorList, "\n"))
+	if len(nonExistentDomains) > 0 {
+		orgName := "<organization>"
+		org, err := b.cfclient.GetOrgByGuid(orgGUID)
+		if err == nil {
+			orgName = org.Name
 		}
-		return fmt.Errorf("Domain does not exist; create it with %s", errorList[0])
+
+		var createDomainCommands []string
+		for i := range nonExistentDomains {
+			createDomainCommands = append(
+				createDomainCommands,
+				fmt.Sprintf("cf create-domain %s %s", nonExistentDomains[i], orgName),
+			)
+		}
+
+		if len(createDomainCommands) == 1 {
+			return fmt.Errorf(
+				"Domain %s does not exist in CloudFoundry; create it with: %s",
+				nonExistentDomains[0],
+				createDomainCommands[0],
+			)
+		}
+
+		return fmt.Errorf(
+			"Multiple domains do not exist in CloudFoundry; create them with:\n%s",
+			strings.Join(createDomainCommands, "\n"),
+		)
+	}
+
+	if len(nonOwnedDomains) > 0 {
+		if len(nonOwnedDomains) == 1 {
+			return fmt.Errorf(
+				"Domain %s is owned by a different organization in CloudFoundry",
+				nonOwnedDomains[0],
+			)
+		}
+		return fmt.Errorf(
+			"Multiple domains are owned by a different organization in CloudFoundry: %s",
+			strings.Join(nonOwnedDomains, ", "),
+		)
 	}
 
 	return nil

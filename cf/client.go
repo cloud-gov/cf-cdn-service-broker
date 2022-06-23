@@ -1,8 +1,12 @@
 package cf
 
-import "github.com/cloudfoundry-community/go-cfclient"
+import (
+	"net/url"
+
+	"github.com/cloudfoundry-community/go-cfclient"
+)
 
 type Client interface {
-	GetDomainByName(name string) (cfclient.Domain, error)
+	ListV3Domains(query url.Values) ([]cfclient.V3Domain, error)
 	GetOrgByGuid(guid string) (cfclient.Org, error)
 }
