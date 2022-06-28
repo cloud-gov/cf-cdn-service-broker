@@ -21,7 +21,7 @@ import (
 	"github.com/alphagov/paas-cdn-broker/utils"
 	utilsmocks "github.com/alphagov/paas-cdn-broker/utils/mocks"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
