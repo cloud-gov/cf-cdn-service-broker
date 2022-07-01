@@ -147,12 +147,14 @@ resources:
   source:
     uri: ((cf-cdn-broker-git-url))
     branch: ((cf-cdn-broker-git-branch))
+    commit_verification_keys: ((cloud-gov-pgp-keys))
 
 - name: pipeline-tasks
   type: git
   source:
     uri: ((pipeline-tasks-git-url))
     branch: ((pipeline-tasks-git-branch))
+    commit_verification_keys: ((cloud-gov-pgp-keys))
 
 - name: broker-deploy-staging
   type: cf
