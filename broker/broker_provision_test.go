@@ -245,7 +245,7 @@ cf create-domain domain3.cloud.gov my-org`,
 		s.cfclient.AssertExpectations(GinkgoT())
 	})
 
-	It("Should error when given an domain using invalid characters", func() {
+	It("Should error when given a domain using invalid characters", func() {
 		details := domain.ProvisionDetails{
 			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
 			RawParameters:    []byte(`{"domain": "domain&.cloud.gov"}`),
@@ -255,6 +255,20 @@ cf create-domain domain3.cloud.gov my-org`,
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(
 			"Domain domain&.cloud.gov doesn't look like a valid domain",
+		))
+		s.cfclient.AssertExpectations(GinkgoT())
+	})
+
+	It("Should error when given a domain with a trailing dot", func() {
+		details := domain.ProvisionDetails{
+			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+			RawParameters:    []byte(`{"domain": "domain.cloud.gov."}`),
+		}
+		_, err := s.Broker.Provision(s.ctx, "123", details, true)
+
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(
+			"Domain domain.cloud.gov. doesn't look like a valid domain",
 		))
 		s.cfclient.AssertExpectations(GinkgoT())
 	})

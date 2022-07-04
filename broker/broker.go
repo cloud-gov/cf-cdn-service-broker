@@ -61,7 +61,7 @@ var (
 	MaxHeaderCount = 10
 
 	// not very strict - only to prevent extreme mischief
-	isValidDomain = regexp.MustCompile("^[A-Za-z0-9.-]+$").MatchString
+	isValidDomain = regexp.MustCompile("^[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$").MatchString
 
 	errDomainOrParentNotFound = errors.New("domain-or-parent-not-found")
 )
