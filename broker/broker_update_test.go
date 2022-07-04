@@ -52,7 +52,7 @@ var _ = Describe("Update", func() {
 			headers *utils.Headers,
 			forwardCookies *bool) (bool, error) {
 
-			if *updateDomain == "domain1.gov" &&
+			if *updateDomain == "domain1.cloud.gov" &&
 				ttl == defaultTTLNotPassed &&
 				headers == forwardedHeadersNotPassed &&
 				forwardCookies == forwardCookiesNotPassed {
@@ -66,7 +66,39 @@ var _ = Describe("Update", func() {
 		s.setupCFClientListV3DomainsDomain1()
 
 		details := domain.UpdateDetails{
-			RawParameters: json.RawMessage(`{"domain": "domain1.gov"}`),
+			RawParameters: json.RawMessage(`{"domain": "domain1.cloud.gov"}`),
+			PreviousValues: domain.PreviousValues{
+				OrgID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+			},
+		}
+		_, err := s.Broker.Update(s.ctx, "123", details, true)
+		Expect(err).NotTo(HaveOccurred())
+		s.cfclient.AssertExpectations(GinkgoT())
+	})
+
+	It("Should succeed when given only a domain whose parent domain is owned in CloudFoundry", func() {
+		s.Manager.UpdateStub = func(
+			_ string,
+			updateDomain *string,
+			ttl *int64,
+			headers *utils.Headers,
+			forwardCookies *bool) (bool, error) {
+
+			if *updateDomain == "domain7.rain.gov" &&
+				ttl == defaultTTLNotPassed &&
+				headers == forwardedHeadersNotPassed &&
+				forwardCookies == forwardCookiesNotPassed {
+
+				return false, nil
+			} else {
+				return false, errors.New("unexpected arguments")
+			}
+		}
+
+		s.setupCFClientListV3DomainsDomain7()
+
+		details := domain.UpdateDetails{
+			RawParameters: json.RawMessage(`{"domain": "domain7.rain.gov"}`),
 			PreviousValues: domain.PreviousValues{
 				OrgID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
 			},
@@ -86,13 +118,13 @@ var _ = Describe("Update", func() {
 			PreviousValues: domain.PreviousValues{
 				OrgID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
 			},
-			RawParameters: json.RawMessage(`{"domain": "domain3.gov"}`),
+			RawParameters: json.RawMessage(`{"domain": "domain3.cloud.gov"}`),
 		}
 		_, err := s.Broker.Update(s.ctx, "123", details, true)
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(
-			"Domain domain3.gov does not exist in CloudFoundry; create it with: cf create-domain domain3.gov my-org",
+			"Domain domain3.cloud.gov does not exist in CloudFoundry; create it with: cf create-domain domain3.cloud.gov my-org",
 		))
 		s.cfclient.AssertExpectations(GinkgoT())
 	})
@@ -108,13 +140,13 @@ var _ = Describe("Update", func() {
 			PreviousValues: domain.PreviousValues{
 				OrgID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
 			},
-			RawParameters: json.RawMessage(`{"domain": "domain3.gov,domain2.gov"}`),
+			RawParameters: json.RawMessage(`{"domain": "domain3.cloud.gov,domain2.cloud.gov"}`),
 		}
 		_, err := s.Broker.Update(s.ctx, "123", details, true)
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(
-			"Domain domain3.gov does not exist in CloudFoundry; create it with: cf create-domain domain3.gov my-org",
+			"Domain domain3.cloud.gov does not exist in CloudFoundry; create it with: cf create-domain domain3.cloud.gov my-org",
 		))
 		s.cfclient.AssertExpectations(GinkgoT())
 	})
@@ -131,15 +163,15 @@ var _ = Describe("Update", func() {
 			PreviousValues: domain.PreviousValues{
 				OrgID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
 			},
-			RawParameters: json.RawMessage(`{"domain": "domain3.gov,domain2.gov,domain4.gov"}`),
+			RawParameters: json.RawMessage(`{"domain": "domain3.cloud.gov,domain2.cloud.gov,domain4.four.cloud.gov"}`),
 		}
 		_, err := s.Broker.Update(s.ctx, "123", details, true)
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(
 `Multiple domains do not exist in CloudFoundry; create them with:
-cf create-domain domain3.gov my-org
-cf create-domain domain4.gov my-org`,
+cf create-domain domain3.cloud.gov my-org
+cf create-domain domain4.four.cloud.gov my-org`,
 		))
 		s.cfclient.AssertExpectations(GinkgoT())
 	})
@@ -156,22 +188,22 @@ cf create-domain domain4.gov my-org`,
 			PreviousValues: domain.PreviousValues{
 				OrgID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
 			},
-			RawParameters: json.RawMessage(`{"domain": "domain3.gov,domain2.gov,domain4.gov"}`),
+			RawParameters: json.RawMessage(`{"domain": "domain3.cloud.gov,domain2.cloud.gov,domain4.four.cloud.gov"}`),
 		}
 		_, err := s.Broker.Update(s.ctx, "123", details, true)
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(
 `Multiple domains do not exist in CloudFoundry; create them with:
-cf create-domain domain3.gov <organization>
-cf create-domain domain4.gov <organization>`,
+cf create-domain domain3.cloud.gov <organization>
+cf create-domain domain4.four.cloud.gov <organization>`,
 		))
 		s.cfclient.AssertExpectations(GinkgoT())
 	})
 
 	It("Should error when given an domain using invalid characters", func() {
 		details := domain.UpdateDetails{
-			RawParameters: json.RawMessage(`{"domain": "domain!.gov"}`),
+			RawParameters: json.RawMessage(`{"domain": "domain!.cloud.gov"}`),
 			PreviousValues: domain.PreviousValues{
 				OrgID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
 			},
@@ -180,7 +212,7 @@ cf create-domain domain4.gov <organization>`,
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(
-			"Domain domain!.gov doesn't look like a valid domain",
+			"Domain domain!.cloud.gov doesn't look like a valid domain",
 		))
 		s.cfclient.AssertExpectations(GinkgoT())
 	})
@@ -194,13 +226,13 @@ cf create-domain domain4.gov <organization>`,
 			PreviousValues: domain.PreviousValues{
 				OrgID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
 			},
-			RawParameters: json.RawMessage(`{"domain": "domain6.gov"}`),
+			RawParameters: json.RawMessage(`{"domain": "domain6.cloud.gov"}`),
 		}
 		_, err := s.Broker.Update(s.ctx, "123", details, true)
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(
-			"Domain domain6.gov is owned by a different organization in CloudFoundry",
+			"Domain domain6.cloud.gov is owned by a different organization in CloudFoundry",
 		))
 		s.cfclient.AssertExpectations(GinkgoT())
 	})
@@ -215,13 +247,13 @@ cf create-domain domain4.gov <organization>`,
 			PreviousValues: domain.PreviousValues{
 				OrgID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
 			},
-			RawParameters: json.RawMessage(`{"domain": "domain6.gov,domain5.gov"}`),
+			RawParameters: json.RawMessage(`{"domain": "domain6.cloud.gov,domain5.cloud.gov"}`),
 		}
 		_, err := s.Broker.Update(s.ctx, "123", details, true)
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(
-			"Multiple domains are owned by a different organization in CloudFoundry: domain6.gov, domain5.gov",
+			"Multiple domains are owned by a different organization in CloudFoundry: domain6.cloud.gov, domain5.cloud.gov",
 		))
 		s.cfclient.AssertExpectations(GinkgoT())
 	})
@@ -237,13 +269,13 @@ cf create-domain domain4.gov <organization>`,
 			PreviousValues: domain.PreviousValues{
 				OrgID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
 			},
-			RawParameters: json.RawMessage(`{"domain": "domain5.gov,domain1.gov,domain2.gov"}`),
+			RawParameters: json.RawMessage(`{"domain": "domain5.cloud.gov,domain1.cloud.gov,domain2.cloud.gov"}`),
 		}
 		_, err := s.Broker.Update(s.ctx, "123", details, true)
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(
-			"Domain domain5.gov is owned by a different organization in CloudFoundry",
+			"Domain domain5.cloud.gov is owned by a different organization in CloudFoundry",
 		))
 		s.cfclient.AssertExpectations(GinkgoT())
 	})
@@ -259,13 +291,33 @@ cf create-domain domain4.gov <organization>`,
 			PreviousValues: domain.PreviousValues{
 				OrgID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
 			},
-			RawParameters: json.RawMessage(`{"domain": "domain4.gov,domain6.gov"}`),
+			RawParameters: json.RawMessage(`{"domain": "domain4.four.cloud.gov,domain6.cloud.gov"}`),
 		}
 		_, err := s.Broker.Update(s.ctx, "123", details, true)
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(
-			"Domain domain4.gov does not exist in CloudFoundry; create it with: cf create-domain domain4.gov my-org",
+			"Domain domain4.four.cloud.gov does not exist in CloudFoundry; create it with: cf create-domain domain4.four.cloud.gov my-org",
+		))
+		s.cfclient.AssertExpectations(GinkgoT())
+	})
+
+	It("Should error when a parent Cloud Foundry domain doesn't belong to the organization", func() {
+		s.Manager.UpdateReturns(true, nil)
+
+		s.setupCFClientListV3DomainsDomain8()
+
+		details := domain.UpdateDetails{
+			PreviousValues: domain.PreviousValues{
+				OrgID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+			},
+			RawParameters: json.RawMessage(`{"domain": "domain8.wet.snow.gov"}`),
+		}
+		_, err := s.Broker.Update(s.ctx, "123", details, true)
+
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(
+			"Domain domain8.wet.snow.gov is owned by a different organization in CloudFoundry",
 		))
 		s.cfclient.AssertExpectations(GinkgoT())
 	})
@@ -281,7 +333,7 @@ cf create-domain domain4.gov <organization>`,
 					OrgID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
 				},
 				RawParameters: json.RawMessage(`{
-			"domain": "domain1.gov",
+			"domain": "domain1.cloud.gov",
 			"headers": ["Host"]
 		}`),
 			}
@@ -299,7 +351,7 @@ cf create-domain domain4.gov <organization>`,
 					OrgID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
 				},
 				RawParameters: json.RawMessage(`{
-			"domain": "domain1.gov",
+			"domain": "domain1.cloud.gov",
 			"headers": ["User-Agent"]
 		}`),
 			}
@@ -317,7 +369,7 @@ cf create-domain domain4.gov <organization>`,
 					OrgID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
 				},
 				RawParameters: json.RawMessage(`{
-			"domain": "domain1.gov",
+			"domain": "domain1.cloud.gov",
 			"headers": ["*"]
 		}`),
 			}
@@ -335,7 +387,7 @@ cf create-domain domain4.gov <organization>`,
 					OrgID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
 				},
 				RawParameters: json.RawMessage(`{
-			"domain": "domain1.gov",
+			"domain": "domain1.cloud.gov",
 			"headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"]
 		}`),
 			}
@@ -353,7 +405,7 @@ cf create-domain domain4.gov <organization>`,
 					OrgID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
 				},
 				RawParameters: json.RawMessage(`{
-			"domain": "domain1.gov",
+			"domain": "domain1.cloud.gov",
 			"headers": ["*", "User-Agent"]
 		}`),
 			}
@@ -370,7 +422,7 @@ cf create-domain domain4.gov <organization>`,
 					OrgID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
 				},
 				RawParameters: json.RawMessage(`{
-			"domain": "domain1.gov",
+			"domain": "domain1.cloud.gov",
 			"headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"]
 		}`),
 			}

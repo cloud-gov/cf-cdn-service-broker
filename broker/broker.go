@@ -62,6 +62,8 @@ var (
 
 	// not very strict - only to prevent extreme mischief
 	isValidDomain = regexp.MustCompile("^[A-Za-z0-9.-]+$").MatchString
+
+	errDomainOrParentNotFound = errors.New("domain-or-parent-not-found")
 )
 
 func (b *CdnServiceBroker) GetBinding(ctx context.Context, first, second string, details domain.FetchBindingDetails) (domain.GetBindingSpec, error) {
@@ -545,7 +547,7 @@ func (b *CdnServiceBroker) parseProvisionDetails(logger lager.Logger, details do
 		return options, err
 	}
 
-	err = b.checkDomain(logger, options.Domain, details.OrganizationGUID)
+	err = b.checkDomains(logger, options.Domain, details.OrganizationGUID)
 	if err != nil {
 		return options, err
 	}
@@ -569,7 +571,7 @@ func (b *CdnServiceBroker) parseUpdateDetails(logger lager.Logger, details domai
 	}
 
 	if options.Domain != nil {
-		err = b.checkDomain(logger, *options.Domain, details.PreviousValues.OrgID)
+		err = b.checkDomains(logger, *options.Domain, details.PreviousValues.OrgID)
 		if err != nil {
 			return options, err
 		}
@@ -578,7 +580,7 @@ func (b *CdnServiceBroker) parseUpdateDetails(logger lager.Logger, details domai
 	return options, err
 }
 
-func (b *CdnServiceBroker) checkDomain(logger lager.Logger, domainsConcat, orgGUID string) error {
+func (b *CdnServiceBroker) checkDomains(logger lager.Logger, domainsConcat, orgGUID string) error {
 	// domain can be a comma separated list so we need to check each one individually
 	domainStrings := strings.Split(domainsConcat, ",")
 	var nonExistentDomains []string
@@ -592,41 +594,24 @@ func (b *CdnServiceBroker) checkDomain(logger lager.Logger, domainsConcat, orgGU
 			)
 		}
 
-		q := url.Values{}
-		q.Set("names", domainStrings[i])
-		v3domains, err := b.cfclient.ListV3Domains(q)
-		if err != nil {
-			return fmt.Errorf(
-				"Error during CloudFoundry domain lookup of %s: %w",
-				domainStrings[i],
-				err,
-			)
-		}
-
-		if len(v3domains) == 0 {
+		v3domain, err := b.getDomainOrParent(logger, domainStrings[i])
+		if errors.Is(err, errDomainOrParentNotFound) {
 			logger.Info("cf-domain-not-found", lager.Data{
 				"domain": domainStrings[i],
 			})
 			nonExistentDomains = append(nonExistentDomains, domainStrings[i])
 			continue
 		}
-		if len(v3domains) > 1 {
-			// shouldn't be possible?
-			logger.Info("cf-domain-multiple-found", lager.Data{
-				"domain": domainStrings[i],
-			})
-			return fmt.Errorf(
-				"Domain %s matches multiple CloudFoundry domains",
-				domainStrings[i],
-			)
+		if err != nil {
+			return err
 		}
 
-		if v3domains[0].Relationships.Organization.Data.GUID != orgGUID {
+		if v3domain.Relationships.Organization.Data.GUID != orgGUID {
 			// check the SharedOrganizations
 			// really, golang?.
 			found := false
-			for j := range v3domains[0].Relationships.SharedOrganizations.Data {
-				if v3domains[0].Relationships.SharedOrganizations.Data[j].GUID == orgGUID {
+			for j := range v3domain.Relationships.SharedOrganizations.Data {
+				if v3domain.Relationships.SharedOrganizations.Data[j].GUID == orgGUID {
 					found = true
 					break
 				}
@@ -634,7 +619,7 @@ func (b *CdnServiceBroker) checkDomain(logger lager.Logger, domainsConcat, orgGU
 			if !found {
 				logger.Info("cf-domain-wrong-owner", lager.Data{
 					"domain": domainStrings[i],
-					"owning_organization_guid": v3domains[0].Relationships.Organization.Data.GUID,
+					"owning_organization_guid": v3domain.Relationships.Organization.Data.GUID,
 				})
 				nonOwnedDomains = append(nonOwnedDomains, domainStrings[i])
 				continue
@@ -685,6 +670,43 @@ func (b *CdnServiceBroker) checkDomain(logger lager.Logger, domainsConcat, orgGU
 	}
 
 	return nil
+}
+
+func (b *CdnServiceBroker) getDomainOrParent(logger lager.Logger, domain string) (cf.V3Domain, error) {
+	for {
+		q := url.Values{}
+		q.Set("names", domain)
+		v3domains, err := b.cfclient.ListV3Domains(q)
+		if err != nil {
+			return cf.V3Domain{}, fmt.Errorf(
+				"Error during CloudFoundry domain lookup of %s: %w",
+				domain,
+				err,
+			)
+		}
+		if len(v3domains) == 1 {
+			// found
+			return v3domains[0], nil
+		}
+		if len(v3domains) > 1 {
+			// shouldn't be possible?
+			logger.Info("cf-domain-multiple-found", lager.Data{
+				"domain": domain,
+			})
+			return cf.V3Domain{}, fmt.Errorf(
+				"Domain %s matches multiple CloudFoundry domains",
+				domain,
+			)
+		}
+
+		// none found, try a parent domain
+		splitDomain := strings.SplitN(domain, ".", 2)
+		if len(splitDomain) != 2 || !strings.Contains(splitDomain[1], ".") {
+			// no more parents or remaining parent not valid domain
+			return cf.V3Domain{}, errDomainOrParentNotFound
+		}
+		domain = splitDomain[1]
+	}
 }
 
 func (b *CdnServiceBroker) getHeaders(headerNames []string) (utils.Headers, error) {

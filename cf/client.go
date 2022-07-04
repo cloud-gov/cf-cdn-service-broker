@@ -10,3 +10,5 @@ type Client interface {
 	ListV3Domains(query url.Values) ([]cfclient.V3Domain, error)
 	GetOrgByGuid(guid string) (cfclient.Org, error)
 }
+
+type V3Domain = cfclient.V3Domain
