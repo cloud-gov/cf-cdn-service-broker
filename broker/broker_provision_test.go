@@ -75,7 +75,7 @@ var _ = Describe("Provision", func() {
 
 		details := domain.ProvisionDetails{
 			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-			RawParameters: []byte(`{"domain": "domain1.gov"}`),
+			RawParameters: []byte(`{"domain": "domain1.cloud.gov"}`),
 		}
 		_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
@@ -93,7 +93,24 @@ var _ = Describe("Provision", func() {
 
 		details := domain.ProvisionDetails{
 			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-			RawParameters: []byte(`{"domain": "domain1.gov"}`),
+			RawParameters: []byte(`{"domain": "domain1.cloud.gov"}`),
+		}
+		_, err := s.Broker.Provision(s.ctx, "123", details, true)
+
+		Expect(err).NotTo(HaveOccurred())
+		s.cfclient.AssertExpectations(GinkgoT())
+	})
+
+	It("Should succeed when a parent domain is owned in cloudfoundry", func() {
+		s.Manager.GetReturns(&models.Route{}, errors.New("not found"))
+		route := &models.Route{State: models.Provisioning}
+		s.Manager.CreateReturns(route, nil)
+
+		s.setupCFClientListV3DomainsDomain7()
+
+		details := domain.ProvisionDetails{
+			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+			RawParameters: []byte(`{"domain": "domain7.rain.gov"}`),
 		}
 		_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
@@ -111,7 +128,7 @@ var _ = Describe("Provision", func() {
 		details := domain.ProvisionDetails{
 			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
 			RawParameters: []byte(`{
-				"domain": "domain1.gov",
+				"domain": "domain1.cloud.gov",
 				"default_ttl": 52
 			}`),
 		}
@@ -134,7 +151,7 @@ var _ = Describe("Provision", func() {
 
 		details := domain.ProvisionDetails{
 			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-			RawParameters:    []byte(`{"domain": "domain1.gov"}`),
+			RawParameters:    []byte(`{"domain": "domain1.cloud.gov"}`),
 			SpaceGUID:        "space-1",
 			ServiceID:        "service-1",
 			PlanID:           "plan-1",
@@ -161,13 +178,13 @@ var _ = Describe("Provision", func() {
 		
 		details := domain.ProvisionDetails{
 			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-			RawParameters:    []byte(`{"domain": "domain3.gov"}`),
+			RawParameters:    []byte(`{"domain": "domain3.cloud.gov"}`),
 		}
 		_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(
-			"Domain domain3.gov does not exist in CloudFoundry; create it with: cf create-domain domain3.gov my-org",
+			"Domain domain3.cloud.gov does not exist in CloudFoundry; create it with: cf create-domain domain3.cloud.gov my-org",
 		))
 		s.cfclient.AssertExpectations(GinkgoT())
 	})
@@ -179,13 +196,13 @@ var _ = Describe("Provision", func() {
 
 		details := domain.ProvisionDetails{
 			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-			RawParameters:    []byte(`{"domain": "domain1.gov,domain3.gov"}`),
+			RawParameters:    []byte(`{"domain": "domain1.cloud.gov,domain3.cloud.gov"}`),
 		}
 		_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(
-			"Domain domain3.gov does not exist in CloudFoundry; create it with: cf create-domain domain3.gov my-org",
+			"Domain domain3.cloud.gov does not exist in CloudFoundry; create it with: cf create-domain domain3.cloud.gov my-org",
 		))
 		s.cfclient.AssertExpectations(GinkgoT())
 	})
@@ -198,15 +215,15 @@ var _ = Describe("Provision", func() {
 
 		details := domain.ProvisionDetails{
 			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-			RawParameters:    []byte(`{"domain": "domain1.gov,domain4.gov,domain3.gov"}`),
+			RawParameters:    []byte(`{"domain": "domain1.cloud.gov,domain4.four.cloud.gov,domain3.cloud.gov"}`),
 		}
 		_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(
 `Multiple domains do not exist in CloudFoundry; create them with:
-cf create-domain domain4.gov my-org
-cf create-domain domain3.gov my-org`,
+cf create-domain domain4.four.cloud.gov my-org
+cf create-domain domain3.cloud.gov my-org`,
 		))
 		s.cfclient.AssertExpectations(GinkgoT())
 	})
@@ -217,27 +234,41 @@ cf create-domain domain3.gov my-org`,
 
 		details := domain.ProvisionDetails{
 			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-			RawParameters:    []byte(`{"domain": "domain4.gov"}`),
+			RawParameters:    []byte(`{"domain": "domain4.four.cloud.gov"}`),
 		}
 		_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(
-			"Domain domain4.gov does not exist in CloudFoundry; create it with: cf create-domain domain4.gov <organization>",
+			"Domain domain4.four.cloud.gov does not exist in CloudFoundry; create it with: cf create-domain domain4.four.cloud.gov <organization>",
 		))
 		s.cfclient.AssertExpectations(GinkgoT())
 	})
 
-	It("Should error when given an domain using invalid characters", func() {
+	It("Should error when given a domain using invalid characters", func() {
 		details := domain.ProvisionDetails{
 			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-			RawParameters:    []byte(`{"domain": "domain&.gov"}`),
+			RawParameters:    []byte(`{"domain": "domain&.cloud.gov"}`),
 		}
 		_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(
-			"Domain domain&.gov doesn't look like a valid domain",
+			"Domain domain&.cloud.gov doesn't look like a valid domain",
+		))
+		s.cfclient.AssertExpectations(GinkgoT())
+	})
+
+	It("Should error when given a domain with a trailing dot", func() {
+		details := domain.ProvisionDetails{
+			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+			RawParameters:    []byte(`{"domain": "domain.cloud.gov."}`),
+		}
+		_, err := s.Broker.Provision(s.ctx, "123", details, true)
+
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(
+			"Domain domain.cloud.gov. doesn't look like a valid domain",
 		))
 		s.cfclient.AssertExpectations(GinkgoT())
 	})
@@ -247,13 +278,13 @@ cf create-domain domain3.gov my-org`,
 
 		details := domain.ProvisionDetails{
 			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-			RawParameters:    []byte(`{"domain": "domain5.gov"}`),
+			RawParameters:    []byte(`{"domain": "domain5.cloud.gov"}`),
 		}
 		_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(
-			"Domain domain5.gov is owned by a different organization in CloudFoundry",
+			"Domain domain5.cloud.gov is owned by a different organization in CloudFoundry",
 		))
 		s.cfclient.AssertExpectations(GinkgoT())
 	})
@@ -264,13 +295,13 @@ cf create-domain domain3.gov my-org`,
 
 		details := domain.ProvisionDetails{
 			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-			RawParameters:    []byte(`{"domain": "domain6.gov,domain5.gov"}`),
+			RawParameters:    []byte(`{"domain": "domain6.cloud.gov,domain5.cloud.gov"}`),
 		}
 		_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(
-			"Multiple domains are owned by a different organization in CloudFoundry: domain6.gov, domain5.gov",
+			"Multiple domains are owned by a different organization in CloudFoundry: domain6.cloud.gov, domain5.cloud.gov",
 		))
 		s.cfclient.AssertExpectations(GinkgoT())
 	})
@@ -282,13 +313,13 @@ cf create-domain domain3.gov my-org`,
 
 		details := domain.ProvisionDetails{
 			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-			RawParameters:    []byte(`{"domain": "domain1.gov,domain6.gov,domain2.gov"}`),
+			RawParameters:    []byte(`{"domain": "domain1.cloud.gov,domain6.cloud.gov,domain2.cloud.gov"}`),
 		}
 		_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(
-			"Domain domain6.gov is owned by a different organization in CloudFoundry",
+			"Domain domain6.cloud.gov is owned by a different organization in CloudFoundry",
 		))
 		s.cfclient.AssertExpectations(GinkgoT())
 	})
@@ -301,13 +332,29 @@ cf create-domain domain3.gov my-org`,
 
 		details := domain.ProvisionDetails{
 			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-			RawParameters:    []byte(`{"domain": "domain1.gov,domain6.gov,domain4.gov"}`),
+			RawParameters:    []byte(`{"domain": "domain1.cloud.gov,domain6.cloud.gov,domain4.four.cloud.gov"}`),
 		}
 		_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(
-			"Domain domain4.gov does not exist in CloudFoundry; create it with: cf create-domain domain4.gov my-org",
+			"Domain domain4.four.cloud.gov does not exist in CloudFoundry; create it with: cf create-domain domain4.four.cloud.gov my-org",
+		))
+		s.cfclient.AssertExpectations(GinkgoT())
+	})
+
+	It("Should error when a parent Cloud Foundry domain doesn't belong to the organization", func() {
+		s.setupCFClientListV3DomainsDomain8()
+
+		details := domain.ProvisionDetails{
+			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
+			RawParameters:    []byte(`{"domain": "domain8.wet.snow.gov"}`),
+		}
+		_, err := s.Broker.Provision(s.ctx, "123", details, true)
+
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(
+			"Domain domain8.wet.snow.gov is owned by a different organization in CloudFoundry",
 		))
 		s.cfclient.AssertExpectations(GinkgoT())
 	})
@@ -323,7 +370,7 @@ cf create-domain domain3.gov my-org`,
 
 			details := domain.ProvisionDetails{
 				OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-				RawParameters: []byte(`{"domain": "domain1.gov", "headers": ["Host"]}`),
+				RawParameters: []byte(`{"domain": "domain1.cloud.gov", "headers": ["Host"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
@@ -337,7 +384,7 @@ cf create-domain domain3.gov my-org`,
 
 			details := domain.ProvisionDetails{
 				OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-				RawParameters: []byte(`{"domain": "domain1.gov", "headers": ["User-Agent"]}`),
+				RawParameters: []byte(`{"domain": "domain1.cloud.gov", "headers": ["User-Agent"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
@@ -351,7 +398,7 @@ cf create-domain domain3.gov my-org`,
 
 			details := domain.ProvisionDetails{
 				OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-				RawParameters: []byte(`{"domain": "domain1.gov", "headers": ["*"]}`),
+				RawParameters: []byte(`{"domain": "domain1.cloud.gov", "headers": ["*"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
@@ -365,7 +412,7 @@ cf create-domain domain3.gov my-org`,
 
 			details := domain.ProvisionDetails{
 				OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-				RawParameters: []byte(`{"domain": "domain1.gov", "headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"]}`),
+				RawParameters: []byte(`{"domain": "domain1.cloud.gov", "headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
@@ -378,7 +425,7 @@ cf create-domain domain3.gov my-org`,
 
 			details := domain.ProvisionDetails{
 				OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-				RawParameters: []byte(`{"domain": "domain1.gov", "headers": ["User-Agent", "Host", "User-Agent"]}`),
+				RawParameters: []byte(`{"domain": "domain1.cloud.gov", "headers": ["User-Agent", "Host", "User-Agent"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
@@ -392,7 +439,7 @@ cf create-domain domain3.gov my-org`,
 
 			details := domain.ProvisionDetails{
 				OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-				RawParameters: []byte(`{"domain": "domain1.gov", "headers": ["*", "User-Agent"]}`),
+				RawParameters: []byte(`{"domain": "domain1.cloud.gov", "headers": ["*", "User-Agent"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
@@ -406,7 +453,7 @@ cf create-domain domain3.gov my-org`,
 
 			details := domain.ProvisionDetails{
 				OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-				RawParameters: []byte(`{"domain": "domain1.gov", "headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"]}`),
+				RawParameters: []byte(`{"domain": "domain1.cloud.gov", "headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
