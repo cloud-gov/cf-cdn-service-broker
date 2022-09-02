@@ -7,13 +7,8 @@ import (
 	"github.com/alphagov/paas-cdn-broker/config"
 )
 
-func Postgresql(settings config.Settings) error {
-	db, err := gorm.Open("postgres", settings.DatabaseUrl)
-	defer db.Close()
-
-	if err != nil {
-		return err
+func CreatePostgresqlChecker(db *gorm.DB) (func(config.Settings) error) {
+	return func(settings config.Settings) error {
+		return db.DB().Ping()
 	}
-
-	return nil
 }

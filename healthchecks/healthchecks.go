@@ -4,15 +4,18 @@ import (
 	"fmt"
 	"github.com/alphagov/paas-cdn-broker/config"
 	"net/http"
+
+	"github.com/jinzhu/gorm"
 )
 
-var checks = map[string]func(config.Settings) error{
-	"cloudfront":   Cloudfront,
-	"cloudfoundry": Cloudfoundry,
-	"postgresql":   Postgresql,
-}
 
-func Bind(mux *http.ServeMux, settings config.Settings) {
+func Bind(mux *http.ServeMux, settings config.Settings, db *gorm.DB) {
+	var checks = map[string]func(config.Settings) error{
+		"cloudfront":   Cloudfront,
+		"cloudfoundry": Cloudfoundry,
+		"postgresql":   CreatePostgresqlChecker(db),
+	}
+
 	mux.HandleFunc("/healthcheck", func(w http.ResponseWriter, r *http.Request) {
 		body := ""
 		for name, function := range checks {
