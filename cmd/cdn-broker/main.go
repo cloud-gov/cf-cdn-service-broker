@@ -33,7 +33,7 @@ func main() {
 
 	db, err := config.Connect(settings)
 	if err != nil {
-		logger.Fatal("connect", err)
+		logger.Fatal("config-connect", err)
 	}
 
 	cfClient, err := cfclient.NewClient(&cfclient.Config{
