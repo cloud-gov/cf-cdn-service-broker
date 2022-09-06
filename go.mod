@@ -14,7 +14,7 @@ require (
 	github.com/jinzhu/inflection v0.0.0-20170102125226-1c35d901db3d // indirect
 	github.com/jinzhu/now v1.0.1 // indirect
 	github.com/kelseyhightower/envconfig v1.2.0
-	github.com/lib/pq v0.0.0-20170324204654-2704adc878c2
+	github.com/lib/pq v1.10.6
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
 	github.com/maxbrunsfeld/counterfeiter/v6 v6.4.1
 	github.com/onsi/gomega v1.19.0
