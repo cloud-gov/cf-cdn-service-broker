@@ -20,7 +20,7 @@ var _ = Describe("HTTPHandler", func() {
 			lager.NewLogger("main.test"),
 			brokerapi.BrokerCredentials{},
 		)
-		handler := bindHTTPHandlers(brokerAPI, config.Settings{})
+		handler := bindHTTPHandlers(brokerAPI, config.Settings{}, nil)
 		req, err := http.NewRequest("GET", "http://example.com/healthcheck/http", nil)
 
 		Expect(err).NotTo(HaveOccurred())

@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/jinzhu/gorm"
+
 	"code.cloudfoundry.org/lager"
 	"github.com/cloudfoundry-community/go-cfclient"
 	"github.com/pivotal-cf/brokerapi/v8"
@@ -31,7 +33,7 @@ func main() {
 
 	db, err := config.Connect(settings)
 	if err != nil {
-		logger.Fatal("connect", err)
+		logger.Fatal("config-connect", err)
 	}
 
 	cfClient, err := cfclient.NewClient(&cfclient.Config{
@@ -68,14 +70,14 @@ func main() {
 	}
 
 	brokerAPI := brokerapi.New(broker, logger, credentials)
-	server := bindHTTPHandlers(brokerAPI, settings)
+	server := bindHTTPHandlers(brokerAPI, settings, db)
 	http.ListenAndServe(fmt.Sprintf(":%s", settings.Port), server)
 }
 
-func bindHTTPHandlers(handler http.Handler, settings config.Settings) http.Handler {
+func bindHTTPHandlers(handler http.Handler, settings config.Settings, db *gorm.DB) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/", handler)
-	healthchecks.Bind(mux, settings)
+	healthchecks.Bind(mux, settings, db)
 
 	return mux
 }

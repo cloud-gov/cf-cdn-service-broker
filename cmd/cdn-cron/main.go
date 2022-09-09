@@ -29,7 +29,7 @@ func main() {
 
 	db, err := config.Connect(settings)
 	if err != nil {
-		logger.Fatal("connect", err)
+		logger.Fatal("config-connect", err)
 	}
 
 	if err := db.AutoMigrate(&models.Route{}, &models.Certificate{}).Error; err != nil {
