@@ -25,3 +25,6 @@ _testmain.go
 *.prof
 
 credentials.yml
+
+# Temporary Build Files
+amd64/*
