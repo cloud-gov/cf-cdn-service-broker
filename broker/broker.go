@@ -109,8 +109,10 @@ func (b *CdnServiceBroker) GetInstance(ctx context.Context, instanceID string, d
 
 	forwardCookies := aws.StringValue(distribution.DistributionConfig.DefaultCacheBehavior.ForwardedValues.Cookies.Forward) == "all"
 	cacheTTL := aws.Int64Value(distribution.DistributionConfig.DefaultCacheBehavior.DefaultTTL)
+	distributionId := aws.StringValue(distribution.Id)
 
 	instanceParams := map[string]interface{}{
+		"cloudfront_distribution_id": distributionId,
 		"cloudfront_domain": route.DomainInternal,
 		"dns_records":       challenges,
 		"forwarded_headers": headers,

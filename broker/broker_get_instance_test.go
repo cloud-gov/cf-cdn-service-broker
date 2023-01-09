@@ -188,6 +188,16 @@ var _ = Describe("GetInstance", func() {
 			Expect(params["forwarded_headers"]).To(ConsistOf("Host", "Authorization"))
 		})
 
+		It("should return the cloudfront distribution id in the instance parameters", func() {
+			instance, err := s.Broker.GetInstance(s.ctx, instanceId, domain.FetchInstanceDetails{})
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(instance.Parameters).ToNot(BeNil())
+			params, err := instanceParamsToMap(instance.Parameters)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(params).To(HaveKeyWithValue("cloudfront_distribution_id", "distribution-1"))
+		})
+
 		It("should return the cookie forwarding configuration in the instance parameters", func() {
 			instance, err := s.Broker.GetInstance(s.ctx, instanceId, domain.FetchInstanceDetails{})
 			Expect(err).ToNot(HaveOccurred())
