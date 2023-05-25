@@ -146,7 +146,7 @@ resources:
   type: git
   source:
     uri: ((cf-cdn-broker-git-url))
-    branch: ((cf-cdn-broker-git-branch))
+    branch: goupdate
     commit_verification_keys: ((cloud-gov-pgp-keys))
 
 - name: pipeline-tasks
