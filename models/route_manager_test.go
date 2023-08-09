@@ -36,23 +36,30 @@ var _ = Describe("RouteManager", func() {
 			fakeDatastore    *mocks.FakeRouteStore
 
 			errorLogOutput *bytes.Buffer
+
+			logger lager.Logger
+			settings config.Settings
 		)
 
 		BeforeEach(func() {
+			settings = config.Settings{}
+
 			errorLogOutput = bytes.NewBuffer([]byte{})
 
-			logger := lager.NewLogger("delete-orphaned-acm-certs")
+			logger = lager.NewLogger("delete-orphaned-acm-certs")
 			logger.RegisterSink(lager.NewWriterSink(GinkgoWriter, lager.INFO))
 			logger.RegisterSink(lager.NewWriterSink(errorLogOutput, lager.ERROR))
 
 			fakeCertsManager = &utilsmocks.FakeCertificateManager{}
 			fakeDatastore = &mocks.FakeRouteStore{}
 			fakeDistribution = &utilsmocks.FakeDistribution{}
+		})
 
+		JustBeforeEach(func() {
 			manager = models.NewManager(
 				logger,
 				fakeDistribution,
-				config.Settings{},
+				settings,
 				fakeDatastore,
 				fakeCertsManager,
 			)
@@ -133,9 +140,13 @@ var _ = Describe("RouteManager", func() {
 		var manager models.RouteManager
 		var cfDist *cloudfront.Distribution
 		var fakeDatastore *modelsmocks.FakeRouteStore
+		var logger lager.Logger
+		var settings config.Settings
 
 		BeforeEach(func() {
-			logger := lager.NewLogger("test")
+			settings = config.Settings{}
+
+			logger = lager.NewLogger("test")
 
 			logger.RegisterSink(lager.NewWriterSink(GinkgoWriter, lager.INFO))
 
@@ -167,6 +178,16 @@ var _ = Describe("RouteManager", func() {
 
 			fakeCertsManager.RequestCertificateReturns(aws.String("FirstCertArn"), nil)
 
+		})
+
+		JustBeforeEach(func() {
+			manager = models.NewManager(
+				logger,
+				fakeDistribution,
+				settings,
+				fakeDatastore,
+				fakeCertsManager,
+			)
 		})
 
 		It("when creating a new route, the function creates a cloudfront distribution and persisting the newly created route to the database", func() {
@@ -220,10 +241,12 @@ var _ = Describe("RouteManager", func() {
 		var route *models.Route
 		var cfDist *cloudfront.Distribution
 		var fakeDatastore *modelsmocks.FakeRouteStore
+		var settings config.Settings
+		var logger lager.Logger
 
 		BeforeEach(func() {
-			//get the logger
-			logger := lager.NewLogger("test")
+			settings = config.Settings{}
+			logger = lager.NewLogger("test")
 
 			logger.RegisterSink(lager.NewWriterSink(GinkgoWriter, lager.INFO))
 
@@ -232,14 +255,6 @@ var _ = Describe("RouteManager", func() {
 			fakeCertsManager = &utilsmocks.FakeCertificateManager{}
 
 			fakeDatastore = &modelsmocks.FakeRouteStore{}
-
-			manager = models.NewManager(
-				logger,
-				fakeDistribution,
-				config.Settings{},
-				fakeDatastore,
-				fakeCertsManager,
-			)
 
 			cfDist = &cloudfront.Distribution{
 				Status:             aws.String("Deployed"),
@@ -251,6 +266,16 @@ var _ = Describe("RouteManager", func() {
 
 			fakeDistribution.GetReturns(cfDist, nil)
 
+		})
+
+		JustBeforeEach(func() {
+			manager = models.NewManager(
+				logger,
+				fakeDistribution,
+				settings,
+				fakeDatastore,
+				fakeCertsManager,
+			)
 		})
 
 		Context("When the route is provisioning", func() {
@@ -438,10 +463,13 @@ var _ = Describe("RouteManager", func() {
 		var route *models.Route
 		var cfDist *cloudfront.Distribution
 		var fakeDatastore *modelsmocks.FakeRouteStore
+		var logger lager.Logger
+		var settings config.Settings
 
 		BeforeEach(func() {
-			//get the logger
-			logger := lager.NewLogger("test")
+			settings = config.Settings{}
+
+			logger = lager.NewLogger("test")
 
 			logger.RegisterSink(lager.NewWriterSink(GinkgoWriter, lager.INFO))
 
@@ -450,14 +478,6 @@ var _ = Describe("RouteManager", func() {
 			fakeCertsManager = &utilsmocks.FakeCertificateManager{}
 
 			fakeDatastore = &modelsmocks.FakeRouteStore{}
-
-			manager = models.NewManager(
-				logger,
-				fakeDistribution,
-				config.Settings{},
-				fakeDatastore,
-				fakeCertsManager,
-			)
 
 			cfDist = &cloudfront.Distribution{
 				Status:             aws.String("Deployed"),
@@ -484,6 +504,16 @@ var _ = Describe("RouteManager", func() {
 					},
 				},
 			}
+		})
+
+		JustBeforeEach(func() {
+			manager = models.NewManager(
+				logger,
+				fakeDistribution,
+				settings,
+				fakeDatastore,
+				fakeCertsManager,
+			)
 		})
 
 		It("returns deployed domains list, when cloudfront Get function returns a valid distribution", func() {
@@ -515,6 +545,8 @@ var _ = Describe("RouteManager", func() {
 			route            *models.Route
 			cfDist           *cloudfront.Distribution
 			fakeDatastore    *modelsmocks.FakeRouteStore
+			logger           lager.Logger
+			settings         config.Settings
 			defaultTTL       = int64(0)
 			forwardedHeaders = utils.Headers{"X-Forwarded-Five": true}
 			forwardCookies   = false
@@ -522,8 +554,9 @@ var _ = Describe("RouteManager", func() {
 		)
 
 		BeforeEach(func() {
-			//get the logger
-			logger := lager.NewLogger("test")
+			settings = config.Settings{}
+
+			logger = lager.NewLogger("test")
 
 			logger.RegisterSink(lager.NewWriterSink(GinkgoWriter, lager.INFO))
 
@@ -532,14 +565,6 @@ var _ = Describe("RouteManager", func() {
 			fakeCertsManager = &utilsmocks.FakeCertificateManager{}
 
 			fakeDatastore = &modelsmocks.FakeRouteStore{}
-
-			manager = models.NewManager(
-				logger,
-				fakeDistribution,
-				config.Settings{},
-				fakeDatastore,
-				fakeCertsManager,
-			)
 
 			route = &models.Route{
 				InstanceId:     "RouteInstanceID",
@@ -579,6 +604,16 @@ var _ = Describe("RouteManager", func() {
 
 			fakeDistribution.GetReturns(cfDist, nil)
 
+		})
+
+		JustBeforeEach(func() {
+			manager = models.NewManager(
+				logger,
+				fakeDistribution,
+				settings,
+				fakeDatastore,
+				fakeCertsManager,
+			)
 		})
 
 		It("should not request a new certificate when domains have not been passed in 'cf service-update' call ", func() {
@@ -636,10 +671,14 @@ var _ = Describe("RouteManager", func() {
 			fakeDatastore        *modelsmocks.FakeRouteStore
 			provisioningRoutes   []models.Route
 			deprovisioningRoutes []models.Route
+			logger           lager.Logger
+			settings         config.Settings
 		)
 
 		BeforeEach(func() {
-			logger := lager.NewLogger("test")
+			settings = config.Settings{}
+
+			logger = lager.NewLogger("test")
 
 			logger.RegisterSink(lager.NewWriterSink(GinkgoWriter, lager.INFO))
 
@@ -648,14 +687,6 @@ var _ = Describe("RouteManager", func() {
 			fakeCertsManager = &utilsmocks.FakeCertificateManager{}
 
 			fakeDatastore = &modelsmocks.FakeRouteStore{}
-
-			manager = models.NewManager(
-				logger,
-				fakeDistribution,
-				config.Settings{},
-				fakeDatastore,
-				fakeCertsManager,
-			)
 
 			provisioningRoutes = []models.Route{}
 			deprovisioningRoutes = []models.Route{}
@@ -670,6 +701,16 @@ var _ = Describe("RouteManager", func() {
 				}
 			})
 
+		})
+
+		JustBeforeEach(func() {
+			manager = models.NewManager(
+				logger,
+				fakeDistribution,
+				settings,
+				fakeDatastore,
+				fakeCertsManager,
+			)
 		})
 
 		It("finds routes in both `Provisioning` and `Deprovisioning` states", func() {
@@ -847,8 +888,14 @@ var _ = Describe("RouteManager", func() {
 			route          models.Route
 			manager        models.RouteManager
 			certsManager   *utilsmocks.FakeCertificateManager
+			logger         lager.Logger
+			settings       config.Settings
 		)
 		BeforeEach(func() {
+			settings = config.Settings{}
+
+			logger = lager.NewLogger("test")
+
 			firstOfMay := time.Date(2020, 05, 01, 12, 00, 00, 00, time.UTC)
 			firstOfJune := time.Date(2020, 06, 01, 12, 00, 00, 00, time.UTC)
 			now := time.Now()
@@ -881,14 +928,18 @@ var _ = Describe("RouteManager", func() {
 			}
 
 			certsManager = &utilsmocks.FakeCertificateManager{}
+		})
+
+		JustBeforeEach(func() {
 			manager = models.NewManager(
-				lager.NewLogger(""),
+				logger,
 				&utils.Distribution{},
-				config.Settings{},
+				settings,
 				&models.RouteStore{},
 				certsManager,
 			)
 		})
+
 		Context("when onlyValidatingCertificates = true", func() {
 			It("only requests DNS challenges for certificates which are in the 'VALIDATING' state", func() {
 				domainValidationChallenge := utils.DomainValidationChallenge{
