@@ -90,6 +90,17 @@ func (d *Distribution) setDistributionConfigOrigins(config *cloudfront.Distribut
 			},
 		},
 	}
+
+	for key, value := range d.Settings.ExtraRequestHeaders {
+		config.Origins.Items[0].CustomHeaders.Items = append(
+			config.Origins.Items[0].CustomHeaders.Items,
+			&cloudfront.OriginCustomHeader{
+				HeaderName: aws.String(key),
+				HeaderValue: aws.String(value),
+			},
+		)
+		(*config.Origins.Items[0].CustomHeaders.Quantity)++
+	}
 }
 
 func (d *Distribution) setDistributionConfigDefaultCacheBehavior(config *cloudfront.DistributionConfig, callerReference string) {

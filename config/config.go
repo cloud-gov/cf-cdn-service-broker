@@ -29,6 +29,7 @@ type Settings struct {
 	DefaultOrigin           string `envconfig:"default_origin" required:"true"`
 	DefaultDefaultTTL       int64  `envconfig:"default_default_ttl" default:"0"`
 	Schedule                string `envconfig:"schedule" default:"0 0 * * * *"`
+	ExtraRequestHeaders     map[string]string `envconfig:"extra_request_headers" default:""`
 }
 
 func NewSettings() (Settings, error) {
