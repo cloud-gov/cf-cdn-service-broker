@@ -3,11 +3,13 @@ package utils
 import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
+	"github.com/aws/aws-sdk-go/service/cloudfront/cloudfrontiface"
 
 	"github.com/alphagov/paas-cdn-broker/config"
 )
 
-//counterfeiter:generate -o mocks/FakeDistribution.go --fake-name FakeDistribution cloudfront.go DistributionIface
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -o mocks/FakeDistribution.go --fake-name FakeDistribution cloudfront.go DistributionIface
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -o mocks/FakeCloudfront.go --fake-name FakeCloudfront github.com/aws/aws-sdk-go/service/cloudfront/cloudfrontiface.CloudFrontAPI
 
 type DistributionIface interface {
 	Create(callerReference string, domains []string, origin string, defaultTTL int64, forwardedHeaders Headers, forwardCookies bool, tags map[string]string) (*cloudfront.Distribution, error)
@@ -21,7 +23,7 @@ type DistributionIface interface {
 
 type Distribution struct {
 	Settings config.Settings
-	Service  *cloudfront.CloudFront
+	Service  cloudfrontiface.CloudFrontAPI
 }
 
 func (d *Distribution) getAliases(domains []string) *cloudfront.Aliases {
