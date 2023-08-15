@@ -109,6 +109,7 @@ func (d *Distribution) setDistributionConfigDefaultCacheBehavior(config *cloudfr
 	config.DefaultCacheBehavior.ForwardedValues.Cookies.Forward = aws.String("all")
 	config.DefaultCacheBehavior.ForwardedValues.QueryString = aws.Bool(true)
 	config.DefaultCacheBehavior.ForwardedValues.QueryStringCacheKeys.Quantity = aws.Int64(0)
+	config.DefaultCacheBehavior.ForwardedValues.QueryStringCacheKeys.Items = []*string{}
 
 	config.DefaultCacheBehavior.SmoothStreaming = aws.Bool(false)
 	config.DefaultCacheBehavior.MinTTL = aws.Int64(0)
@@ -117,6 +118,7 @@ func (d *Distribution) setDistributionConfigDefaultCacheBehavior(config *cloudfr
 
 	config.DefaultCacheBehavior.TrustedSigners.Enabled = aws.Bool(false)
 	config.DefaultCacheBehavior.TrustedSigners.Quantity = aws.Int64(0)
+	config.DefaultCacheBehavior.TrustedSigners.Items = []*string{}
 
 	config.DefaultCacheBehavior.ViewerProtocolPolicy = aws.String("redirect-to-https")
 
