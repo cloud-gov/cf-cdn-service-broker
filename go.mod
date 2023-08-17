@@ -13,7 +13,7 @@ require (
 	github.com/jinzhu/gorm v0.0.0-20160404144928-5174cc5c242a
 	github.com/jinzhu/inflection v0.0.0-20170102125226-1c35d901db3d // indirect
 	github.com/jinzhu/now v1.0.1 // indirect
-	github.com/kelseyhightower/envconfig v1.2.0
+	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lib/pq v1.10.6
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
 	github.com/maxbrunsfeld/counterfeiter/v6 v6.4.1

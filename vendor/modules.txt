@@ -93,7 +93,7 @@ github.com/jinzhu/inflection
 # github.com/jmespath/go-jmespath v0.4.0
 ## explicit; go 1.14
 github.com/jmespath/go-jmespath
-# github.com/kelseyhightower/envconfig v1.2.0
+# github.com/kelseyhightower/envconfig v1.4.0
 ## explicit
 github.com/kelseyhightower/envconfig
 # github.com/lib/pq v1.10.6
