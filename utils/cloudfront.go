@@ -3,11 +3,13 @@ package utils
 import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
+	"github.com/aws/aws-sdk-go/service/cloudfront/cloudfrontiface"
 
 	"github.com/alphagov/paas-cdn-broker/config"
 )
 
-//counterfeiter:generate -o mocks/FakeDistribution.go --fake-name FakeDistribution cloudfront.go DistributionIface
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -o mocks/FakeDistribution.go --fake-name FakeDistribution cloudfront.go DistributionIface
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -o mocks/FakeCloudfront.go --fake-name FakeCloudfront github.com/aws/aws-sdk-go/service/cloudfront/cloudfrontiface.CloudFrontAPI
 
 type DistributionIface interface {
 	Create(callerReference string, domains []string, origin string, defaultTTL int64, forwardedHeaders Headers, forwardCookies bool, tags map[string]string) (*cloudfront.Distribution, error)
@@ -21,7 +23,7 @@ type DistributionIface interface {
 
 type Distribution struct {
 	Settings config.Settings
-	Service  *cloudfront.CloudFront
+	Service  cloudfrontiface.CloudFrontAPI
 }
 
 func (d *Distribution) getAliases(domains []string) *cloudfront.Aliases {
@@ -90,25 +92,67 @@ func (d *Distribution) setDistributionConfigOrigins(config *cloudfront.Distribut
 			},
 		},
 	}
+
+	for key, value := range d.Settings.ExtraRequestHeaders {
+		config.Origins.Items[0].CustomHeaders.Items = append(
+			config.Origins.Items[0].CustomHeaders.Items,
+			&cloudfront.OriginCustomHeader{
+				HeaderName: aws.String(key),
+				HeaderValue: aws.String(value),
+			},
+		)
+		(*config.Origins.Items[0].CustomHeaders.Quantity)++
+	}
 }
 
 func (d *Distribution) setDistributionConfigDefaultCacheBehavior(config *cloudfront.DistributionConfig, callerReference string) {
+	if config.DefaultCacheBehavior == nil {
+		config.DefaultCacheBehavior = &cloudfront.DefaultCacheBehavior{}
+	}
 	config.DefaultCacheBehavior.TargetOriginId = aws.String(callerReference)
+	config.DefaultCacheBehavior.FieldLevelEncryptionId = aws.String("")
 
+	if config.DefaultCacheBehavior.LambdaFunctionAssociations == nil {
+		config.DefaultCacheBehavior.LambdaFunctionAssociations = &cloudfront.LambdaFunctionAssociations{}
+	}
+	config.DefaultCacheBehavior.LambdaFunctionAssociations.Quantity = aws.Int64(0)
+	config.DefaultCacheBehavior.LambdaFunctionAssociations.Items = []*cloudfront.LambdaFunctionAssociation{}
+
+	if config.DefaultCacheBehavior.ForwardedValues == nil {
+		config.DefaultCacheBehavior.ForwardedValues = &cloudfront.ForwardedValues{}
+	}
+	if config.DefaultCacheBehavior.ForwardedValues.Cookies == nil {
+		config.DefaultCacheBehavior.ForwardedValues.Cookies = &cloudfront.CookiePreference{}
+	}
 	config.DefaultCacheBehavior.ForwardedValues.Cookies.Forward = aws.String("all")
 	config.DefaultCacheBehavior.ForwardedValues.QueryString = aws.Bool(true)
+
+	if config.DefaultCacheBehavior.ForwardedValues.QueryStringCacheKeys == nil {
+		config.DefaultCacheBehavior.ForwardedValues.QueryStringCacheKeys = &cloudfront.QueryStringCacheKeys{}
+	}
 	config.DefaultCacheBehavior.ForwardedValues.QueryStringCacheKeys.Quantity = aws.Int64(0)
+	config.DefaultCacheBehavior.ForwardedValues.QueryStringCacheKeys.Items = []*string{}
 
 	config.DefaultCacheBehavior.SmoothStreaming = aws.Bool(false)
 	config.DefaultCacheBehavior.MinTTL = aws.Int64(0)
 	config.DefaultCacheBehavior.MaxTTL = aws.Int64(31622400)
 	config.DefaultCacheBehavior.Compress = aws.Bool(false)
 
+	if config.DefaultCacheBehavior.TrustedSigners == nil {
+		config.DefaultCacheBehavior.TrustedSigners = &cloudfront.TrustedSigners{}
+	}
 	config.DefaultCacheBehavior.TrustedSigners.Enabled = aws.Bool(false)
 	config.DefaultCacheBehavior.TrustedSigners.Quantity = aws.Int64(0)
+	config.DefaultCacheBehavior.TrustedSigners.Items = []*string{}
 
 	config.DefaultCacheBehavior.ViewerProtocolPolicy = aws.String("redirect-to-https")
 
+	if config.DefaultCacheBehavior.AllowedMethods == nil {
+		config.DefaultCacheBehavior.AllowedMethods = &cloudfront.AllowedMethods{}
+	}
+	if config.DefaultCacheBehavior.AllowedMethods.CachedMethods == nil {
+		config.DefaultCacheBehavior.AllowedMethods.CachedMethods = &cloudfront.CachedMethods{}
+	}
 	config.DefaultCacheBehavior.AllowedMethods.CachedMethods.Quantity = aws.Int64(2)
 	config.DefaultCacheBehavior.AllowedMethods.CachedMethods.Items = []*string{
 		aws.String("HEAD"),
@@ -130,20 +174,7 @@ func (d *Distribution) setDistributionConfigDefaultCacheBehavior(config *cloudfr
 func (d *Distribution) Create(callerReference string, domains []string, origin string, defaultTTL int64, forwardedHeaders Headers, forwardCookies bool, tags map[string]string) (*cloudfront.Distribution, error) {
 	distConfig := new(cloudfront.DistributionConfig)
 
-	distConfig.DefaultCacheBehavior = &cloudfront.DefaultCacheBehavior{
-		FieldLevelEncryptionId: aws.String(""),
-		ForwardedValues: &cloudfront.ForwardedValues{
-			Cookies:              &cloudfront.CookiePreference{},
-			QueryStringCacheKeys: &cloudfront.QueryStringCacheKeys{},
-		},
-		LambdaFunctionAssociations: &cloudfront.LambdaFunctionAssociations{
-			Quantity: aws.Int64(0),
-		},
-		TrustedSigners: &cloudfront.TrustedSigners{},
-		AllowedMethods: &cloudfront.AllowedMethods{
-			CachedMethods: &cloudfront.CachedMethods{},
-		},
-	}
+	distConfig.DefaultCacheBehavior = &cloudfront.DefaultCacheBehavior{}
 
 	d.setDistributionConfigDefaults(distConfig, callerReference)
 	d.setDistributionConfigDefaultCacheBehavior(distConfig, callerReference)
@@ -330,13 +361,15 @@ func (d *Distribution) ListDistributions(callback func(cloudfront.DistributionSu
 }
 
 func (d *Distribution) removeLetsEncryptCacheBehavior(config *cloudfront.DistributionConfig) {
-	newItems := []*cloudfront.CacheBehavior{}
+	if config.CacheBehaviors != nil {
+		newItems := []*cloudfront.CacheBehavior{}
 
-	for _, v := range config.CacheBehaviors.Items {
-		if v.PathPattern != nil && *v.PathPattern != "/.well-known/acme-challenge/*" {
-			newItems = append(newItems, v)
+		for _, v := range config.CacheBehaviors.Items {
+			if v.PathPattern != nil && *v.PathPattern != "/.well-known/acme-challenge/*" {
+				newItems = append(newItems, v)
+			}
 		}
+		config.CacheBehaviors.Items = newItems
+		config.CacheBehaviors.Quantity = aws.Int64(int64(len(newItems)))
 	}
-	config.CacheBehaviors.Items = newItems
-	config.CacheBehaviors.Quantity = aws.Int64(int64(len(newItems)))
 }
