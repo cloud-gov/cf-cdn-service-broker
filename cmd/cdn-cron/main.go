@@ -38,7 +38,7 @@ func main() {
 
 	manager := models.NewManager(
 		logger,
-		&utils.Distribution{settings, cloudfront.New(session)},
+		&utils.Distribution{Settings: settings, Service: cloudfront.New(session)},
 		settings,
 		models.RouteStore{Database: db, Logger: logger.Session("route-store", lager.Data{"entry-point": "cron"})},
 		utils.NewCertificateManager(logger, settings, session),

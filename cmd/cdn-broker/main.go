@@ -45,7 +45,11 @@ func main() {
 		logger.Fatal("cf-client", err)
 	}
 
-	session := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
+	session, err := session.NewSession(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
+
+	if err != nil {
+		logger.Fatal("session", err)
+	}
 
 	if err := models.Migrate(db); err != nil {
 		logger.Fatal("migrate", err)
@@ -53,7 +57,7 @@ func main() {
 
 	manager := models.NewManager(
 		logger,
-		&utils.Distribution{settings, cloudfront.New(session)},
+		&utils.Distribution{Settings: settings, Service: cloudfront.New(session)},
 		settings,
 		models.RouteStore{Database: db, Logger: logger.Session("route-store", lager.Data{"entry-point": "broker"})},
 		utils.NewCertificateManager(logger, settings, session),
