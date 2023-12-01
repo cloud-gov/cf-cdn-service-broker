@@ -3,10 +3,10 @@ package broker_test
 import (
 	"context"
 	"errors"
-	"github.com/pivotal-cf/brokerapi/v8/domain"
-	"github.com/pivotal-cf/brokerapi/v8/domain/apiresponses"
+	"github.com/pivotal-cf/brokerapi/v10/domain"
+	"github.com/pivotal-cf/brokerapi/v10/domain/apiresponses"
 
-	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/lager/v3"
 	"github.com/alphagov/paas-cdn-broker/broker"
 	cfmock "github.com/alphagov/paas-cdn-broker/cf/mocks"
 	"github.com/alphagov/paas-cdn-broker/config"
@@ -75,7 +75,7 @@ var _ = Describe("Provision", func() {
 
 		details := domain.ProvisionDetails{
 			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-			RawParameters: []byte(`{"domain": "domain1.cloud.gov"}`),
+			RawParameters:    []byte(`{"domain": "domain1.cloud.gov"}`),
 		}
 		_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
@@ -93,7 +93,7 @@ var _ = Describe("Provision", func() {
 
 		details := domain.ProvisionDetails{
 			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-			RawParameters: []byte(`{"domain": "domain1.cloud.gov"}`),
+			RawParameters:    []byte(`{"domain": "domain1.cloud.gov"}`),
 		}
 		_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
@@ -110,7 +110,7 @@ var _ = Describe("Provision", func() {
 
 		details := domain.ProvisionDetails{
 			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-			RawParameters: []byte(`{"domain": "domain7.rain.gov"}`),
+			RawParameters:    []byte(`{"domain": "domain7.rain.gov"}`),
 		}
 		_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
@@ -175,7 +175,7 @@ var _ = Describe("Provision", func() {
 	It("Should error when Cloud Foundry does not have the domain registered", func() {
 		s.setupCFClientOrg()
 		s.setupCFClientListV3DomainsDomain3()
-		
+
 		details := domain.ProvisionDetails{
 			OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
 			RawParameters:    []byte(`{"domain": "domain3.cloud.gov"}`),
@@ -221,7 +221,7 @@ var _ = Describe("Provision", func() {
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(
-`Multiple domains do not exist in CloudFoundry; create them with:
+			`Multiple domains do not exist in CloudFoundry; create them with:
 cf create-domain domain4.four.cloud.gov my-org
 cf create-domain domain3.cloud.gov my-org`,
 		))
@@ -370,7 +370,7 @@ cf create-domain domain3.cloud.gov my-org`,
 
 			details := domain.ProvisionDetails{
 				OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-				RawParameters: []byte(`{"domain": "domain1.cloud.gov", "headers": ["Host"]}`),
+				RawParameters:    []byte(`{"domain": "domain1.cloud.gov", "headers": ["Host"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
@@ -384,7 +384,7 @@ cf create-domain domain3.cloud.gov my-org`,
 
 			details := domain.ProvisionDetails{
 				OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-				RawParameters: []byte(`{"domain": "domain1.cloud.gov", "headers": ["User-Agent"]}`),
+				RawParameters:    []byte(`{"domain": "domain1.cloud.gov", "headers": ["User-Agent"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
@@ -398,7 +398,7 @@ cf create-domain domain3.cloud.gov my-org`,
 
 			details := domain.ProvisionDetails{
 				OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-				RawParameters: []byte(`{"domain": "domain1.cloud.gov", "headers": ["*"]}`),
+				RawParameters:    []byte(`{"domain": "domain1.cloud.gov", "headers": ["*"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
@@ -412,7 +412,7 @@ cf create-domain domain3.cloud.gov my-org`,
 
 			details := domain.ProvisionDetails{
 				OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-				RawParameters: []byte(`{"domain": "domain1.cloud.gov", "headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"]}`),
+				RawParameters:    []byte(`{"domain": "domain1.cloud.gov", "headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
@@ -425,7 +425,7 @@ cf create-domain domain3.cloud.gov my-org`,
 
 			details := domain.ProvisionDetails{
 				OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-				RawParameters: []byte(`{"domain": "domain1.cloud.gov", "headers": ["User-Agent", "Host", "User-Agent"]}`),
+				RawParameters:    []byte(`{"domain": "domain1.cloud.gov", "headers": ["User-Agent", "Host", "User-Agent"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
@@ -439,7 +439,7 @@ cf create-domain domain3.cloud.gov my-org`,
 
 			details := domain.ProvisionDetails{
 				OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-				RawParameters: []byte(`{"domain": "domain1.cloud.gov", "headers": ["*", "User-Agent"]}`),
+				RawParameters:    []byte(`{"domain": "domain1.cloud.gov", "headers": ["*", "User-Agent"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
 
@@ -453,7 +453,7 @@ cf create-domain domain3.cloud.gov my-org`,
 
 			details := domain.ProvisionDetails{
 				OrganizationGUID: "dfb39134-ab7d-489e-ae59-4ed5c6f42fb5",
-				RawParameters: []byte(`{"domain": "domain1.cloud.gov", "headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"]}`),
+				RawParameters:    []byte(`{"domain": "domain1.cloud.gov", "headers": ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"]}`),
 			}
 			_, err := s.Broker.Provision(s.ctx, "123", details, true)
 

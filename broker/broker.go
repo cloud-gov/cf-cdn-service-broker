@@ -6,14 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/pivotal-cf/brokerapi/v8/domain/apiresponses"
+	"github.com/pivotal-cf/brokerapi/v10/domain/apiresponses"
 	"io/ioutil"
 	"net/url"
 	"regexp"
 	"strings"
 
-	"code.cloudfoundry.org/lager"
-	"github.com/pivotal-cf/brokerapi/v8/domain"
+	"code.cloudfoundry.org/lager/v3"
+	"github.com/pivotal-cf/brokerapi/v10/domain"
 
 	"github.com/alphagov/paas-cdn-broker/cf"
 	"github.com/alphagov/paas-cdn-broker/config"
@@ -113,11 +113,11 @@ func (b *CdnServiceBroker) GetInstance(ctx context.Context, instanceID string, d
 
 	instanceParams := map[string]interface{}{
 		"cloudfront_distribution_id": distributionId,
-		"cloudfront_domain": route.DomainInternal,
-		"dns_records":       challenges,
-		"forwarded_headers": headers,
-		"forward_cookies":   forwardCookies,
-		"cache_ttl":         cacheTTL,
+		"cloudfront_domain":          route.DomainInternal,
+		"dns_records":                challenges,
+		"forwarded_headers":          headers,
+		"forward_cookies":            forwardCookies,
+		"cache_ttl":                  cacheTTL,
 	}
 
 	return domain.GetInstanceDetailsSpec{
@@ -620,7 +620,7 @@ func (b *CdnServiceBroker) checkDomains(logger lager.Logger, domainsConcat, orgG
 			}
 			if !found {
 				logger.Info("cf-domain-wrong-owner", lager.Data{
-					"domain": domainStrings[i],
+					"domain":                   domainStrings[i],
 					"owning_organization_guid": v3domain.Relationships.Organization.Data.GUID,
 				})
 				nonOwnedDomains = append(nonOwnedDomains, domainStrings[i])

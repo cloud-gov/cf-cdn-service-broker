@@ -1,0 +1,37 @@
+{
+    "basic_auth_username": "username",
+    "basic_auth_password": "password",
+    "host": "127.0.0.1",
+    "log_level": "info",
+    "aws_region": "us-east-1",
+    "resource_prefix": "paas-s3-broker-",
+    "iam_user_path": "/paas-s3-broker/",
+    "deploy_env": "london",
+    "iam_ip_restriction_policy_arn": "something",
+    "tls": {
+      "certificate": "__from_maketarget__",
+      "private_key": "__from_maketarget__",
+      "ca": "__from_maketarget__"
+    },
+    "catalog": {
+      "services": [
+        {
+          "id": "uuid-1",
+          "name": "S3",
+          "description": "Object storage with AWS S3",
+          "bindable": true,
+          "plan_updateable": false,
+          "requires": [],
+          "metadata": {},
+          "plans": [
+            {
+              "id": "uuid-2",
+              "name": "bucket",
+              "description": "A single S3 bucket",
+              "metadata": {}
+            }
+          ]
+        }
+      ]
+    }
+  }

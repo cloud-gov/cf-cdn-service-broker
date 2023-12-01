@@ -1,15 +1,17 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 
 	"github.com/jinzhu/gorm"
 
-	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/lager/v3"
 	"github.com/cloudfoundry-community/go-cfclient"
-	"github.com/pivotal-cf/brokerapi/v8"
+	"github.com/pivotal-cf/brokerapi/v10"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -68,20 +70,51 @@ func main() {
 		settings,
 		logger,
 	)
-	credentials := brokerapi.BrokerCredentials{
-		Username: settings.BrokerUsername,
-		Password: settings.BrokerPassword,
-	}
 
-	brokerAPI := brokerapi.New(broker, logger, credentials)
-	server := bindHTTPHandlers(brokerAPI, settings, db)
-	http.ListenAndServe(fmt.Sprintf(":%s", settings.Port), server)
+	err = startHTTPServer(&settings, broker, db, logger)
+	if err != nil {
+		logger.Fatal("Failed to start broker process: %s", err)
+	}
 }
 
-func bindHTTPHandlers(handler http.Handler, settings config.Settings, db *gorm.DB) http.Handler {
-	mux := http.NewServeMux()
-	mux.Handle("/", handler)
-	healthchecks.Bind(mux, settings, db)
+func buildHTTPHandler(serviceBroker *broker.CdnServiceBroker, logger lager.Logger, config *config.Settings, db *gorm.DB) http.Handler {
+	credentials := brokerapi.BrokerCredentials{
+		Username: config.BrokerUsername,
+		Password: config.BrokerPassword,
+	}
 
+	brokerAPI := brokerapi.New(serviceBroker, logger, credentials)
+	mux := http.NewServeMux()
+	mux.Handle("/", brokerAPI)
+	healthchecks.Bind(mux, *config, db)
 	return mux
+}
+
+func startHTTPServer(
+	cfg *config.Settings,
+	serviceBroker *broker.CdnServiceBroker,
+	db *gorm.DB,
+	logger lager.Logger,
+) error {
+	server := buildHTTPHandler(serviceBroker, logger, cfg, db)
+
+	listenAddress := fmt.Sprintf("%s:%s", cfg.Host, cfg.Port)
+	// We don't use http.ListenAndServe here so that the "start" log message is
+	// logged after the socket is listening. This log message is used by the
+	// tests to wait until the broker is ready.
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.Port))
+	if err != nil {
+		return fmt.Errorf("failed to listen on address %s: %s", listenAddress, err)
+	}
+	if cfg.TLSEnabled() {
+		tlsConfig, err := cfg.Tls.GenerateTLSConfig()
+		if err != nil {
+			logger.Fatal("Error configuring TLS: %s", err)
+		}
+		listener = tls.NewListener(listener, tlsConfig)
+		logger.Info("start", lager.Data{"port": cfg.Port, "tls": true, "host": cfg.Host, "address": listenAddress})
+	} else {
+		logger.Info("start", lager.Data{"port": cfg.Port, "tls": false, "host": cfg.Host, "address": listenAddress})
+	}
+	return http.Serve(listener, server)
 }

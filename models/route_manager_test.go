@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/lager/v3"
 	"github.com/jinzhu/gorm"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -37,7 +37,7 @@ var _ = Describe("RouteManager", func() {
 
 			errorLogOutput *bytes.Buffer
 
-			logger lager.Logger
+			logger   lager.Logger
 			settings config.Settings
 		)
 
@@ -671,8 +671,8 @@ var _ = Describe("RouteManager", func() {
 			fakeDatastore        *modelsmocks.FakeRouteStore
 			provisioningRoutes   []models.Route
 			deprovisioningRoutes []models.Route
-			logger           lager.Logger
-			settings         config.Settings
+			logger               lager.Logger
+			settings             config.Settings
 		)
 
 		BeforeEach(func() {

@@ -1,7 +1,7 @@
 package models_test
 
 import (
-	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/lager/v3"
 	"os"
 	"time"
 

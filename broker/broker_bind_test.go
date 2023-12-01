@@ -2,9 +2,9 @@ package broker_test
 
 import (
 	"context"
-	"github.com/pivotal-cf/brokerapi/v8/domain"
+	"github.com/pivotal-cf/brokerapi/v10/domain"
 
-	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/lager/v3"
 	"github.com/alphagov/paas-cdn-broker/broker"
 	cfmock "github.com/alphagov/paas-cdn-broker/cf/mocks"
 	"github.com/alphagov/paas-cdn-broker/config"
