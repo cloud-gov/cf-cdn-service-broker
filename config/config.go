@@ -1,10 +1,12 @@
 package config
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/kelseyhightower/envconfig"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
@@ -12,33 +14,48 @@ import (
 )
 
 type Settings struct {
-	Port                    string `envconfig:"port" default:"3000"`
-	BrokerUsername          string `envconfig:"broker_username" required:"true"`
-	BrokerPassword          string `envconfig:"broker_password" required:"true"`
-	DatabaseUrl             string `envconfig:"database_url" required:"true"`
-	DatabaseConnMaxLifetime string `envconfig:"database_conn_max_lifetime" default:"1h"`
-	DatabaseMaxIdleConns    int    `envconfig:"database_max_idle_conns" default:"1"`
-	CloudFrontPrefix        string `envconfig:"cloudfront_prefix" default:""`
-	AwsAccessKeyId          string `envconfig:"aws_access_key_id" required:"true"`
-	AwsSecretAccessKey      string `envconfig:"aws_secret_access_key" required:"true"`
-	AwsDefaultRegion        string `envconfig:"aws_default_region" required:"true"`
-	ServerSideEncryption    string `envconfig:"server_side_encryption"`
-	APIAddress              string `envconfig:"api_address" required:"true"`
-	ClientID                string `envconfig:"client_id" required:"true"`
-	ClientSecret            string `envconfig:"client_secret" required:"true"`
-	DefaultOrigin           string `envconfig:"default_origin" required:"true"`
-	DefaultDefaultTTL       int64  `envconfig:"default_default_ttl" default:"0"`
-	Schedule                string `envconfig:"schedule" default:"0 0 * * * *"`
-	ExtraRequestHeaders     map[string]string `envconfig:"extra_request_headers" default:""`
+	Port                    string            `json:"port"`
+	BrokerUsername          string            `json:"broker_username"`
+	BrokerPassword          string            `json:"broker_password"`
+	Host                    string            `json:"host"`
+	DatabaseUrl             string            `json:"database_url"`
+	DatabaseConnMaxLifetime string            `json:"database_conn_max_lifetime"`
+	DatabaseMaxIdleConns    int               `json:"database_max_idle_conns"`
+	CloudFrontPrefix        string            `json:"cloudfront_prefix"`
+	AwsAccessKeyId          string            `json:"aws_access_key_id"`
+	AwsSecretAccessKey      string            `json:"aws_secret_access_key"`
+	AwsDefaultRegion        string            `json:"aws_region"`
+	ServerSideEncryption    string            `json:"server_side_encryption"`
+	APIAddress              string            `json:"api_address"`
+	ClientID                string            `json:"client_id"`
+	ClientSecret            string            `json:"client_secret"`
+	DefaultOrigin           string            `json:"default_origin"`
+	DefaultDefaultTTL       int64             `json:"default_default_ttl"`
+	Schedule                string            `json:"schedule"`
+	ExtraRequestHeaders     map[string]string `json:"extra_request_headers"`
+	Tls                     *TLSConfig        `json:"tls"`
 }
 
-func NewSettings() (Settings, error) {
-	var settings Settings
-	err := envconfig.Process("cdn", &settings)
-	if err != nil {
-		return Settings{}, err
+func LoadConfig(configFile string) (config *Settings, err error) {
+	if configFile == "" {
+		return config, errors.New("Must provide a config file")
 	}
-	return settings, nil
+
+	file, err := os.Open(configFile)
+	if err != nil {
+		return config, err
+	}
+	defer file.Close()
+
+	if err = json.NewDecoder(file).Decode(&config); err != nil {
+		return config, err
+	}
+
+	if err = config.Validate(); err != nil {
+		return config, fmt.Errorf("Validating config contents: %s", err)
+	}
+
+	return config, nil
 }
 
 func Connect(settings Settings) (*gorm.DB, error) {
@@ -56,4 +73,31 @@ func Connect(settings Settings) (*gorm.DB, error) {
 	gormDb.DB().SetMaxIdleConns(settings.DatabaseMaxIdleConns)
 
 	return gormDb, nil
+}
+
+func (s Settings) TLSEnabled() bool {
+	return s.Tls != nil
+}
+
+func (c Settings) Validate() error {
+	if c.BrokerUsername == "" {
+		return errors.New("Must provide a non-empty BrokerUsername")
+	}
+
+	if c.BrokerPassword == "" {
+		return errors.New("Must provide a non-empty BrokerPassword")
+	}
+
+	if c.Schedule == "" {
+		return errors.New("must provide a non-empty Schedule")
+	}
+
+	if c.Tls != nil {
+		tlsValidation := c.Tls.validate()
+		if tlsValidation != nil {
+			return tlsValidation
+		}
+	}
+
+	return nil
 }

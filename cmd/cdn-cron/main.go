@@ -1,10 +1,12 @@
 package main
 
 import (
+	"flag"
+	"log"
 	"os"
 	"os/signal"
 
-	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/lager/v3"
 	"github.com/robfig/cron"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -17,17 +19,19 @@ import (
 )
 
 func main() {
+	configFilePath := flag.String("config", "", "Location of the config file")
+	flag.Parse()
+
+	cfg, err := config.LoadConfig(*configFilePath)
+	if err != nil {
+		log.Fatalf("Error loading config file: %s", err)
+	}
 	logger := lager.NewLogger("cdn-cron")
 	logger.RegisterSink(lager.NewWriterSink(os.Stderr, lager.INFO))
 
-	settings, err := config.NewSettings()
-	if err != nil {
-		logger.Fatal("new-settings", err)
-	}
+	session := session.New(aws.NewConfig().WithRegion(cfg.AwsDefaultRegion))
 
-	session := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
-
-	db, err := config.Connect(settings)
+	db, err := config.Connect(*cfg)
 	if err != nil {
 		logger.Fatal("config-connect", err)
 	}
@@ -38,15 +42,15 @@ func main() {
 
 	manager := models.NewManager(
 		logger,
-		&utils.Distribution{settings, cloudfront.New(session)},
-		settings,
+		&utils.Distribution{Settings: *cfg, Service: cloudfront.New(session)},
+		*cfg,
 		models.RouteStore{Database: db, Logger: logger.Session("route-store", lager.Data{"entry-point": "cron"})},
-		utils.NewCertificateManager(logger, settings, session),
+		utils.NewCertificateManager(logger, *cfg, session),
 	)
 
 	c := cron.New()
 
-	c.AddFunc(settings.Schedule, func() {
+	c.AddFunc(cfg.Schedule, func() {
 		logger.Info("run-cert-cleanup")
 		manager.DeleteOrphanedCerts()
 	})

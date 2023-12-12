@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/pivotal-cf/brokerapi/v8/domain"
 
-	"code.cloudfoundry.org/lager"
+	"github.com/pivotal-cf/brokerapi/v10/domain"
+
+	"code.cloudfoundry.org/lager/v3"
 	"github.com/alphagov/paas-cdn-broker/broker"
 	cfmock "github.com/alphagov/paas-cdn-broker/cf/mocks"
 	"github.com/alphagov/paas-cdn-broker/config"
@@ -169,7 +170,7 @@ var _ = Describe("Update", func() {
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(
-`Multiple domains do not exist in CloudFoundry; create them with:
+			`Multiple domains do not exist in CloudFoundry; create them with:
 cf create-domain domain3.cloud.gov my-org
 cf create-domain domain4.four.cloud.gov my-org`,
 		))
@@ -194,7 +195,7 @@ cf create-domain domain4.four.cloud.gov my-org`,
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(
-`Multiple domains do not exist in CloudFoundry; create them with:
+			`Multiple domains do not exist in CloudFoundry; create them with:
 cf create-domain domain3.cloud.gov <organization>
 cf create-domain domain4.four.cloud.gov <organization>`,
 		))

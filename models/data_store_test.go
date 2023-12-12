@@ -1,9 +1,10 @@
 package models_test
 
 import (
-	"code.cloudfoundry.org/lager"
 	"os"
 	"time"
+
+	"code.cloudfoundry.org/lager/v3"
 
 	"github.com/alphagov/paas-cdn-broker/models"
 	"github.com/jinzhu/gorm"

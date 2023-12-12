@@ -1,7 +1,7 @@
 package utils_test
 
 import (
-	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/lager/v3"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/request"
 	awsSession "github.com/aws/aws-sdk-go/aws/session"
@@ -17,7 +17,6 @@ import (
 var _ = Describe("Acm", func() {
 	var (
 		settings     config.Settings
-		session      *awsSession.Session
 		fakeacm      *acm.ACM
 		certsManager CertificateManager
 	)
@@ -27,8 +26,8 @@ var _ = Describe("Acm", func() {
 
 	BeforeEach(func() {
 		//Setup an input for the RequestCertificate call with a single domain as a common name
-		settings, _ = config.NewSettings()
-		session = awsSession.New(nil)
+		session, err := awsSession.NewSession(nil)
+		Expect(err).NotTo(HaveOccurred())
 
 		//mock out the aws call to return a fixed list of certs, two of which should be deleted
 		fakeacm = acm.New(session)
