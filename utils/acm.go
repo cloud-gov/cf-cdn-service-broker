@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/lager/v3"
 	"github.com/alphagov/paas-cdn-broker/config"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -76,10 +76,10 @@ const ManagedByTagValue string = "cdn-broker"
 // has timed out, no further explanation is offered by the ACM API.
 var ErrValidationTimedOut = errors.New("validation timed out")
 
-//NewCertificateManager retruns the NewCertificateManagerInterface,
-//forceing ACM to be in Virginia (us-east-1) region, becuase CloudFront only supports reading certs from
-//that region ONLY
-//for more details - https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_ViewerCertificate.html#cloudfront-Type-ViewerCertificate-ACMCertificateArn
+// NewCertificateManager retruns the NewCertificateManagerInterface,
+// forceing ACM to be in Virginia (us-east-1) region, becuase CloudFront only supports reading certs from
+// that region ONLY
+// for more details - https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_ViewerCertificate.html#cloudfront-Type-ViewerCertificate-ACMCertificateArn
 func NewCertificateManager(logger lager.Logger, settings config.Settings, session *session.Session) CertificateManagerInterface {
 
 	copySession := session.Copy()

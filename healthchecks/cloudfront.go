@@ -9,11 +9,15 @@ import (
 )
 
 func Cloudfront(settings config.Settings) error {
-	session := session.New(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
+	session, err := session.NewSession(aws.NewConfig().WithRegion(settings.AwsDefaultRegion))
+	if err != nil {
+		return err
+	}
+
 	svc := cloudfront.New(session)
 
 	params := &cloudfront.ListDistributionsInput{}
-	_, err := svc.ListDistributions(params)
+	_, err = svc.ListDistributions(params)
 	if err != nil {
 		return err
 	}

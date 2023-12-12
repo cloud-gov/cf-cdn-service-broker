@@ -3,14 +3,15 @@ package broker_test
 import (
 	"context"
 	"errors"
-	"github.com/alphagov/paas-cdn-broker/utils"
-	"github.com/pivotal-cf/brokerapi/v8/domain"
 	"time"
+
+	"github.com/alphagov/paas-cdn-broker/utils"
+	"github.com/pivotal-cf/brokerapi/v10/domain"
 
 	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/suite"
 
-	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/lager/v3"
 	"github.com/alphagov/paas-cdn-broker/broker"
 	cfmock "github.com/alphagov/paas-cdn-broker/cf/mocks"
 	"github.com/alphagov/paas-cdn-broker/config"

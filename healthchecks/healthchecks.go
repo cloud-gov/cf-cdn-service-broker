@@ -2,12 +2,12 @@ package healthchecks
 
 import (
 	"fmt"
-	"github.com/alphagov/paas-cdn-broker/config"
 	"net/http"
+
+	"github.com/alphagov/paas-cdn-broker/config"
 
 	"github.com/jinzhu/gorm"
 )
-
 
 func Bind(mux *http.ServeMux, settings config.Settings, db *gorm.DB) {
 	var checks = map[string]func(config.Settings) error{
@@ -30,10 +30,6 @@ func Bind(mux *http.ServeMux, settings config.Settings, db *gorm.DB) {
 		} else {
 			w.WriteHeader(http.StatusOK)
 		}
-	})
-
-	mux.HandleFunc("/healthcheck/http", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
 	})
 
 	for name, function := range checks {
