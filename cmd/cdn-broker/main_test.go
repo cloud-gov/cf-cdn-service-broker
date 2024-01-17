@@ -95,7 +95,7 @@ var _ = Describe("TLS Configuration", func() {
 		tlsConfig.RootCAs = caCertPool
 		Expect(tlsConfig.RootCAs).ToNot(BeNil())
 
-		server = BuildHTTPHandler(CdnBroker, logger, &cfg)
+		server = BuildHTTPHandler(CdnBroker, logger, &cfg, &db)
 		Expect(server).ToNot(BeNil())
 
 		go func() {

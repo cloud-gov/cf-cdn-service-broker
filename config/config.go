@@ -34,7 +34,6 @@ type Settings struct {
 	Schedule                string            `json:"schedule"`
 	ExtraRequestHeaders     map[string]string `json:"extra_request_headers"`
 	Tls                     *TLSConfig        `json:"tls"`
-	HealthCheckPort         string            `json:"healthcheck_port"`
 }
 
 func LoadConfig(configFile string) (config *Settings, err error) {

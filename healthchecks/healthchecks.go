@@ -9,11 +9,16 @@ import (
 	"github.com/jinzhu/gorm"
 )
 
+func HttpsCheck(_ config.Settings) error {
+	return nil
+}
+
 func Bind(mux *http.ServeMux, settings config.Settings, db *gorm.DB) {
 	var checks = map[string]func(config.Settings) error{
 		"cloudfront":   Cloudfront,
 		"cloudfoundry": Cloudfoundry,
 		"postgresql":   CreatePostgresqlChecker(db),
+		"https":        HttpsCheck,
 	}
 
 	mux.HandleFunc("/healthcheck", func(w http.ResponseWriter, r *http.Request) {

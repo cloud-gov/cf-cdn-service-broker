@@ -76,13 +76,7 @@ func main() {
 		logger,
 	)
 
-	server443 := BuildHTTPHandler(broker, logger, cfg)
-
-	serverHealthChecks := BuildHealthCheckHandler(logger, cfg, db)
-
-	go func() {
-		http.ListenAndServe(fmt.Sprintf(":%s", cfg.HealthCheckPort), serverHealthChecks)
-	}()
+	server443 := BuildHTTPHandler(broker, logger, cfg, db)
 
 	err = StartHTTPServer(cfg, server443, logger)
 	if err != nil {
@@ -90,7 +84,7 @@ func main() {
 	}
 }
 
-func BuildHTTPHandler(serviceBroker *broker.CdnServiceBroker, logger lager.Logger, config *config.Settings) http.Handler {
+func BuildHTTPHandler(serviceBroker *broker.CdnServiceBroker, logger lager.Logger, config *config.Settings, db *gorm.DB) http.Handler {
 	credentials := brokerapi.BrokerCredentials{
 		Username: config.BrokerUsername,
 		Password: config.BrokerPassword,
@@ -99,14 +93,6 @@ func BuildHTTPHandler(serviceBroker *broker.CdnServiceBroker, logger lager.Logge
 	brokerAPI := brokerapi.New(serviceBroker, logger, credentials)
 	mux := http.NewServeMux()
 	mux.Handle("/", brokerAPI)
-	mux.HandleFunc("/healthcheck/https", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
-	return mux
-}
-
-func BuildHealthCheckHandler(logger lager.Logger, config *config.Settings, db *gorm.DB) http.Handler {
-	mux := http.NewServeMux()
 	healthchecks.Bind(mux, *config, db)
 	return mux
 }
