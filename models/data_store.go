@@ -1,7 +1,7 @@
 package models
 
 import (
-	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/lager/v3"
 
 	"github.com/jinzhu/gorm"
 )
@@ -21,7 +21,7 @@ type RouteStoreInterface interface {
 
 type RouteStore struct {
 	Database *gorm.DB
-	Logger lager.Logger
+	Logger   lager.Logger
 }
 
 func (r RouteStore) Save(route *Route) error {
@@ -66,7 +66,7 @@ func (r RouteStore) FindAllMatching(route Route) ([]Route, error) {
 		return []Route{}, err
 	}
 
-	for i, _ := range results {
+	for i := range results {
 		err = r.hydrateRoute(&results[i])
 		if err != nil {
 			return []Route{}, err
