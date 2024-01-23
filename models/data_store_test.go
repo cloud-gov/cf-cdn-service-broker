@@ -4,7 +4,7 @@ import (
 	"os"
 	"time"
 
-	"code.cloudfoundry.org/lager/v3"
+	"code.cloudfoundry.org/lager"
 
 	"github.com/alphagov/paas-cdn-broker/models"
 	"github.com/jinzhu/gorm"

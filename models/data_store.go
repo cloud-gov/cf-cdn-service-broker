@@ -1,7 +1,7 @@
 package models
 
 import (
-	"code.cloudfoundry.org/lager/v3"
+	"code.cloudfoundry.org/lager"
 
 	"github.com/jinzhu/gorm"
 )

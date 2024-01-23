@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/pivotal-cf/brokerapi/v10/domain"
+	"github.com/pivotal-cf/brokerapi/v8/domain"
 
-	"code.cloudfoundry.org/lager/v3"
+	"code.cloudfoundry.org/lager"
 	"github.com/alphagov/paas-cdn-broker/broker"
 	cfmock "github.com/alphagov/paas-cdn-broker/cf/mocks"
 	"github.com/alphagov/paas-cdn-broker/config"
