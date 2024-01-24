@@ -15,7 +15,7 @@ import (
 	"os"
 	"time"
 
-	"code.cloudfoundry.org/lager/v3"
+	"code.cloudfoundry.org/lager"
 	"github.com/alphagov/paas-cdn-broker/broker"
 	cfmock "github.com/alphagov/paas-cdn-broker/cf/mocks"
 	. "github.com/alphagov/paas-cdn-broker/cmd/cdn-broker"
@@ -114,11 +114,12 @@ var _ = Describe("TLS Configuration", func() {
 				TLSClientConfig: tlsConfig,
 			},
 		}
-		resp, err := client.Get(fmt.Sprintf("https://localhost:%s%s", mockPort, mockEndpoint))
-		Expect(err).NotTo(HaveOccurred())
-		defer resp.Body.Close()
-
-		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		Eventually(func() {
+			resp, err := client.Get(fmt.Sprintf("https://localhost:%s%s", mockPort, mockEndpoint))
+			Expect(err).NotTo(HaveOccurred())
+			defer resp.Body.Close()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		}, 10*time.Second, 1*time.Second)
 	})
 })
 

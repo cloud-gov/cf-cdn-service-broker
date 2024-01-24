@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	cloud.google.com/go v0.43.0 // indirect
-	code.cloudfoundry.org/lager v2.0.0+incompatible // indirect
+	code.cloudfoundry.org/lager v2.0.0+incompatible
 	github.com/aws/aws-sdk-go v1.38.66
 	github.com/cloudfoundry-community/go-cfclient v0.0.0-20220601192014-596c068bcda2
 	github.com/denisenkom/go-mssqldb v0.0.0-20190515213511-eb9f6a1743f3 // indirect
@@ -26,17 +26,15 @@ require (
 )
 
 require (
-	code.cloudfoundry.org/lager/v3 v3.0.3
 	github.com/onsi/ginkgo/v2 v2.13.2
 	github.com/pivotal-cf/brokerapi v6.4.2+incompatible
-	github.com/pivotal-cf/brokerapi/v10 v10.1.1
+	github.com/pivotal-cf/brokerapi/v8 v8.2.0
 )
 
 require (
 	code.cloudfoundry.org/gofileutils v0.0.0-20170111115228-4d0c80011a0f // indirect
 	github.com/Masterminds/semver v1.4.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/go-chi/chi/v5 v5.0.10 // indirect
 	github.com/go-logr/logr v1.3.0 // indirect
 	github.com/go-sql-driver/mysql v1.6.0 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
@@ -46,8 +44,7 @@ require (
 	github.com/google/uuid v1.0.0 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
-	github.com/onsi/ginkgo v1.16.4 // indirect
-	github.com/openzipkin/zipkin-go v0.4.2 // indirect
+	github.com/kr/text v0.2.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	golang.org/x/mod v0.13.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
@@ -56,6 +53,5 @@ require (
 	golang.org/x/tools v0.14.0 // indirect
 	google.golang.org/appengine v1.6.1 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
