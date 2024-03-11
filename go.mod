@@ -27,7 +27,6 @@ require (
 
 require (
 	github.com/onsi/ginkgo/v2 v2.13.2
-	github.com/pivotal-cf/brokerapi v6.4.2+incompatible
 	github.com/pivotal-cf/brokerapi/v8 v8.2.0
 )
 
