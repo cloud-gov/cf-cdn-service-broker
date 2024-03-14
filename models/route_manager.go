@@ -12,7 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/acm"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"github.com/jinzhu/gorm"
-	"github.com/pivotal-cf/brokerapi/domain/apiresponses"
+	"github.com/pivotal-cf/brokerapi/v10/domain/apiresponses"
 )
 
 //counterfeiter:generate -o mocks/RouteManagerIface.go --fake-name RouteManagerIface route_manager.go RouteManagerIface
