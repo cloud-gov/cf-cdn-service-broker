@@ -12,7 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/acm"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"github.com/jinzhu/gorm"
-	"github.com/pivotal-cf/brokerapi/v8"
+	"github.com/pivotal-cf/brokerapi/domain/apiresponses"
 )
 
 //counterfeiter:generate -o mocks/RouteManagerIface.go --fake-name RouteManagerIface route_manager.go RouteManagerIface
@@ -158,8 +158,8 @@ func (m *RouteManager) Get(instanceId string) (*Route, error) {
 	if err == nil {
 		return &route, nil
 	} else if err == gorm.ErrRecordNotFound {
-		lsession.Error("db-record-not-found", brokerapi.ErrInstanceDoesNotExist)
-		return nil, brokerapi.ErrInstanceDoesNotExist
+		lsession.Error("db-record-not-found", apiresponses.ErrInstanceDoesNotExist)
+		return nil, apiresponses.ErrInstanceDoesNotExist
 	} else {
 		lsession.Error("db-generic-error", err)
 		return nil, err
