@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/lager/v3"
 	"github.com/jinzhu/gorm"
 
 	"github.com/aws/aws-sdk-go/aws"
