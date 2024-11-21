@@ -4,7 +4,6 @@ go 1.21
 
 require (
 	cloud.google.com/go v0.43.0 // indirect
-	code.cloudfoundry.org/lager v2.0.0+incompatible // indirect
 	github.com/aws/aws-sdk-go v1.38.66
 	github.com/cloudfoundry-community/go-cfclient v0.0.0-20220601192014-596c068bcda2
 	github.com/denisenkom/go-mssqldb v0.0.0-20190515213511-eb9f6a1743f3 // indirect
@@ -28,7 +27,6 @@ require (
 require (
 	code.cloudfoundry.org/lager/v3 v3.0.3
 	github.com/onsi/ginkgo/v2 v2.13.2
-	github.com/pivotal-cf/brokerapi v6.4.2+incompatible
 	github.com/pivotal-cf/brokerapi/v10 v10.1.1
 )
 
@@ -44,7 +42,6 @@ require (
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/pprof v0.0.0-20210407192527-94a9f03dee38 // indirect
 	github.com/google/uuid v1.0.0 // indirect
-	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/onsi/ginkgo v1.16.4 // indirect
 	github.com/openzipkin/zipkin-go v0.4.2 // indirect
