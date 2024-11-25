@@ -6,7 +6,7 @@ import (
 	"os"
 	"os/signal"
 
-	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/lager/v3"
 	"github.com/robfig/cron"
 
 	"github.com/aws/aws-sdk-go/aws"

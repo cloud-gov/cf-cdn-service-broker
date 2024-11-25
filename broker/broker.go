@@ -11,10 +11,10 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/pivotal-cf/brokerapi/v8/domain/apiresponses"
+	"github.com/pivotal-cf/brokerapi/v10/domain/apiresponses"
 
-	"code.cloudfoundry.org/lager"
-	"github.com/pivotal-cf/brokerapi/v8/domain"
+	"code.cloudfoundry.org/lager/v3"
+	"github.com/pivotal-cf/brokerapi/v10/domain"
 
 	"github.com/alphagov/paas-cdn-broker/cf"
 	"github.com/alphagov/paas-cdn-broker/config"
