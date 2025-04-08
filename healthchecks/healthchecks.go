@@ -2,7 +2,7 @@ package healthchecks
 
 import (
 	"fmt"
-	"github.com/18F/cf-cdn-service-broker/config"
+	"github.com/cloud-gov/cf-cdn-service-broker/config"
 	"net/http"
 )
 

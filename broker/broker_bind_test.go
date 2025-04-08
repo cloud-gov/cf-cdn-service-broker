@@ -8,7 +8,7 @@ import (
 
 	"github.com/pivotal-cf/brokerapi"
 
-	"github.com/18F/cf-cdn-service-broker/broker"
+	"github.com/cloud-gov/cf-cdn-service-broker/broker"
 )
 
 func TestBind(t *testing.T) {

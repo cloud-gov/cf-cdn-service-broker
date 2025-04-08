@@ -5,7 +5,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 
-	"github.com/18F/cf-cdn-service-broker/config"
+	"github.com/cloud-gov/cf-cdn-service-broker/config"
 )
 
 func Cloudfront(settings config.Settings) error {

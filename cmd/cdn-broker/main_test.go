@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"code.cloudfoundry.org/lager"
-	"github.com/18F/cf-cdn-service-broker/broker"
-	"github.com/18F/cf-cdn-service-broker/config"
+	"github.com/cloud-gov/cf-cdn-service-broker/broker"
+	"github.com/cloud-gov/cf-cdn-service-broker/config"
 	"github.com/pivotal-cf/brokerapi"
 )
 

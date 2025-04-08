@@ -6,7 +6,7 @@ import (
 
 	"github.com/cloudfoundry-community/go-cfclient"
 
-	"github.com/18F/cf-cdn-service-broker/config"
+	"github.com/cloud-gov/cf-cdn-service-broker/config"
 )
 
 func Cloudfoundry(settings config.Settings) error {
