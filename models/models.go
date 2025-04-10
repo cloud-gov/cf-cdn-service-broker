@@ -29,8 +29,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/s3"
 
-	"github.com/18F/cf-cdn-service-broker/config"
-	"github.com/18F/cf-cdn-service-broker/utils"
+	"github.com/cloud-gov/cf-cdn-service-broker/config"
+	"github.com/cloud-gov/cf-cdn-service-broker/utils"
 )
 
 type State string

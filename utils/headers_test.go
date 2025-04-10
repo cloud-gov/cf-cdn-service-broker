@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	. "github.com/18F/cf-cdn-service-broker/utils"
+	. "github.com/cloud-gov/cf-cdn-service-broker/utils"
 )
 
 func TestHeaders(t *testing.T) {

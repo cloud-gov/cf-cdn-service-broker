@@ -1,6 +1,6 @@
 package mocks
 
-import cf "github.com/18F/cf-cdn-service-broker/cf"
+import cf "github.com/cloud-gov/cf-cdn-service-broker/cf"
 import cfclient "github.com/cloudfoundry-community/go-cfclient"
 import mock "github.com/stretchr/testify/mock"
 

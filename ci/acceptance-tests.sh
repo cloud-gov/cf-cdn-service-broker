@@ -41,8 +41,8 @@ dns_regex="name: (.*), value: (.*), ttl: (.*)"
 
 elapsed=300
 until [ "${elapsed}" -le 0 ]; do
-  status=$(cf curl "/v2/service_instances/${service_guid}")
-  description=$(echo "${status}" | jq -r '.entity.last_operation.description')
+  status=$(cf curl "/v3/service_instances/${service_guid}")
+  description=$(echo "${status}" | jq -r '.last_operation.description')
   if [[ "${description}" =~ ${http_regex} ]]; then
     domain_external="${BASH_REMATCH[1]}"
     domain_internal="${BASH_REMATCH[2]}"
@@ -115,8 +115,8 @@ fi
 # Wait for provision to complete
 elapsed="${CDN_TIMEOUT}"
 until [ "${elapsed}" -le 0 ]; do
-  status=$(cf curl "/v2/service_instances/${service_guid}")
-  state=$(echo "${status}" | jq -r '.entity.last_operation.state')
+  status=$(cf curl "/v3/service_instances/${service_guid}")
+  state=$(echo "${status}" | jq -r '.last_operation.state')
   if [[ "${state}" == "succeeded" ]]; then
     updated="true"
     break

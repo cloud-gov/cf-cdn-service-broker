@@ -7,4 +7,4 @@ applications:
   no-route: true
   env:
     GO_INSTALL_PACKAGE_SPEC: "./cmd/cdn-cron"
-    GOPACKAGENAME: "github.com/18F/cf-cdn-service-broker"
+    GOPACKAGENAME: "github.com/cloud-gov/cf-cdn-service-broker"

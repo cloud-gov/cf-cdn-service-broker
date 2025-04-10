@@ -1,4 +1,4 @@
-module github.com/18F/cf-cdn-service-broker
+module github.com/cloud-gov/cf-cdn-service-broker
 
 go 1.20
 

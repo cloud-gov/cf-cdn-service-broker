@@ -4,7 +4,7 @@ import (
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
 
-	"github.com/18F/cf-cdn-service-broker/config"
+	"github.com/cloud-gov/cf-cdn-service-broker/config"
 )
 
 func Postgresql(settings config.Settings) error {
