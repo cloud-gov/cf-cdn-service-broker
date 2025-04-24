@@ -1,6 +1,6 @@
 module github.com/alphagov/paas-cdn-broker
 
-go 1.21
+go 1.22
 
 require (
 	cloud.google.com/go v0.43.0 // indirect
