@@ -4,4 +4,4 @@ memory: 128M
 services:
 - rds-cdn-broker
 env:
-  GOVERSION: go1.21
+  GOVERSION: go1.22

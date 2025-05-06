@@ -1,12 +1,11 @@
 name: Go
 on: [push, pull_request]
 env:
-  GO_VERSION: "1.21"
+  GO_VERSION: "1.22"
 jobs:
-
   build:
     name: Build
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repo
         uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
