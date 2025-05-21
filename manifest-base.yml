@@ -1,5 +1,6 @@
 ---
 buildpack: go_buildpack
+stack: cflinuxfs4
 memory: 128M
 services:
 - rds-cdn-broker
