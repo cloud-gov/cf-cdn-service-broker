@@ -14,10 +14,18 @@ meta:
     CF_SPACE: ((cf-space-production))
 
 jobs:
+- name: set-self
+  plan:
+    - get: broker-src
+      trigger: true
+    - set_pipeline: self
+      file: broker-src/ci/pipeline.yml
+
 - name: test-cdn-broker
   plan:
   - get: broker-src
     trigger: true
+    passed: [set-self]
   - task: run-tests
     file: broker-src/ci/run-tests.yml
 
@@ -26,7 +34,7 @@ jobs:
   - in_parallel:
     - get: broker-src
       passed: [test-cdn-broker]
-      trigger: true 
+      trigger: true
     - get: pipeline-tasks
   - task: create-db
     file: broker-src/ci/create-db.yml
@@ -67,15 +75,6 @@ jobs:
     params:
       text: |
         :x: FAILED to deploy cf-cdn-service-broker on "((cf-api-url-staging))"
-        <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
-      channel: ((slack-channel))
-      username: ((slack-username))
-      icon_url: ((slack-icon-url))
-  on_success:
-    put: slack
-    params:
-      text: |
-        :white_check_mark: Successfully deployed cf-cdn-service-broker on "((cf-api-url-staging))"
         <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
       channel: ((slack-channel))
       username: ((slack-username))
@@ -128,16 +127,7 @@ jobs:
       text: |
         :x: FAILED to deploy cf-cdn-service-broker on "((cf-api-url-production))"
         <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
-      channel: ((slack-channel))
-      username: ((slack-username))
-      icon_url: ((slack-icon-url))
-  on_success:
-    put: slack
-    params:
-      text: |
-        :white_check_mark: Successfully deployed cf-cdn-service-broker on "((cf-api-url-production))"
-        <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
-      channel: ((slack-channel))
+      channel: ((slack-failure-channel))
       username: ((slack-username))
       icon_url: ((slack-icon-url))
 
@@ -145,15 +135,15 @@ resources:
 - name: broker-src
   type: git
   source:
-    uri: ((cf-cdn-broker-git-url))
-    branch: ((cf-cdn-broker-git-branch))
+    uri: https://github.com/cloud-gov/cf-cdn-service-broker.git
+    branch: main
     commit_verification_keys: ((cloud-gov-pgp-keys))
 
 - name: pipeline-tasks
   type: git
   source:
-    uri: ((pipeline-tasks-git-url))
-    branch: ((pipeline-tasks-git-branch))
+    uri: https://github.com/cloud-gov/cg-pipeline-tasks
+    branch: main
     commit_verification_keys: ((cloud-gov-pgp-keys))
 
 - name: broker-deploy-staging
