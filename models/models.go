@@ -428,11 +428,11 @@ func (m *RouteManager) Disable(r *Route) error {
 		"instance-id": r.InstanceId,
 	})
 
-	err := m.cloudFront.Disable(r.DistId)
-	if err != nil {
-		lsession.Error("cloudfront-disable", err)
-		return err
-	}
+	// err := m.cloudFront.Disable(r.DistId)
+	// if err != nil {
+	// 	lsession.Error("cloudfront-disable", err)
+	// 	return err
+	// }
 
 	r.State = Deprovisioning
 	if err := m.db.Save(r).Error; err != nil {
@@ -739,17 +739,22 @@ func (m *RouteManager) updateProvisioning(r *Route) error {
 func (m *RouteManager) updateDeprovisioning(r *Route) error {
 	lsession := m.logger.Session("route-manager-update-deprovisioning")
 
-	deleted, err := m.cloudFront.Delete(r.DistId)
-	if err != nil {
-		lsession.Error("cloudfront-delete", err)
-		return err
-	}
+	// deleted, err := m.cloudFront.Delete(r.DistId)
+	// if err != nil {
+	// 	lsession.Error("cloudfront-delete", err)
+	// 	return err
+	// }
 
-	if deleted {
-		r.State = Deprovisioned
-		if err := m.db.Save(r).Error; err != nil {
-			lsession.Error("db-save-delete-state", err)
-		}
+	// if deleted {
+	// 	r.State = Deprovisioned
+	// 	if err := m.db.Save(r).Error; err != nil {
+	// 		lsession.Error("db-save-delete-state", err)
+	// 	}
+	// }
+
+	r.State = Deprovisioned
+	if err := m.db.Save(r).Error; err != nil {
+		lsession.Error("db-save-delete-state", err)
 	}
 
 	return nil

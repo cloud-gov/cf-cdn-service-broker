@@ -64,31 +64,31 @@ func TestDeleteOrphanedCerts(t *testing.T) {
 
 			list := []*iam.ServerCertificateMetadata{
 				&iam.ServerCertificateMetadata{
-					Arn: aws.String("an-active-certificate"),
+					Arn:                   aws.String("an-active-certificate"),
 					ServerCertificateName: aws.String("an-active-certificate"),
 					ServerCertificateId:   aws.String("an-active-certificate"),
 					UploadDate:            &old,
 				},
 				&iam.ServerCertificateMetadata{
-					Arn: aws.String("some-other-active-certificate"),
+					Arn:                   aws.String("some-other-active-certificate"),
 					ServerCertificateName: aws.String("some-other-active-certificate"),
 					ServerCertificateId:   aws.String("some-other-active-certificate"),
 					UploadDate:            &old,
 				},
 				&iam.ServerCertificateMetadata{
-					Arn: aws.String("orphaned-but-not-old-enough"),
+					Arn:                   aws.String("orphaned-but-not-old-enough"),
 					ServerCertificateName: aws.String("orphaned-but-not-old-enough"),
 					ServerCertificateId:   aws.String("this-cert-should-not-be-deleted"),
 					UploadDate:            &current,
 				},
 				&iam.ServerCertificateMetadata{
-					Arn: aws.String("some-orphaned-cert"),
+					Arn:                   aws.String("some-orphaned-cert"),
 					ServerCertificateName: aws.String("some-orphaned-cert"),
 					ServerCertificateId:   aws.String("this-cert-should-be-deleted"),
 					UploadDate:            &old,
 				},
 				&iam.ServerCertificateMetadata{
-					Arn: aws.String("some-other-orphaned-cert"),
+					Arn:                   aws.String("some-other-orphaned-cert"),
 					ServerCertificateName: aws.String("some-other-orphaned-cert"),
 					ServerCertificateId:   aws.String("this-cert-should-also-be-deleted"),
 					UploadDate:            &old,
@@ -104,9 +104,8 @@ func TestDeleteOrphanedCerts(t *testing.T) {
 	fakecf := cloudfront.New(session)
 	fakecf.Handlers.Clear()
 	fakecf.Handlers.Send.PushBack(func(r *request.Request) {
-		//t.Log(r.Operation.Name)
 		switch r.Operation.Name {
-		case "ListDistributions2017_03_25":
+		case "ListDistributions2020_05_31":
 			list := []*cloudfront.DistributionSummary{
 				&cloudfront.DistributionSummary{
 					ARN: aws.String("some-distribution"),
