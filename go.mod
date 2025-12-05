@@ -1,6 +1,6 @@
 module github.com/cloud-gov/cf-cdn-service-broker
 
-go 1.20
+go 1.25
 
 require (
 	code.cloudfoundry.org/lager v1.0.1-0.20180322215153-25ee72f227fe
