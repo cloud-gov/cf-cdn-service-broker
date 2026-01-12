@@ -151,7 +151,7 @@ func (b *CdnServiceBroker) LastOperation(
 		}, nil
 	case models.Failed:
 		return brokerapi.LastOperation{
-			State: brokerapi.Failed,
+			State:       brokerapi.Failed,
 			Description: "Failure while provisioning instance",
 		}, nil
 	default:
@@ -182,7 +182,7 @@ func (b *CdnServiceBroker) Deprovision(
 
 	err = b.manager.Disable(route)
 	if err != nil {
-		return brokerapi.DeprovisionServiceSpec{}, nil
+		return brokerapi.DeprovisionServiceSpec{}, err
 	}
 
 	return brokerapi.DeprovisionServiceSpec{IsAsync: true}, nil
